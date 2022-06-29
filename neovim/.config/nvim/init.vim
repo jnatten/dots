@@ -38,6 +38,7 @@ Plug 'kyazdani42/nvim-tree.lua'
 Plug 'easymotion/vim-easymotion'
 Plug 'doums/darcula'
 Plug 'terryma/vim-multiple-cursors'
+Plug 'f-person/git-blame.nvim'
 call plug#end()
 
 lua require('config')
