@@ -39,13 +39,33 @@ Plug 'easymotion/vim-easymotion'
 Plug 'doums/darcula'
 Plug 'terryma/vim-multiple-cursors'
 Plug 'f-person/git-blame.nvim'
+Plug 'tpope/vim-fugitive'
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+
+" ->  nvim-cmp
+Plug 'hrsh7th/cmp-nvim-lsp'
+Plug 'hrsh7th/cmp-buffer'
+Plug 'hrsh7th/cmp-path'
+Plug 'hrsh7th/cmp-cmdline'
+Plug 'hrsh7th/nvim-cmp'
+Plug 'hrsh7th/cmp-vsnip'
+Plug 'hrsh7th/vim-vsnip'
+Plug 'hrsh7th/vim-vsnip-integ'
+" -> nvim-cmp done
+
+
 call plug#end()
+
+set completeopt=menu,menuone,noselect
+
+let g:gitblame_enabled = 0 " Disable inline git-blaming on startup
 
 lua require('config')
 lua require('typescript')
 lua require('python')
 lua require('barbar')
 lua require('rust')
+lua require('autocomplete')
 
 " nnoremap <Tab> :bnext<CR>
 " nnoremap <S-Tab> :bprevious<CR>
