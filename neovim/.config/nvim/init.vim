@@ -7,7 +7,7 @@ imap jj <Esc>
 map <C-j> 5j
 map <C-k> 5k
 
-set clipboard=unnamed
+set clipboard=unnamedplus
 
 set hlsearch
 map <silent> <C-l> :noh<CR>
