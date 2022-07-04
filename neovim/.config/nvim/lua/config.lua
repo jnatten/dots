@@ -37,6 +37,7 @@ packer.startup(function()
   use "jose-elias-alvarez/nvim-lsp-ts-utils"
   use { "briones-gabriel/darcula-solid.nvim", requires = "rktjmp/lush.nvim" }
   use "EdenEast/nightfox.nvim"
+  use { 'nvim-telescope/telescope.nvim', requires = { {'nvim-lua/plenary.nvim'} } }
   end
 )
 
