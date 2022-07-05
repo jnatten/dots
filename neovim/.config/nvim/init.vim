@@ -18,6 +18,7 @@ map <silent> <C-l> :noh<CR>
 map <F1> :NvimTreeToggle<CR>
 map <leader>t :NvimTreeToggle<CR>
 map <leader>l :GFiles<CR>
+map <leader>p :Telescope<CR>
 map <A-l> :Files<CR>
 map <C-p> :Commands<CR>
 map <C-y> :Rg 

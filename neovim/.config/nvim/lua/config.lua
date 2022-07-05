@@ -38,6 +38,8 @@ packer.startup(function()
   use { "briones-gabriel/darcula-solid.nvim", requires = "rktjmp/lush.nvim" }
   use "EdenEast/nightfox.nvim"
   use { 'nvim-telescope/telescope.nvim', requires = { {'nvim-lua/plenary.nvim'} } }
+  use { 'nvim-telescope/telescope-dap.nvim' }
+  use 'mfussenegger/nvim-dap'
   end
 )
 
@@ -192,3 +194,5 @@ require("nvim-tree").setup({
     }
   }
 })
+
+require('telescope').load_extension('dap')
