@@ -33,12 +33,6 @@ nnoremap <C-A-Right> <C-i>
 set shortmess-=F
 
 call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
-Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }                                                       " Fzf search
-Plug 'junegunn/fzf.vim'                                                                                   " Fzf search
-
-Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}                                               " Better syntax highlighting
-
-
 
 call plug#end()
 
