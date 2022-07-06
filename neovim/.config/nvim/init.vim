@@ -22,7 +22,7 @@ map <leader>p :Telescope<CR>
 map <A-l> :Files<CR>
 map <C-p> :Commands<CR>
 map <C-y> :Rg 
-nmap gx :bd<CR>
+map <A-w> :bd<CR>
 
 nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
@@ -33,31 +33,10 @@ nnoremap <C-A-Right> <C-i>
 set shortmess-=F
 
 call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
-Plug 'tpope/vim-sensible'                                                                                 " 'Sensible' defaults, not really sure if i use this
-Plug 'junegunn/seoul256.vim'                                                                              " Theme
-Plug 'preservim/nerdtree'                                                                                 " Worse filetree
-Plug 'tpope/vim-surround'                                                                                 " Surround
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }                                                       " Fzf search
 Plug 'junegunn/fzf.vim'                                                                                   " Fzf search
-Plug 'kyazdani42/nvim-web-devicons'                                                                       " FileTree icons
-Plug 'kyazdani42/nvim-tree.lua'                                                                           " FileTree
-Plug 'easymotion/vim-easymotion'                                                                          " Jump around
-Plug 'doums/darcula'                                                                                      " Theme
-Plug 'terryma/vim-multiple-cursors'                                                                       " Sublime-style multi-cursors
-Plug 'f-person/git-blame.nvim'                                                                            " Inline git-blame
-Plug 'tpope/vim-fugitive'                                                                                 " Git commands
-Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}                                               " Better syntax highlighting
 
-" ->  nvim-cmp
-Plug 'hrsh7th/cmp-nvim-lsp'
-Plug 'hrsh7th/cmp-buffer'
-Plug 'hrsh7th/cmp-path'
-Plug 'hrsh7th/cmp-cmdline'
-Plug 'hrsh7th/nvim-cmp'
-Plug 'hrsh7th/cmp-vsnip'
-Plug 'hrsh7th/vim-vsnip'
-Plug 'hrsh7th/vim-vsnip-integ'
-" -> nvim-cmp done
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}                                               " Better syntax highlighting
 
 
 

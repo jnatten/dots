@@ -32,6 +32,9 @@ packer.startup(function()
   use { 'nvim-telescope/telescope.nvim', requires = { {'nvim-lua/plenary.nvim'} } }
   use { 'nvim-telescope/telescope-dap.nvim' }
   use 'mfussenegger/nvim-dap'
+  use {'nvim-telescope/telescope-ui-select.nvim' }
+  use 'simrat39/rust-tools.nvim'
+  use 'nvim-lua/plenary.nvim'
   use {
     "folke/trouble.nvim",
     requires = "kyazdani42/nvim-web-devicons",
@@ -39,6 +42,28 @@ packer.startup(function()
       require("trouble").setup {}
     end
   }
+  use 'tpope/vim-sensible'                                                                                 -- 'Sensible' defaults, not really sure if i use this
+  use 'junegunn/seoul256.vim'                                                                              -- Theme
+  use 'preservim/nerdtree'                                                                                 -- Worse filetree
+  use 'tpope/vim-surround'                                                                                 -- Surround
+  use 'kyazdani42/nvim-web-devicons'                                                                       -- FileTree icons
+  use 'kyazdani42/nvim-tree.lua'                                                                           -- FileTree
+  use 'easymotion/vim-easymotion'                                                                          -- Jump around
+  use 'doums/darcula'                                                                                      -- Theme
+  use 'terryma/vim-multiple-cursors'                                                                       -- Sublime-style multi-cursors
+  use 'f-person/git-blame.nvim'                                                                            -- Inline git-blame
+  use 'tpope/vim-fugitive'                                                                                 -- Git commands
+
+  -- ->  nvim-cmp
+  use 'hrsh7th/cmp-nvim-lsp'
+  use 'hrsh7th/cmp-buffer'
+  use 'hrsh7th/cmp-path'
+  use 'hrsh7th/cmp-cmdline'
+  use 'hrsh7th/nvim-cmp'
+  use 'hrsh7th/cmp-vsnip'
+  use 'hrsh7th/vim-vsnip'
+  use 'hrsh7th/vim-vsnip-integ'
+  -- -> nvim-cmp done
   end
 )
 
