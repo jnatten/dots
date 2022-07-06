@@ -22,6 +22,8 @@ map <leader>p :Telescope<CR>
 map <A-l> :Files<CR>
 map <C-p> :Commands<CR>
 map <C-y> :Rg 
+nmap gx :bd<CR>
+
 nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
 nnoremap <C-A-Left> <C-o>
@@ -66,6 +68,9 @@ set completeopt=menu,menuone,noselect
 let g:gitblame_enabled = 0 " Disable inline git-blaming on startup
 
 lua require('config')
+lua require('lsp-cfg')
+lua require('nvim-tree-cfg')
+lua require('telescope-cfg')
 lua require('typescript')
 lua require('python')
 lua require('barbar')
