@@ -44,6 +44,7 @@ let g:gitblame_enabled = 0 " Disable inline git-blaming on startup
 
 lua require('config')
 lua require('lsp-cfg')
+lua require('treesitter-cfg')
 lua require('nvim-tree-cfg')
 lua require('telescope-cfg')
 lua require('typescript')
