@@ -22,7 +22,14 @@ $ stow neovim --target ~
 
 The neovim config has some dependencies:
 
-https://github.com/pappasam/jedi-language-server
-https://rust-analyzer.github.io/manual.html#installation
+- https://github.com/pappasam/jedi-language-server
+- https://rust-analyzer.github.io/manual.html#installation
+
 `npm install -g typescript typescript-language-server eslint prettier`
+
+```
+pipx install python-lsp-server
+pipx install pylsp-myp
+pipx inject python-lsp-server pylsp-mypy
+```
 
