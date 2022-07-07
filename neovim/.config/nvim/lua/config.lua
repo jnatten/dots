@@ -69,6 +69,8 @@ packer.startup(function()
   -- -> nvim-cmp done
 
   use 'airblade/vim-gitgutter'
+
+  use 'lukas-reineke/indent-blankline.nvim'
   end
 )
 

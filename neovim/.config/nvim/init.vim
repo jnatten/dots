@@ -34,6 +34,8 @@ set shortmess-=F
 
 call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
 
+" Plug 'github/name'
+
 call plug#end()
 
 set completeopt=menu,menuone,noselect
@@ -49,6 +51,7 @@ lua require('python')
 lua require('barbar')
 lua require('rust')
 lua require('autocomplete')
+lua require('indent-blankline-cfg')
 
 " nnoremap <Tab> :bnext<CR>
 " nnoremap <S-Tab> :bprevious<CR>
