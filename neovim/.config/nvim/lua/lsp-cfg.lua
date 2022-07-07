@@ -10,13 +10,21 @@ end
 
 
 -- LSP mappings
-map("n", "gd", "<cmd>lua vim.lsp.buf.definition()<CR>")
+-- These have <leader> prefix because they could be replaced by Telescope stuff
+map("n", "<leader>gd", "<cmd>lua vim.lsp.buf.definition()<CR>")
+map("n", "<leader>gi", "<cmd>lua vim.lsp.buf.implementation()<CR>")
+map("n", "<leader>gr", "<cmd>lua vim.lsp.buf.references()<CR>")
+map("n", "<leader>gds", "<cmd>lua vim.lsp.buf.document_symbol()<CR>")
+map("n", "<leader>gws", "<cmd>lua vim.lsp.buf.workspace_symbol()<CR>")
+--
+map("n", "gd", "<cmd>Telescope lsp_definitions<CR>")
+map("n", "gi", "<cmd>Telescope lsp_implementations<CR>")
+map("n", "gr", "<cmd>Telescope lsp_references<CR>")
+map("n", "gds", "<cmd>Telescope lsp_document_symbols<CR>")
+map("n", "gws", "<cmd>Telescope lsp_workspace_symbols<CR>")
+--
 map("n", "gD", "<cmd>lua vim.lsp.buf.declaration()<CR>")
 map("n", "K", "<cmd>lua vim.lsp.buf.hover()<CR>")
-map("n", "gi", "<cmd>lua vim.lsp.buf.implementation()<CR>")
-map("n", "gr", "<cmd>lua vim.lsp.buf.references()<CR>")
-map("n", "gds", "<cmd>lua vim.lsp.buf.document_symbol()<CR>")
-map("n", "gws", "<cmd>lua vim.lsp.buf.workspace_symbol()<CR>")
 map("n", "<leader>cl", [[<cmd>lua vim.lsp.codelens.run()<CR>]])
 map("n", "<leader>sh", [[<cmd>lua vim.lsp.buf.signature_help()<CR>]])
 map("n", "<leader>rn", "<cmd>lua vim.lsp.buf.rename()<CR>")
