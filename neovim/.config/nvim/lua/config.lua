@@ -67,6 +67,8 @@ packer.startup(function()
   use 'hrsh7th/vim-vsnip'
   use 'hrsh7th/vim-vsnip-integ'
   -- -> nvim-cmp done
+
+  use 'airblade/vim-gitgutter'
   end
 )
 

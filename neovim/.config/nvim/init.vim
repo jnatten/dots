@@ -61,3 +61,4 @@ colorscheme nightfox
 set termguicolors
 let g:lightline = { 'colorscheme': 'darcula' }
 
+set updatetime=250 " git gutter update time
