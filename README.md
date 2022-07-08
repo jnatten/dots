@@ -29,7 +29,7 @@ The neovim config has some dependencies:
 
 ```
 pipx install python-lsp-server
-pipx install pylsp-myp
+pipx install pylsp-mypy
 pipx inject python-lsp-server pylsp-mypy
 ```
 
