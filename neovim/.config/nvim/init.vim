@@ -29,6 +29,11 @@ nnoremap <S-A-f> :Rg <C-R><C-W>
 vnoremap <A-f> "ay:Rg <C-r>a<CR>
 vnoremap <S-A-f> "ay:Rg <C-r>a
 
+nnoremap <leader>f :Rg <C-R><C-W><CR>
+nnoremap <leader>F :Rg <C-R><C-W>
+vnoremap <leader>f "ay:Rg <C-r>a<CR>
+vnoremap <leader>F "ay:Rg <C-r>a
+
 nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
 nnoremap <C-A-Left> <C-o>
