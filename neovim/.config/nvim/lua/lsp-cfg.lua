@@ -8,6 +8,9 @@ local function map(mode, lhs, rhs, opts)
   api.nvim_set_keymap(mode, lhs, rhs, options)
 end
 
+-- autoformat on save:
+vim.cmd [[autocmd BufWritePre * lua vim.lsp.buf.formatting_sync()]]
+
 
 -- LSP mappings
 -- These have <leader> prefix because they could be replaced by Telescope stuff
