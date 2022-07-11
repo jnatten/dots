@@ -17,22 +17,22 @@ map <silent> <C-l> :noh<CR>
 
 map <F1> :NvimTreeToggle<CR>
 map <leader>t :NvimTreeToggle<CR>
-map <leader>l :GFiles<CR>
+map <leader>l :GFiles!<CR>
 map <leader>p :Telescope<CR>
 map <leader>ø :Telescope find_files<CR>
-map <A-l> :Files<CR>
-map <C-p> :Commands<CR>
+map <A-l> :Files!<CR>
+map <C-p> :Commands!<CR>
 map <A-w> :bd<CR>
 
-nnoremap <A-f> :Rg <C-R><C-W><CR>
-nnoremap <S-A-f> :Rg <C-R><C-W>
-vnoremap <A-f> "ay:Rg <C-r>a<CR>
-vnoremap <S-A-f> "ay:Rg <C-r>a
+nnoremap <A-f> :Rg! <C-R><C-W><CR>
+nnoremap <S-A-f> :Rg! <C-R><C-W>
+vnoremap <A-f> "ay:Rg! <C-r>a<CR>
+vnoremap <S-A-f> "ay:Rg! <C-r>a
 
-nnoremap <leader>f :Rg <C-R><C-W><CR>
-nnoremap <leader>F :Rg <C-R><C-W>
-vnoremap <leader>f "ay:Rg <C-r>a<CR>
-vnoremap <leader>F "ay:Rg <C-r>a
+nnoremap <leader>f :Rg! <C-R><C-W><CR>
+nnoremap <leader>F :Rg! <C-R><C-W>
+vnoremap <leader>f "ay:Rg! <C-r>a<CR>
+vnoremap <leader>F "ay:Rg! <C-r>a
 
 nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
