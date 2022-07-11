@@ -22,8 +22,12 @@ map <leader>p :Telescope<CR>
 map <leader>ø :Telescope find_files<CR>
 map <A-l> :Files<CR>
 map <C-p> :Commands<CR>
-map <C-y> :Rg 
 map <A-w> :bd<CR>
+
+nnoremap <A-f> :Rg <C-R><C-W><CR>
+nnoremap <S-A-f> :Rg <C-R><C-W>
+vnoremap <A-f> "ay:Rg <C-r>a<CR>
+vnoremap <S-A-f> "ay:Rg <C-r>a
 
 nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
