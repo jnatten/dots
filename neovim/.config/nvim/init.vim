@@ -29,10 +29,11 @@ nnoremap <S-A-f> :Rg! <C-R><C-W>
 vnoremap <A-f> "ay:Rg! <C-r>a<CR>
 vnoremap <S-A-f> "ay:Rg! <C-r>a
 
-nnoremap <leader>f :Rg! <C-R><C-W><CR>
-nnoremap <leader>F :Rg! <C-R><C-W>
-vnoremap <leader>f "ay:Rg! <C-r>a<CR>
-vnoremap <leader>F "ay:Rg! <C-r>a
+nnoremap <leader>f :FzfLua grep<CR><C-R><C-W><CR>
+nnoremap <leader>F :FzfLua grep<CR><C-R><C-W>
+vnoremap <leader>f "ay:FzfLua grep<CR><C-r>a<CR>
+vnoremap <leader>F "ay:FzfLua grep<CR><C-r>a
+nnoremap <leader><leader>f :FzfLua live_grep<CR>
 
 nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
@@ -63,6 +64,7 @@ lua require('barbar')
 lua require('rust')
 lua require('autocomplete')
 lua require('indent-blankline-cfg')
+lua require('fzf-lua-cfg')
 
 " nnoremap <Tab> :bnext<CR>
 " nnoremap <S-Tab> :bprevious<CR>

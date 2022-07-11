@@ -71,6 +71,7 @@ packer.startup(function()
   use 'airblade/vim-gitgutter'
 
   use 'lukas-reineke/indent-blankline.nvim'
+  use { 'ibhagwan/fzf-lua', requires = { 'kyazdani42/nvim-web-devicons' } }
   end
 )
 
