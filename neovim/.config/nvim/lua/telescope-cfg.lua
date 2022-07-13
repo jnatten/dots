@@ -1,5 +1,11 @@
 require('telescope').load_extension('dap')
 require("telescope").setup {
+  defaults = {
+    layout_config = {
+	width = 0.999999999,
+	height = 0.999999999
+    }
+  },
   extensions = {
     ["ui-select"] = {
       require("telescope.themes").get_dropdown {
