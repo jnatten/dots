@@ -13,10 +13,7 @@ Example to install neovim
 $ stow neovim --target ~
 ```
 
-
-
 ## Dependencies
-
 
 ### neovim
 
@@ -25,11 +22,10 @@ The neovim config has some dependencies:
 - https://github.com/pappasam/jedi-language-server
 - https://rust-analyzer.github.io/manual.html#installation
 
-`npm install -g typescript typescript-language-server eslint prettier`
+`npm install -g typescript typescript-language-server eslint prettier @fsouza/prettierd`
 
 ```
 pipx install python-lsp-server
 pipx install pylsp-mypy
 pipx inject python-lsp-server pylsp-mypy
 ```
-
