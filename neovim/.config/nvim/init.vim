@@ -23,6 +23,7 @@ map <leader>ø :Telescope find_files<CR>
 map <A-l> :Files!<CR>
 map <C-p> :Commands!<CR>
 map <A-w> :bd<CR>
+map <leader>s :ClangdSwitchSourceHeader<CR>
 
 nnoremap <A-f> :Rg! <C-R><C-W><CR>
 nnoremap <S-A-f> :Rg! <C-R><C-W>
@@ -65,6 +66,7 @@ lua require('rust')
 lua require('autocomplete')
 lua require('indent-blankline-cfg')
 lua require('fzf-lua-cfg')
+lua require('clangd-cfg')
 
 " nnoremap <Tab> :bnext<CR>
 " nnoremap <S-Tab> :bprevious<CR>
