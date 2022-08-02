@@ -12,6 +12,8 @@ imap <C-k> <Up>
 
 set clipboard=unnamedplus
 
+set nowrap
+
 set hlsearch
 map <silent> <C-l> :noh<CR>
 
