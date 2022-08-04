@@ -37,6 +37,7 @@ nnoremap <leader>F :FzfLua grep<CR><C-R><C-W>
 vnoremap <leader>f "ay:FzfLua grep<CR><C-r>a<CR>
 vnoremap <leader>F "ay:FzfLua grep<CR><C-r>a
 nnoremap <leader><leader>f :FzfLua live_grep<CR>
+nnoremap <leader>r :FzfLua grep_last<CR>
 
 nnoremap <leader>T :TroubleToggle<CR>
 
