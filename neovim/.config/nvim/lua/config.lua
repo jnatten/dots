@@ -45,6 +45,7 @@ packer.startup(function()
   use 'junegunn/seoul256.vim'                                                                              -- Theme
   use 'preservim/nerdtree'                                                                                 -- Worse filetree
   use 'tpope/vim-surround'                                                                                 -- Surround
+  use 'tpope/vim-commentary'
   use 'kyazdani42/nvim-web-devicons'                                                                       -- FileTree icons
   use 'kyazdani42/nvim-tree.lua'                                                                           -- FileTree
   use 'easymotion/vim-easymotion'                                                                          -- Jump around
