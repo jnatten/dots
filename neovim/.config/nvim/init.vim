@@ -12,6 +12,9 @@ imap <C-k> <Up>
 
 set clipboard=unnamedplus
 
+set ignorecase
+set smartcase
+
 set nowrap
 
 set hlsearch
