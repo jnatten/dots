@@ -53,6 +53,7 @@ packer.startup(function()
   use 'terryma/vim-multiple-cursors'                                                                       -- Sublime-style multi-cursors
   use 'f-person/git-blame.nvim'                                                                            -- Inline git-blame
   use 'tpope/vim-fugitive'                                                                                 -- Git commands
+  use 'tpope/vim-sleuth'
   use { 'nvim-treesitter/nvim-treesitter', run = ":TSUpdate" }
 
   use { 'junegunn/fzf', run = ":call fzf#install()" }
