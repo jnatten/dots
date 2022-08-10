@@ -41,12 +41,6 @@ packer.startup(function()
       require("trouble").setup {}
     end
   }
-  use({
-    "olimorris/onedarkpro.nvim",
-    config = function()
-      require("onedarkpro").setup()
-    end
-  })
   use 'tpope/vim-sensible'                                                                                 -- 'Sensible' defaults, not really sure if i use this
   use 'junegunn/seoul256.vim'                                                                              -- Theme
   use 'preservim/nerdtree'                                                                                 -- Worse filetree

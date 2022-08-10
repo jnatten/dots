@@ -74,8 +74,7 @@ nnoremap <silent> <Tab> <Cmd>BufferNext<CR>
 nnoremap <silent> <A-l> <Cmd>BufferNext<CR>
 nnoremap <silent> <A-h> <Cmd>BufferPrevious<CR>
 
-" colorscheme nightfox
-colorscheme onedarkpro
+colorscheme nightfox
 set termguicolors
 let g:lightline = { 'colorscheme': 'darcula' }
 
