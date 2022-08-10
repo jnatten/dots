@@ -75,6 +75,7 @@ packer.startup(function()
   use 'lukas-reineke/indent-blankline.nvim'
   use { 'ibhagwan/fzf-lua', requires = { 'kyazdani42/nvim-web-devicons' } }
   use '907th/vim-auto-save'
+  use 'andymass/vim-matchup'
   end
 )
 

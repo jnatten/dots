@@ -1,3 +1,4 @@
+let g:loaded_matchit = 1
 syntax on
 let mapleader=","
 set nu
