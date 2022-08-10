@@ -48,15 +48,8 @@ nnoremap <C-Left> <C-o>
 nnoremap <C-Right> <C-i>
 nnoremap <C-A-Left> <C-o>
 nnoremap <C-A-Right> <C-i>
-" map <S-p> :Commands<CR>
 
 set shortmess-=F
-
-call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
-
-" Plug 'github/name'
-
-call plug#end()
 
 set completeopt=menu,menuone,noselect
 
@@ -76,14 +69,13 @@ lua require('indent-blankline-cfg')
 lua require('fzf-lua-cfg')
 lua require('clangd-cfg')
 
-" nnoremap <Tab> :bnext<CR>
-" nnoremap <S-Tab> :bprevious<CR>
 nnoremap <silent> <S-Tab> <Cmd>BufferPrevious<CR>
 nnoremap <silent> <Tab> <Cmd>BufferNext<CR>
 nnoremap <silent> <A-l> <Cmd>BufferNext<CR>
 nnoremap <silent> <A-h> <Cmd>BufferPrevious<CR>
 
-colorscheme nightfox
+" colorscheme nightfox
+colorscheme onedarkpro
 set termguicolors
 let g:lightline = { 'colorscheme': 'darcula' }
 
