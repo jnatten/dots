@@ -57,4 +57,4 @@ source ~/.zoxiderc
 # Created by `pipx` on 2022-08-03 07:25:25
 export PATH="$PATH:/home/jonas/.local/bin"
 eval "$(register-python-argcomplete pipx)"  
-
+eval "$(starship init zsh)"
