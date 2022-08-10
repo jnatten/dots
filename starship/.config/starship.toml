@@ -111,6 +111,7 @@ disabled = true
 format = '\[[$symbol($profile)(\($region\))(\[$duration\])]($style)\]'
 
 [c]
+disabled = true
 format = '\[[$symbol($version(-$name))]($style)\]'
 
 [cmake]
