@@ -29,3 +29,7 @@ pipx install python-lsp-server
 pipx install pylsp-mypy
 pipx inject python-lsp-server pylsp-mypy
 ```
+
+### zsh
+
+The .zshrc config is using [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh/)
