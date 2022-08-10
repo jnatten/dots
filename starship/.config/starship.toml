@@ -192,6 +192,7 @@ disabled = true
 format = '\[[$symbol$context( \($namespace\))]($style)\]'
 
 [lua]
+disabled = true
 format = '\[[$symbol($version)]($style)\]'
 
 [memory_usage]
