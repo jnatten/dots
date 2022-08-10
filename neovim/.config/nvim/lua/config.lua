@@ -76,6 +76,7 @@ packer.startup(function()
   use { 'ibhagwan/fzf-lua', requires = { 'kyazdani42/nvim-web-devicons' } }
   use '907th/vim-auto-save'
   use 'andymass/vim-matchup'
+  use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
   end
 )
 
