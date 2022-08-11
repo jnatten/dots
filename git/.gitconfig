@@ -3,7 +3,7 @@
     name = Jonas Natten
     signingkey = 76A7F1335EEF86E1A1FC8B41A954425D0B186FE5
 [core]
-    editor = vim
+    editor = nvim
     commentChar = ";"
     # pager = "diff-so-fancy | less --tabs=4 -RFX"
     # pager = delta
