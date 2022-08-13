@@ -1,7 +1,7 @@
 # Custom configuration that is specific to THIS system
 source ~/.zshcustom
 
-if [[ "$TMUX" = "" && -t 1 ]]; then 
+if [[ "$TMUX" = "" && -t 1 && "$DISABLE_AUTO_TMUX" = "" ]]; then 
 	case $(tty) in 
 	  (/dev/tty[1-9]) ;;
 		      (*) tmux;;
