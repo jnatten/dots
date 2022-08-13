@@ -1,3 +1,6 @@
+# Custom configuration that is specific to THIS system
+source ~/.zshcustom
+
 if [[ "$TMUX" = "" && -t 1 ]]; then 
 	case $(tty) in 
 	  (/dev/tty[1-9]) ;;
@@ -58,3 +61,12 @@ source ~/.zoxiderc
 export PATH="$PATH:/home/jonas/.local/bin"
 eval "$(register-python-argcomplete pipx)"  
 eval "$(starship init zsh)"
+
+function bwcopy() {
+  if [[ -z "$BW_SESSION" ]]; then
+    export BW_SESSION=$(bw unlock --passwordfile ~/.bw --raw)
+  fi
+  if hash bw 2>/dev/null; then
+    bw get item "$(bw list items | jq '.[] | "\(.name) | username: \(.login.username) | id: \(.id)" ' | fzf-tmux | awk '{print $(NF -0)}' | sed 's/\"//g')" | jq '.login.password' | sed 's/\"//g' | pbcopy
+  fi
+}
