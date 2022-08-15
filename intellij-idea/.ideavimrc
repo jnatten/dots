@@ -15,7 +15,7 @@ map <silent> <C-l> :noh<CR>
 nnoremap <silent> <Tab> :bnext<CR>
 nnoremap <silent> <S-Tab> :bprevious<CR>
 
-map <A-w> :bd
+map <A-w> :bd<CR>
 
 imap jj <Esc>
 
