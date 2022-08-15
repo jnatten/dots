@@ -36,7 +36,6 @@ source $ZSH/oh-my-zsh.sh
 export PATH=$PATH:~/.bin
 export PATH=$PATH:~/.rd/bin
 export PATH=$PATH:~/dev/blackbox/bin
-source ~/.zsh_ndla
 
 alias confignvim='$EDITOR ~/.config/nvim/init.vim'
 
@@ -70,3 +69,20 @@ function bwcopy() {
     bw get item "$(bw list items | jq '.[] | "\(.name) | username: \(.login.username) | id: \(.id)" ' | fzf-tmux | awk '{print $(NF -0)}' | sed 's/\"//g')" | jq '.login.password' | sed 's/\"//g' | pbcopy
   fi
 }
+
+function supervim() {
+  WHERE=$1
+  COMP_PATH=$(readlink -f $WHERE)
+  NAME=$(basename $COMP_PATH)
+
+  tmux neww -n $NAME
+  tmux send-keys -t $NAME cd Space $COMP_PATH Enter
+  tmux send-keys -t $NAME vim Enter
+  tmux split -t $NAME -l 10
+  tmux send-keys -t $NAME cd Space $COMP_PATH Enter
+  tmux select-pane -t $NAME -D
+
+
+}
+
+source ~/.zsh_ndla
