@@ -4,3 +4,6 @@
 /project/metals.sbt
 /project/project/
 .env
+.vscode/
+*.sc
+/gitignored/
