@@ -7,3 +7,4 @@
 .vscode/
 *.sc
 /gitignored/
+*.iml
