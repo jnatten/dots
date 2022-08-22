@@ -31,7 +31,8 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
-# . /usr/local/opt/asdf/libexec/asdf.sh
+. ~/.asdf/asdf.sh
+. ~/.asdf/plugins/java/set-java-home.zsh
 
 export PATH=$PATH:~/.bin
 export PATH=$PATH:~/.rd/bin
