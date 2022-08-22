@@ -41,6 +41,10 @@ packer.startup(function()
       require("trouble").setup {}
     end
   }
+  use {
+    "folke/todo-comments.nvim",
+    requires = "nvim-lua/plenary.nvim",
+  }
   use 'tpope/vim-sensible'                                                                                 -- 'Sensible' defaults, not really sure if i use this
   use 'junegunn/seoul256.vim'                                                                              -- Theme
   use 'preservim/nerdtree'                                                                                 -- Worse filetree

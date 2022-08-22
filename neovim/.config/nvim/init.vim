@@ -69,6 +69,7 @@ lua require('autocomplete')
 lua require('indent-blankline-cfg')
 lua require('fzf-lua-cfg')
 lua require('clangd-cfg')
+lua require('todo-cfg')
 
 nnoremap <silent> <S-Tab> <Cmd>BufferPrevious<CR>
 nnoremap <silent> <Tab> <Cmd>BufferNext<CR>
