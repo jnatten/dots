@@ -27,6 +27,7 @@ plugins=(
 	zsh-autosuggestions
 	web-search
 	yarn
+	docker
 )
 
 source $ZSH/oh-my-zsh.sh
