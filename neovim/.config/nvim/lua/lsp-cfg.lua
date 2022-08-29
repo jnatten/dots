@@ -9,7 +9,7 @@ local function map(mode, lhs, rhs, opts)
 end
 
 -- autoformat on save:
-vim.cmd [[autocmd BufWritePre * lua vim.lsp.buf.formatting_sync()]]
+-- vim.cmd [[autocmd BufWritePre * lua vim.lsp.buf.formatting_sync()]]
 
 
 -- LSP mappings
