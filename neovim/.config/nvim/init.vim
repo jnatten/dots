@@ -70,6 +70,7 @@ lua require('indent-blankline-cfg')
 lua require('fzf-lua-cfg')
 lua require('clangd-cfg')
 lua require('todo-cfg')
+lua require('gitsigns-cfg')
 
 nnoremap <silent> <S-Tab> <Cmd>BufferPrevious<CR>
 nnoremap <silent> <Tab> <Cmd>BufferNext<CR>
@@ -80,5 +81,4 @@ colorscheme nightfox
 set termguicolors
 let g:lightline = { 'colorscheme': 'darcula' }
 
-set updatetime=250 " git gutter update time
 let g:auto_save = 1

@@ -74,7 +74,7 @@ packer.startup(function()
   use 'hrsh7th/vim-vsnip-integ'
   -- -> nvim-cmp done
 
-  use 'airblade/vim-gitgutter'
+  use 'lewis6991/gitsigns.nvim'
 
   use 'lukas-reineke/indent-blankline.nvim'
   use { 'ibhagwan/fzf-lua', requires = { 'kyazdani42/nvim-web-devicons' } }
