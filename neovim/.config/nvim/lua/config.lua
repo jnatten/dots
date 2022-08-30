@@ -81,6 +81,14 @@ packer.startup(function()
   use '907th/vim-auto-save'
   use 'andymass/vim-matchup'
   use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
+
+  use {
+    'TimUntersberger/neogit',
+    requires = 'nvim-lua/plenary.nvim',
+    config = function()
+      require("neogit").setup {}
+    end
+  }
   end
 )
 
