@@ -90,6 +90,12 @@ format = '\[[$symbol($output)]($style)\]'
 when = """ true """
 style = "bold green"
 
+[custom.colima]
+command = """echo 🐋"""
+format = '\[[$symbol($output)]($style)\]'
+when = """test -e ~/.colima/docker.sock"""
+style = "bold green"
+
 [line_break]
 disabled = true
 
