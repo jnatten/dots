@@ -18,6 +18,8 @@ set smartcase
 
 set nowrap
 
+set laststatus=0 ruler
+
 set hlsearch
 map <silent> <C-l> :noh<CR>
 
