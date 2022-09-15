@@ -54,7 +54,7 @@ packer.startup(function()
   use 'kyazdani42/nvim-tree.lua'                                                                           -- FileTree
   use 'easymotion/vim-easymotion'                                                                          -- Jump around
   use 'doums/darcula'                                                                                      -- Theme
-  use 'terryma/vim-multiple-cursors'                                                                       -- Sublime-style multi-cursors
+  use 'mg979/vim-visual-multi'
   use 'f-person/git-blame.nvim'                                                                            -- Inline git-blame
   use 'tpope/vim-fugitive'                                                                                 -- Git commands
   use 'tpope/vim-sleuth'
