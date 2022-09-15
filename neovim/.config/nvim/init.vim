@@ -84,3 +84,5 @@ set termguicolors
 let g:lightline = { 'colorscheme': 'darcula' }
 
 let g:auto_save = 1
+
+set mouse=a
