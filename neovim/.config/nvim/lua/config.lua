@@ -19,6 +19,7 @@ packer.init({
 --- startup and add configure plugins
 packer.startup(function()
   local use = use
+  use 'wbthomason/packer.nvim'
   use { 'romgrk/barbar.nvim', requires = {'kyazdani42/nvim-web-devicons'} }
   use 'neovim/nvim-lspconfig'
   use 'nvim-lua/completion-nvim'
