@@ -33,6 +33,8 @@ map <C-p> :Commands!<CR>
 map <A-w> :bd<CR>
 map <leader>s :ClangdSwitchSourceHeader<CR>
 
+nnoremap <silent> <space> /
+
 nnoremap <A-f> :Rg! <C-R><C-W><CR>
 nnoremap <S-A-f> :Rg! <C-R><C-W>
 vnoremap <A-f> "ay:Rg! <C-r>a<CR>
