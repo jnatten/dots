@@ -96,4 +96,5 @@ packer.startup(function()
 
 -- global
 vim.opt_global.completeopt = { "menuone", "noinsert", "noselect" }
-vim.opt_global.shortmess:remove("F"):append("c")
+-- vim.opt_global.shortmess:remove("F"):append("c")
+
