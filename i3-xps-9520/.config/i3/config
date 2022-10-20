@@ -220,7 +220,8 @@ bindsym --release Control+Print exec --no-startup-id /opt/copyshot/copyshot.py -
 bindsym --release Print exec --no-startup-id /opt/copyshot/copyshot.py
 bindsym --release Shift+Print exec --no-startup-id /opt/copyshot/copyshot.py -s
 bindsym --release Control+Shift+Print exec --no-startup-id /opt/copyshot/copyshot.py -s -a
-bindsym $mod+Shift+Return exec --no-startup-id /usr/bin/google-chrome-stable
+# bindsym $mod+Shift+Return exec --no-startup-id /usr/bin/google-chrome-stable
+bindsym $mod+Shift+Return exec --no-startup-id /usr/bin/firefox
 
 # Colors
 client.focused #222222 #000000 #FFFFFF #000000 
