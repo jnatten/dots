@@ -205,7 +205,7 @@ exec --no-startup-id xss-lock ~/.bin/lock.sh
 bindsym $mod+b exec --no-startup-id /usr/bin/rofi -show window
 bindsym $mod+d exec --no-startup-id /usr/bin/rofi -show drun
 bindsym $mod+Shift+d exec --no-startup-id /usr/bin/rofi -show ssh
-bindsym $mod+p exec --no-startup-id bwmenu --auto-lock 28800
+bindsym $mod+p exec --no-startup-id bwmenu --auto-lock -1
 
 bindsym $mod+Tab workspace next_on_output
 bindsym $mod+Shift+Tab workspace prev_on_output
@@ -237,7 +237,7 @@ exec --no-startup-id sudo sh -c "rivalcfg -s 800"
 exec --no-startup-id sudo sh -c "rivalcfg -S 800"
 exec_always --no-startup-id sh -c "~/.conky/conky-startup.sh"
 exec --no-startup-id xfce4-power-manager
-exec_always --no-startup-id picom -b -c
+exec_always --no-startup-id sh -c "killall picom; sleep 1; picom -b -c"
 exec --no-startup-id ~/.bin/touchpad.sh
 
 
