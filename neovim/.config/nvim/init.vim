@@ -8,6 +8,9 @@ imap jj <Esc>
 map <C-j> 5j
 map <C-k> 5k
 
+" Split to newline and go back :^)
+map <leader>j i<CR><Esc>k$
+
 imap <C-j> <Down>
 imap <C-k> <Up>
 
