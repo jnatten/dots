@@ -35,6 +35,7 @@ map <A-l> :Files!<CR>
 map <C-p> :Commands!<CR>
 map <A-w> :bd<CR>
 map <leader>s :ClangdSwitchSourceHeader<CR>
+map ø <Plug>(easymotion-s)
 
 nnoremap <silent> <space> /
 
