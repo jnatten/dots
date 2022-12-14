@@ -28,6 +28,8 @@ map <C-k> 5k
 imap <C-j> <Down>
 imap <C-k> <Up>
 
+nmap ø <Plug>(easymotion-s)
+
 nmap <C-n> <Plug>NextWholeOccurrence
 xmap <C-n> <Plug>NextWholeOccurrence
 nmap g<C-n> <Plug>NextOccurrence
