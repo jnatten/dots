@@ -10,3 +10,4 @@
 /gitignored/
 *.iml
 
+/src/messages/convertTheFilesNeverCommitNeverDie.ts
