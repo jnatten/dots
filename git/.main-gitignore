@@ -10,4 +10,9 @@
 /gitignored/
 *.iml
 
+.classpath
+.factorypath
+.project
+.settings/
+
 /src/messages/convertTheFilesNeverCommitNeverDie.ts
