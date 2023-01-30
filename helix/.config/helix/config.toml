@@ -1,0 +1,13 @@
+
+theme = "dark_plus"
+[editor]
+auto-save = true
+
+[keys.normal]
+
+C-j = ["move_line_down","move_line_down","move_line_down","move_line_down","move_line_down"]
+
+C-k = ["move_line_up","move_line_up","move_line_up","move_line_up","move_line_up"]
+
+C-minus = "jump_backward"
+# C-plus = "jump_forward"
