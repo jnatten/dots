@@ -16,3 +16,4 @@
 .settings/
 
 /src/messages/convertTheFilesNeverCommitNeverDie.ts
+http-requests/
