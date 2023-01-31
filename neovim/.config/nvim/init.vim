@@ -94,3 +94,4 @@ let g:auto_save = 1
 set mouse=a
 
 command NdlaJson set syntax=html | :%!jq ".content[0].content" -r | prettier --stdin-filepath input.html
+command HtmlPretty set syntax=html | :%!prettier --stdin-filepath input.html
