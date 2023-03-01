@@ -4,7 +4,8 @@ set $smod Mod1
 font pango:monospace 8
 
 floating_modifier $mod
-bindsym $mod+Return exec alacritty -e zsh
+# bindsym $mod+Return exec alacritty -e zsh
+bindsym $mod+Return exec kitty -e zsh
 bindsym $mod+q kill
 bindsym Mod4+F4 kill
 bindsym $mod+Shift+q kill
