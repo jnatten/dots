@@ -13,6 +13,8 @@ map <leader>j i<CR><Esc>k$
 
 imap <C-j> <Down>
 imap <C-k> <Up>
+imap <C-h> <Left>
+imap <C-l> <Right>
 
 set clipboard=unnamedplus
 
