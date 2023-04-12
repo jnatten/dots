@@ -20,7 +20,7 @@ packer.init({
 packer.startup(function()
   local use = use
   use 'wbthomason/packer.nvim'
-  use { 'romgrk/barbar.nvim', requires = {'kyazdani42/nvim-web-devicons'} }
+  use {'romgrk/barbar.nvim', requires = 'nvim-web-devicons'}
   use 'neovim/nvim-lspconfig'
   use 'nvim-lua/completion-nvim'
   use 'anott03/nvim-lspinstall'
