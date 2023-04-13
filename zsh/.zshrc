@@ -42,7 +42,8 @@ plugins=(
 source $ZSH/oh-my-zsh.sh
 
 . ~/.asdf/asdf.sh
-. ~/.asdf/plugins/java/set-java-home.zsh
+
+# . ~/.asdf/plugins/java/set-java-home.zsh # This is commented out because slow, dont really need it do we?
 
 export PATH=$PATH:~/.bin
 export PATH=$PATH:~/.rd/bin
@@ -73,7 +74,7 @@ alias cat='bat'
 
 # Created by `pipx` on 2022-08-03 07:25:25
 export PATH="$PATH:/home/jonas/.local/bin"
-eval "$(register-python-argcomplete pipx)"  
+# eval "$(register-python-argcomplete pipx)" # Also slow, probably useful if we use pipx?
 eval "$(starship init zsh)"
 
 function bwcopy() {
