@@ -41,6 +41,10 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
+if [ -e ̃~/.zshcustom_late ]; then
+  source ~/.zshcustom_late
+fi
+
 . ~/.asdf/asdf.sh
 
 # . ~/.asdf/plugins/java/set-java-home.zsh # This is commented out because slow, dont really need it do we?
