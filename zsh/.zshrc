@@ -1,6 +1,15 @@
 # Custom configuration that is specific to THIS system
 source ~/.zshcustom
 
+
+if [[ -z $ALACRITTY_LOG && -z $WEINKITTY ]]; then
+  # Disable auto spawning tmux if not in alacritty (Nice in intellij since it sucks with tmux)
+  case $(tty) in
+    (/dev/tty[1-9]) ;;
+              (*) export DISABLE_AUTO_TMUX=true;;
+  esac
+fi
+
 if [[ "$TMUX" = "" && -t 1 && "$DISABLE_AUTO_TMUX" = "" ]]; then 
 	case $(tty) in 
 	  (/dev/tty[1-9]) ;;
