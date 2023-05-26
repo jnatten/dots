@@ -41,9 +41,7 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
-if [ -e ̃~/.zshcustom_late ]; then
-  source ~/.zshcustom_late
-fi
+source ~/.zshcustom_late
 
 . ~/.asdf/asdf.sh
 
