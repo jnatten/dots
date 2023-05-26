@@ -53,6 +53,7 @@ export PATH=$PATH:~/dev/blackbox/bin
 
 alias confignvim='$EDITOR ~/.config/nvim/init.vim'
 
+bindkey '^f' end-of-line # Binds Ctrl+f to go to end of line. Useful with zsh-autosuggestion
 
 alias vim='nvim'
 alias gs='git status'
