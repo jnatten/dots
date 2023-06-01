@@ -6,7 +6,7 @@
     editor = nvim
     commentChar = ";"
     # pager = "diff-so-fancy | less --tabs=4 -RFX"
-    # pager = delta
+    pager = delta
     excludesfile = "~/.main-gitignore"
     hooksPath = /home/jonas/.config/git/hooks/
 [color]
@@ -33,6 +33,7 @@
     syntax-theme = Dracula
     plus-style = syntax "#003800"
     minus-style = syntax "#3f0001"
+    side-by-side = false
 
 [delta "decorations"]
     commit-decoration-style = bold yellow box ul
