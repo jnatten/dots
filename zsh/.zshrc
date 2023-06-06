@@ -69,6 +69,8 @@ alias kn='kubie ns'
 alias k='kubectl'
 alias gpr='cd $(git root)'
 alias gpo='git push -u origin $(git branch --show-current)'
+alias gch='git checkout $(git branch --sort=-committerdate -a | fzf)'
+
 export PATH="/usr/local/opt/libpq/bin:$PATH"
 
 source ~/.zoxiderc
