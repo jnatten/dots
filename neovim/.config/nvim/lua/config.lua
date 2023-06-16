@@ -25,8 +25,8 @@ packer.startup(function()
   use 'nvim-lua/completion-nvim'
   use 'anott03/nvim-lspinstall'
   use({ "scalameta/nvim-metals", requires = { "nvim-lua/plenary.nvim", "mfussenegger/nvim-dap", } })
-  use "jose-elias-alvarez/null-ls.nvim"
-  use "jose-elias-alvarez/nvim-lsp-ts-utils"
+  -- use "jose-elias-alvarez/null-ls.nvim"
+  -- use "jose-elias-alvarez/nvim-lsp-ts-utils"
   use { "briones-gabriel/darcula-solid.nvim", requires = "rktjmp/lush.nvim" }
   use "EdenEast/nightfox.nvim"
   use { 'nvim-telescope/telescope.nvim', requires = { {'nvim-lua/plenary.nvim'} } }

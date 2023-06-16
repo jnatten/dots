@@ -1,14 +1,14 @@
-local nvimtreemappings = {
-  { 
-    key = { "<C-k>" }, 
-    action = "" 
-  },
-}
+-- local nvimtreemappings = {
+--   { 
+--     key = { "<C-k>" }, 
+--     action = "" 
+--   },
+-- }
 
-require("nvim-tree").setup({
-  view = { 
-    mappings = { 
-      list = nvimtreemappings 
-    }
-  }
-})
+-- require("nvim-tree").setup({
+--   view = { 
+--     mappings = { 
+--       list = nvimtreemappings 
+--     }
+--   }
+-- })

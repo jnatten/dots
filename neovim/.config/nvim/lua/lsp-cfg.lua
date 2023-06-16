@@ -39,7 +39,7 @@ map("n", "<leader>ae", [[<cmd>lua vim.diagnostic.setqflist({severity = "E"})<CR>
 map("n", "<leader>aw", [[<cmd>lua vim.diagnostic.setqflist({severity = "W"})<CR>]]) -- all workspace warnings
 map("n", "<leader>d", "<cmd>lua vim.diagnostic.setloclist()<CR>") -- buffer diagnostics only
 map("n", "[c", "<cmd>lua vim.diagnostic.goto_prev { wrap = false }<CR>")
-map("n", "]c", "<cmd>lua vim.diagnostic.goto_next { wrap = false }<CR>")
+map("n", "gn", "<cmd>lua vim.diagnostic.goto_next { wrap = true }<CR>")
 
 -- Example mappings for usage with nvim-dap. If you don't use that, you can
 -- skip these
