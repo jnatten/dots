@@ -59,6 +59,7 @@
     show-merge = "!sh -c 'merge=$(git find-merge $0 $1) && [ -n \"$merge\" ] && git show $merge'"
     root = rev-parse --show-toplevel
     dft = difftool
+    ru = reset --hard @{upstream}
 [diff]
     tool = difftastic
 [difftool]
