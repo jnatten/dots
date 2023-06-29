@@ -90,6 +90,15 @@ packer.startup(function()
       require("neogit").setup {}
     end
   }
+  use {
+      "williamboman/mason.nvim",
+      run = ":MasonUpdate" -- :MasonUpdate updates registry contents
+  }
+  use {
+    "williamboman/mason.nvim",
+    "williamboman/mason-lspconfig.nvim",
+    "neovim/nvim-lspconfig",
+}
   end
 )
 

@@ -81,6 +81,7 @@ lua require('fzf-lua-cfg')
 lua require('clangd-cfg')
 lua require('todo-cfg')
 lua require('gitsigns-cfg')
+lua require('mason-cfg')
 
 nnoremap <silent> <S-Tab> <Cmd>BufferPrevious<CR>
 nnoremap <silent> <Tab> <Cmd>BufferNext<CR>

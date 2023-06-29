@@ -1,3 +1,4 @@
+require("nvim-tree").setup()
 -- local nvimtreemappings = {
 --   { 
 --     key = { "<C-k>" }, 
