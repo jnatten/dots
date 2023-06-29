@@ -30,10 +30,9 @@ map <silent> <C-l> :noh<CR>
 
 map <F1> :NvimTreeToggle<CR>
 map <leader>t :NvimTreeToggle<CR>
-map <leader>l :GFiles!<CR>
+map <leader>l :FzfLua files<CR>
 map <leader>p :Telescope<CR>
 map <leader>ø :Telescope find_files<CR>
-map <A-l> :Files!<CR>
 map <C-p> :Commands!<CR>
 map <A-w> :bd<CR>
 map <leader>s :ClangdSwitchSourceHeader<CR>
@@ -82,6 +81,7 @@ lua require('clangd-cfg')
 lua require('todo-cfg')
 lua require('gitsigns-cfg')
 lua require('mason-cfg')
+lua require('formatter-cfg')
 
 nnoremap <silent> <S-Tab> <Cmd>BufferPrevious<CR>
 nnoremap <silent> <Tab> <Cmd>BufferNext<CR>
