@@ -23,10 +23,6 @@ The neovim config has some dependencies:
 - https://rust-analyzer.github.io/manual.html#installation
 
 ```bash
-npm install -g typescript typescript-language-server eslint prettier @fsouza/prettierd
-```
-
-```bash
 pipx install python-lsp-server
 pipx install pylsp-mypy
 pipx inject python-lsp-server pylsp-mypy
