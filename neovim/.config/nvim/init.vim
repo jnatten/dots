@@ -29,6 +29,7 @@ set hlsearch
 map <silent> <C-l> :noh<CR>
 
 map <F1> :NvimTreeToggle<CR>
+map <leader><F1> :NvimTreeFindFileToggle<CR>
 map <leader>t :NvimTreeToggle<CR>
 map <leader>l :FzfLua files<CR>
 map <leader>p :Telescope<CR>
