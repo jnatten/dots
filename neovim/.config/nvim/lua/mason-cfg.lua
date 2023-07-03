@@ -3,12 +3,8 @@ local masonlsp = require("mason-lspconfig")
 masonlsp.setup {
     ensure_installed = {
         "lua_ls",
-        "stylua",
         "rust_analyzer",
-        "tsserver",
-        "pylsp",
-        "prettier",
-        "prettierd"
+        "tsserver"
     },
 }
 masonlsp.setup_handlers {
