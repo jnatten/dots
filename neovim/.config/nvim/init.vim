@@ -98,3 +98,5 @@ set mouse=a
 
 command NdlaJson set syntax=html | :%!jq ".content[0].content" -r | prettier --stdin-filepath input.html
 command HtmlPretty set syntax=html | :%!prettier --stdin-filepath input.html
+
+au TextYankPost * silent! lua vim.highlight.on_yank({timeout = 200})
