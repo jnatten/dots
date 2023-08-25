@@ -41,6 +41,9 @@ map("n", "<leader>d", "<cmd>lua vim.diagnostic.setloclist()<CR>") -- buffer diag
 map("n", "[c", "<cmd>lua vim.diagnostic.goto_prev { wrap = false }<CR>")
 map("n", "gn", "<cmd>lua vim.diagnostic.goto_next { wrap = true }<CR>")
 
+map("n", "<leader><leader>e", "<cmd>lua vim.diagnostic.goto_prev { wrap = false }<CR>")
+map("n", "<leader>e", "<cmd>lua vim.diagnostic.goto_next { wrap = true }<CR>")
+
 -- Example mappings for usage with nvim-dap. If you don't use that, you can
 -- skip these
 map("n", "<leader>dc", [[<cmd>lua require"dap".continue()<CR>]])
