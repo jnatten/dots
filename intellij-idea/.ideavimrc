@@ -50,4 +50,8 @@ xmap g<S-C-n> <Plug>AllOccurrences
 map <Leader>r :action RenameElement<CR>
 map <Leader>e <Action>(GotoNextError)
 map <Leader><Leader>e <Action>(GotoPreviousError)
+map <Leader>dt <Action>(ToggleLineBreakpoint)
+map <Leader>dc <Action>(Debugger.ResumeThread)
+map <Leader>dl <Action>(Debug)
+map <Leader><Leader>dl <Action>(ChooseDebugConfiguration)
 
