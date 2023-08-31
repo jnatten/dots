@@ -54,4 +54,8 @@ map <Leader>dt <Action>(ToggleLineBreakpoint)
 map <Leader>dc <Action>(Debugger.ResumeThread)
 map <Leader>dl <Action>(Debug)
 map <Leader><Leader>dl <Action>(ChooseDebugConfiguration)
+map <Leader>ca <Action>(ShowIntentionActions)
+map <Leader>gc <Action>(GotoImplementation)
+map <Leader>gp <Action>(GotoSuperMethod)
+map <Leader>gt <Action>(GotoTypeDeclaration)
 
