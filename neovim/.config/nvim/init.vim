@@ -31,6 +31,7 @@ map <silent> <C-l> :noh<CR>
 map <F1> :NvimTreeToggle<CR>
 map <leader><F1> :NvimTreeFindFileToggle<CR>
 map <leader>t :NvimTreeToggle<CR>
+map <leader><leader>t :ToggleTerm direction=float<CR>
 map <leader>l :FzfLua files<CR>
 map <leader>p :Telescope<CR>
 map <leader>ø :Telescope find_files<CR>
