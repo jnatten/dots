@@ -39,6 +39,9 @@ map <A-w> :bd<CR>
 map <leader>s :ClangdSwitchSourceHeader<CR>
 map ø <Plug>(easymotion-s)
 
+tnoremap <Esc> <C-\><C-n>
+tnoremap <leader>n <C-\><C-n>
+
 nnoremap <silent> <space> /
 
 nnoremap <A-f> :Rg! <C-R><C-W><CR>

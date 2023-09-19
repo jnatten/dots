@@ -99,6 +99,10 @@ packer.startup(function()
   }
   use { 'mhartington/formatter.nvim' }
 
+  use {"akinsho/toggleterm.nvim", tag = '*', config = function()
+    require("toggleterm").setup()
+  end}
+
   end
 )
 
