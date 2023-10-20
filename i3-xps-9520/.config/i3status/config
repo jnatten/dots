@@ -23,7 +23,7 @@ order += "load"
 # order += "ram_usage"
 # order += "disk /"
 # order += "disk /home"
-order += "ethernet eth0"
+order += "ethernet enp0s20f0u1u1"
 order += "wireless wlp0s20f3"
 #order += "ipv6"
 #order += "run_watch DHCP"
@@ -55,14 +55,14 @@ disk "/" {
 	format = " root: %avail " 
 }
 
-ethernet eth0 {
-	format_up =  " eth0 %ip "
-	format_down = " Ð eth0 "
+ethernet enp0s20f0u1u1 {
+	format_up =  " eth %ip "
+	format_down = " eth "
 }
 
 wireless wlp0s20f3 {
-        format_up = " wlp0s20f3: (%quality @ %essid ) %ip "
-	format_down = " ☡ wlp0s20f3 "
+        format_up = " wifi: (%quality @ %essid ) %ip "
+	format_down = " wifi "
 }
 
 run_watch DHCP {
