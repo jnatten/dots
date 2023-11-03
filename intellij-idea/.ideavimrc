@@ -61,4 +61,6 @@ map <Leader>gt <Action>(GotoTypeDeclaration)
 map <Leader><Leader>n <Action>(NextOccurence)
 map <Leader><Leader>p <Action>(PreviousOccurence)
 map <S-C-k> <Action>(ShowErrorDescription)
+map <Leader>f <Action>(GotoFile)
+map <S-C-n> <Action>(GotoFile)
 
