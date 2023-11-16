@@ -9,6 +9,7 @@
 *.sc
 /gitignored/
 *.iml
+.idea/
 
 .classpath
 .factorypath
