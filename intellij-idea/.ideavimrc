@@ -39,7 +39,7 @@ nmap <C-n> <Plug>NextWholeOccurrence
 xmap <C-n> <Plug>NextWholeOccurrence
 nmap g<C-n> <Plug>NextOccurrence
 xmap g<C-n> <Plug>NextOccurrence
-nmap <C-x> <Plug>SkipOccurrence
+" nmap <C-x> <Plug>SkipOccurrence
 xmap <C-x> <Plug>SkipOccurrence
 nmap <C-p> <Plug>RemoveOccurrence
 xmap <C-p> <Plug>RemoveOccurrence
@@ -65,6 +65,10 @@ map <Leader><Leader>p <Action>(PreviousOccurence)
 map <S-C-k> <Action>(ShowErrorDescription)
 map <Leader>f <Action>(GotoFile)
 map <S-C-n> <Action>(GotoFile)
+
+map <Leader>gj <Action>(VcsShowNextChangeMarker)
+map <Leader>gk <Action>(VcsShowPrevChangeMarker)
+map <Leader>gr <Action>(Vcs.RollbackChangedLines)
 
 map <C--> <Action>(Back)
 map <C-,> <Action>(Back)
