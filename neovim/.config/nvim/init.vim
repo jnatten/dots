@@ -16,6 +16,8 @@ imap <C-k> <Up>
 imap <C-h> <Left>
 imap <C-l> <Right>
 
+vmap . "_x
+
 set clipboard=unnamedplus
 
 set ignorecase

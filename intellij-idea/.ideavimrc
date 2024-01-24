@@ -30,6 +30,8 @@ map <C-k> 5k
 
 map <leader>j i<CR><Esc>k$
 
+vmap . "_x
+
 imap <C-j> <Down>
 imap <C-k> <Up>
 
