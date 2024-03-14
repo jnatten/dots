@@ -37,6 +37,7 @@ plugins=(
 	web-search
 	yarn
 	docker
+	zsh-autocomplete # https://github.com/marlonrichert/zsh-autocomplete/issues/658
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -90,6 +91,10 @@ function bwcopy() {
     bw get item "$(bw list items | jq '.[] | "\(.name) | username: \(.login.username) | id: \(.id)" ' | fzf-tmux | awk '{print $(NF -0)}' | sed 's/\"//g')" | jq '.login.password' | sed 's/\"//g' | pbcopy
   fi
 }
+
+# Bindings for zsh-autocomplete https://github.com/marlonrichert/zsh-autocomplete
+bindkey '\t' menu-select "$terminfo[kcbt]" menu-select
+bindkey -M menuselect '\t' menu-complete "$terminfo[kcbt]" reverse-menu-complete
 
 function supervim() {
   WHERE=$1
