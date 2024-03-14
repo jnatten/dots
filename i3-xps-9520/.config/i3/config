@@ -208,6 +208,7 @@ exec --no-startup-id xss-lock ~/.bin/lock.sh
 bindsym $mod+c exec --no-startup-id /usr/bin/rofi -show calc -modi calc -no-show-match -no-sort
 bindsym $mod+b exec --no-startup-id /usr/bin/rofi -show window
 bindsym $mod+d exec --no-startup-id /usr/bin/rofi -show drun
+bindsym $mod+o exec --no-startup-id /usr/bin/rofi -modi emoji -show emoji
 bindsym $mod+Shift+d exec --no-startup-id /usr/bin/rofi -show ssh
 bindsym $mod+p exec --no-startup-id bwmenu --auto-lock -1
 
