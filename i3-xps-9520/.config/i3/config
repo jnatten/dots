@@ -205,6 +205,7 @@ exec --no-startup-id xss-lock ~/.bin/lock.sh
 
 # Personal keybinds
 #bindsym $mod+b exec --no-startup-id /usr/bin/dmenu-i3-window-jumper
+bindsym $mod+c exec --no-startup-id /usr/bin/rofi -show calc -modi calc -no-show-match -no-sort
 bindsym $mod+b exec --no-startup-id /usr/bin/rofi -show window
 bindsym $mod+d exec --no-startup-id /usr/bin/rofi -show drun
 bindsym $mod+Shift+d exec --no-startup-id /usr/bin/rofi -show ssh
