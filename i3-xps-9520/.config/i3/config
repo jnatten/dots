@@ -1,11 +1,12 @@
 set $mod Mod4
 set $smod Mod1
 
+set $terminal_emulator kitty
+
 font pango:monospace 8
 
 floating_modifier $mod
-# bindsym $mod+Return exec alacritty -e zsh
-bindsym $mod+Return exec kitty -e tmux
+bindsym $mod+Return exec $terminal_emulator -e tmux
 bindsym $mod+q kill
 bindsym Mod4+F4 kill
 bindsym $mod+Shift+q kill
@@ -68,6 +69,8 @@ bindsym $mod+Shift+space floating toggle
 bindsym $mod+Shift+Escape move scratchpad
 
 bindsym $mod+Escape scratchpad show
+
+bindsym $mod+t [instance="$terminal_emulator"] scratchpad show
 
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
