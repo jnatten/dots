@@ -268,7 +268,7 @@ mode  "(s)leep (h)ybernate (r)estart shut(d)own" {
 bindsym $mod+n mode "(s)leep (h)ybernate (r)estart shut(d)own"
 
 #bindsym $mod+Shift+t exec i3-input -F 'rename workspace to %s' -P #LOOK ONE LINE DOWN
-bindsym $mod+Shift+t exec --no-startup-id ~/.config/i3/rename-workspace.sh
+# bindsym $mod+Shift+t exec --no-startup-id ~/.config/i3/rename-workspace.sh
 
 bindsym $mod+Shift+y exec i3-input -F 'move container to workspace %s' -P
 
