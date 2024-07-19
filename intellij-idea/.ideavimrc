@@ -35,6 +35,8 @@ vmap . "_x
 imap <C-j> <Down>
 imap <C-k> <Up>
 
+map gx gd
+
 nmap ø <Plug>(easymotion-s)
 
 nmap <C-n> <Plug>NextWholeOccurrence
