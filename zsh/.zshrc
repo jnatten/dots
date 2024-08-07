@@ -75,7 +75,7 @@ export PATH="/usr/local/opt/libpq/bin:$PATH"
 
 source ~/.zoxiderc
 alias cd='z'
-alias cat='bat'
+alias cat='bat -n'
 
 # Created by `pipx` on 2022-08-03 07:25:25
 export PATH="$PATH:/home/jonas/.local/bin"
