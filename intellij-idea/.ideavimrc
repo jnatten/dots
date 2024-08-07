@@ -75,6 +75,20 @@ map <Leader>wh <Action>(TabShiftActions.ShiftLeft)
 map <Leader>wk <Action>(TabShiftActions.ShiftUp)
 map <Leader>wj <Action>(TabShiftActions.ShiftDown)
 
+map <Leader><Leader>wl <Action>(TabShiftActions.StretchRight)
+map <Leader><Leader>wh <Action>(TabShiftActions.StretchLeft)
+map <Leader><Leader>wk <Action>(TabShiftActions.StretchUp)
+map <Leader><Leader>wj <Action>(TabShiftActions.StretchDown)
+
+map <A-S-h> <Action>(TabShiftActions.StretchLeft)
+map <A-S-l> <Action>(TabShiftActions.StretchRight)
+map <A-S-k> <Action>(TabShiftActions.StretchUp)
+map <A-S-j> <Action>(TabShiftActions.StretchDown)
+
+map <Leader>wo <Action>(UnsplitAll)
+map <Leader>wc <Action>(Unsplit)
+map <Leader>w= <Action>(tabshifter.Actions.EqualSizeSplit)
+
 map <Leader>gj <Action>(VcsShowNextChangeMarker)
 map <Leader>gk <Action>(VcsShowPrevChangeMarker)
 map <Leader>gr <Action>(Vcs.RollbackChangedLines)
