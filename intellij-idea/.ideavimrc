@@ -70,6 +70,11 @@ map <S-C-k> <Action>(ShowErrorDescription)
 map <Leader>f <Action>(GotoFile)
 map <S-C-n> <Action>(GotoFile)
 
+map <Leader>wl <Action>(TabShiftActions.ShiftRight)
+map <Leader>wh <Action>(TabShiftActions.ShiftLeft)
+map <Leader>wk <Action>(TabShiftActions.ShiftUp)
+map <Leader>wj <Action>(TabShiftActions.ShiftDown)
+
 map <Leader>gj <Action>(VcsShowNextChangeMarker)
 map <Leader>gk <Action>(VcsShowPrevChangeMarker)
 map <Leader>gr <Action>(Vcs.RollbackChangedLines)
