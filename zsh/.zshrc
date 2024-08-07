@@ -69,7 +69,7 @@ alias kn='kubie ns'
 alias k='kubectl'
 alias gpr='cd $(git root)'
 alias gpo='git push -u origin $(git branch --show-current)'
-alias gch='git checkout $(git branch --sort=-committerdate -a | sed "s/remotes\/origin\///g" | fzf --no-sort)'
+alias gch='git checkout $(git branch --sort=-committerdate -a | sed "s/remotes\/origin\///g" | uniq | fzf --no-sort)'
 
 export PATH="/usr/local/opt/libpq/bin:$PATH"
 
