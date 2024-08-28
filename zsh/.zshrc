@@ -34,6 +34,7 @@ plugins=(
 	asdf 
 	kubectl 
 	zsh-autosuggestions
+	zsh-autocomplete
 	web-search
 	yarn
 	docker
@@ -41,7 +42,13 @@ plugins=(
 
 source $ZSH/oh-my-zsh.sh
 
+
 source ~/.zshcustom_late
+
+
+bindkey              '^I' menu-select
+bindkey "$terminfo[kcbt]" menu-select
+
 
 . ~/.asdf/asdf.sh
 
@@ -106,4 +113,6 @@ function supervim() {
 
 }
 
+
 source ~/.zsh_ndla
+
