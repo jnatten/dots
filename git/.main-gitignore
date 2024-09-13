@@ -10,6 +10,7 @@
 /gitignored/
 *.iml
 .idea/
+.mise.toml
 
 .classpath
 .factorypath
