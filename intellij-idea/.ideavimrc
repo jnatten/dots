@@ -31,6 +31,8 @@ map <C-k> 5k
 map <leader>j i<CR><Esc>k$
 
 vmap . "_x
+vmap <Leader>p "_xP
+
 
 imap <C-j> <Down>
 imap <C-k> <Up>
@@ -70,20 +72,22 @@ map <S-C-k> <Action>(ShowErrorDescription)
 map <Leader>f <Action>(GotoFile)
 map <S-C-n> <Action>(GotoFile)
 
-map <Leader>wl <Action>(TabShiftActions.ShiftRight)
-map <Leader>wh <Action>(TabShiftActions.ShiftLeft)
-map <Leader>wk <Action>(TabShiftActions.ShiftUp)
-map <Leader>wj <Action>(TabShiftActions.ShiftDown)
+map <Leader><Leader>wl <Action>(TabShiftActions.ShiftRight)
+map <Leader><Leader>wh <Action>(TabShiftActions.ShiftLeft)
+map <Leader><Leader>wk <Action>(TabShiftActions.ShiftUp)
+map <Leader><Leader>wj <Action>(TabShiftActions.ShiftDown)
 
-map <Leader><Leader>wl <Action>(TabShiftActions.StretchRight)
-map <Leader><Leader>wh <Action>(TabShiftActions.StretchLeft)
-map <Leader><Leader>wk <Action>(TabShiftActions.StretchUp)
-map <Leader><Leader>wj <Action>(TabShiftActions.StretchDown)
+map <Leader><Leader>a <Action>(Annotate)
 
-map <A-S-h> <Action>(TabShiftActions.StretchLeft)
-map <A-S-l> <Action>(TabShiftActions.StretchRight)
-map <A-S-k> <Action>(TabShiftActions.StretchUp)
-map <A-S-j> <Action>(TabShiftActions.StretchDown)
+map <Leader>wl <Action>(TabShiftActions.StretchRight)
+map <Leader>wh <Action>(TabShiftActions.StretchLeft)
+map <Leader>wk <Action>(TabShiftActions.StretchUp)
+map <Leader>wj <Action>(TabShiftActions.StretchDown)
+
+map <A-S-h> <Action>(TabShiftActions.ShiftLeft)
+map <A-S-l> <Action>(TabShiftActions.ShiftRight)
+map <A-S-k> <Action>(TabShiftActions.ShiftUp)
+map <A-S-j> <Action>(TabShiftActions.ShiftDown)
 
 map <Leader>wo <Action>(UnsplitAll)
 map <Leader>wc <Action>(Unsplit)
@@ -100,4 +104,3 @@ map <A-r> <Action>(Vcs.RollbackChangedLines)
 map <C--> <Action>(Back)
 map <C-,> <Action>(Back)
 map <C-.> <Action>(Forward)
-
