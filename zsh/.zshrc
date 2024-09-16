@@ -108,7 +108,7 @@ function supervim() {
 
 }
 
-eval "$(/opt/homebrew/bin/mise activate zsh)"
+eval "$(mise activate zsh)"
 
 
 source ~/.zsh_ndla
