@@ -31,7 +31,6 @@ export SAVEHIST=100000
 plugins=(
 	git 
 	vi-mode 
-	asdf 
 	kubectl 
 	zsh-autosuggestions
 	web-search
@@ -44,10 +43,6 @@ source $ZSH/oh-my-zsh.sh
 
 source ~/.zshcustom_late
 
-
-. ~/.asdf/asdf.sh
-
-# . ~/.asdf/plugins/java/set-java-home.zsh # This is commented out because slow, dont really need it do we?
 
 export PATH=$PATH:~/.bin
 export PATH=$PATH:~/.rd/bin
@@ -109,6 +104,7 @@ function supervim() {
 }
 
 eval "$(mise activate zsh)"
+eval "$(mise completion zsh)"
 
 
 source ~/.zsh_ndla
