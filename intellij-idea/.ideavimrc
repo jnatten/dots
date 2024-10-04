@@ -101,6 +101,8 @@ map <A-j> <Action>(VcsShowNextChangeMarker)
 map <A-k> <Action>(VcsShowPrevChangeMarker)
 map <A-r> <Action>(Vcs.RollbackChangedLines)
 
+map <Leader>å <Action>(ManageRecentProjects)
+
 map <C--> <Action>(Back)
 map <C-,> <Action>(Back)
 map <C-.> <Action>(Forward)
