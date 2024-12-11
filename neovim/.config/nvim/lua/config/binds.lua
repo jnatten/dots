@@ -20,3 +20,15 @@ map(vn, "<C-l>", ":noh<CR>", cmd_options)
 map(mall, "<A-w>", ":bd<CR>", cmd_options)
 
 map(mall, "<leader>t", ":Neotree toggle<CR>", cmd_options)
+
+
+map(mall, "<leader>l", ":FzfLua files<CR>", cmd_options)
+map("n", "<leader>f", ":FzfLua grep<CR><C-R><C-W><CR>", cmd_options)
+map("n", "<leader>F", ":FzfLua grep<CR><C-R><C-W>", cmd_options)
+
+map("v", "<leader>f", '"ay:FzfLua grep<CR><C-r>a<CR>', cmd_options)
+map("v", "<leader>F", '"ay:FzfLua grep<CR><C-r>a', cmd_options)
+map("n", "<leader><leader>f", ":FzfLua live_grep<CR>", cmd_options)
+map("n", "<leader><leader>f", ":FzfLua live_grep<CR>", cmd_options)
+
+
