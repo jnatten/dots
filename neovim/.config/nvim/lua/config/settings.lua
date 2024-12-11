@@ -1,7 +1,5 @@
 local global = vim.g
 local o = vim.opt
-global.mapleader = ","
-global.maplocalleader = "," 
 
 o.number = true
 o.clipboard = "unnamedplus"
