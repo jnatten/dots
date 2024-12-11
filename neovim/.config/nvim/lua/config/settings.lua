@@ -14,6 +14,7 @@ o.tabstop = 2
 o.encoding = "UTF-8"
 o.ruler = true
 o.mouse = "a"
+o.wrap = false
 o.title = true
 o.hidden = true
 o.ttimeoutlen = 0
