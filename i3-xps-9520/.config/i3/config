@@ -200,7 +200,8 @@ bindsym $mod+Shift+d exec --no-startup-id /usr/bin/rofi -show ssh
 bindsym $mod+p exec --no-startup-id bwmenu --auto-lock -1
 
 
-workspace_auto_back_and_forth yes
+# This messes up moving workspaces between outputs
+# workspace_auto_back_and_forth yes 
 
 bindsym $mod+a exec --no-startup-id /home/jonas/.bin/workspace_cycle.py cycle
 bindsym $mod+Shift+a exec --no-startup-id /home/jonas/.bin/workspace_cycle.py tag
