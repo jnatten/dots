@@ -238,6 +238,7 @@ exec_always --no-startup-id sh -c "~/.conky/conky-startup.sh"
 exec --no-startup-id xfce4-power-manager
 exec_always --no-startup-id sh -c "killall picom; sleep 1; picom -b"
 exec --no-startup-id ~/.bin/touchpad.sh
+exec_always --no-startup-id i3wsr
 
 
 
