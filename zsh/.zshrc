@@ -38,6 +38,20 @@ plugins=(
 	docker
 )
 
+function gwl() {
+  WLS=$(git worktree list)
+  FOUND=$(echo $WLS | fzf)
+  if [ -z "${FOUND}" ]; then
+    echo "Cancelled..."
+  else
+    echo "Going to worktree -> $FOUND"
+    CDDIR=$(echo $FOUND | cut -d' ' -f1)
+    cd $CDDIR
+  fi
+
+}
+
+
 source $ZSH/oh-my-zsh.sh
 
 
