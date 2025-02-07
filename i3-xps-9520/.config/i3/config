@@ -192,7 +192,8 @@ exec --no-startup-id xss-lock ~/.bin/lock.sh
 
 # Personal keybinds
 #bindsym $mod+b exec --no-startup-id /usr/bin/dmenu-i3-window-jumper
-bindsym $mod+c exec --no-startup-id /usr/bin/rofi -show calc -modi calc -no-show-match -no-sort
+# bindsym $mod+c exec --no-startup-id /usr/bin/rofi -show calc -modi calc -no-show-match -no-sort
+bindsym $mod+c exec --no-startup-id /usr/bin/rofi -modi "clipboard:greenclip print" -show clipboard -run-command '{cmd}'
 bindsym $mod+b exec --no-startup-id /usr/bin/rofi -show window
 bindsym $mod+d exec --no-startup-id /usr/bin/rofi -show drun
 bindsym $mod+o exec --no-startup-id /usr/bin/rofi -modi emoji -show emoji
