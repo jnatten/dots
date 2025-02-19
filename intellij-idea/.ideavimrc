@@ -108,3 +108,6 @@ map <Leader>å <Action>(ManageRecentProjects)
 map <C--> <Action>(Back)
 map <C-,> <Action>(Back)
 map <C-.> <Action>(Forward)
+
+map <C-l> [w
+map <C-h> [b
