@@ -1,0 +1,36 @@
+ctrl - right: aerospace-helper.py next-workspace
+ctrl - left: aerospace-helper.py prev-workspace
+
+
+lalt - h: aerospace focus --boundaries-action wrap-around-the-workspace left
+lalt - j: aerospace focus --boundaries-action wrap-around-the-workspace down
+lalt - k: aerospace focus --boundaries-action wrap-around-the-workspace up
+lalt - l: aerospace focus --boundaries-action wrap-around-the-workspace right
+
+lalt+shift-h: aerospace move left
+lalt+shift-j: aerospace move down
+lalt+shift-k: aerospace move up
+lalt+shift-l: aerospace move right
+lalt-f: aerospace fullscreen
+
+lalt-1: aerospace workspace 1
+lalt-2: aerospace workspace 2
+lalt-3: aerospace workspace 3
+lalt-4: aerospace workspace 4
+lalt-5: aerospace workspace 5
+lalt-6: aerospace workspace 6
+lalt-7: aerospace workspace 7
+lalt-8: aerospace workspace 8
+lalt-9: aerospace workspace 9
+lalt-0: aerospace workspace 10
+
+lalt+shift-1: aerospace move-node-to-workspace 1
+lalt+shift-2: aerospace move-node-to-workspace 2
+lalt+shift-3: aerospace move-node-to-workspace 3
+lalt+shift-4: aerospace move-node-to-workspace 4
+lalt+shift-5: aerospace move-node-to-workspace 5
+lalt+shift-6: aerospace move-node-to-workspace 6
+lalt+shift-7: aerospace move-node-to-workspace 7
+lalt+shift-8: aerospace move-node-to-workspace 8
+lalt+shift-9: aerospace move-node-to-workspace 9
+lalt+shift-0: aerospace move-node-to-workspace 10
