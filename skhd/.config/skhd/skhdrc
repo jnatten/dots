@@ -1,6 +1,5 @@
-ctrl - right: aerospace-helper.py next-workspace
-ctrl - left: aerospace-helper.py prev-workspace
-
+ctrl - right: aerospace list-workspaces --monitor focused --empty no | aerospace workspace next
+ctrl - left: aerospace list-workspaces --monitor focused --empty no | aerospace workspace prev
 
 lalt - h: aerospace focus --boundaries-action wrap-around-the-workspace left
 lalt - j: aerospace focus --boundaries-action wrap-around-the-workspace down
