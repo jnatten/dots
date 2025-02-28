@@ -46,6 +46,8 @@ return {
 		map("n", "<A-r>", gitsigns.reset_hunk)
 		map("n", "<leader>hr", gitsigns.reset_hunk)
 		map("n", "<leader>hp", gitsigns.preview_hunk)
+		map("n", "<leader>hs", gitsigns.stage_hunk)
+		map("n", "<leader>hS", gitsigns.stage_buffer)
 		map("n", "<A-n>", function()
 			gitsigns.nav_hunk("next")
 		end)
