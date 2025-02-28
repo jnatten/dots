@@ -95,13 +95,11 @@ map <Leader>wo <Action>(UnsplitAll)
 map <Leader>wc <Action>(Unsplit)
 map <Leader>w= <Action>(tabshifter.Actions.EqualSizeSplit)
 
-map <Leader>gj <Action>(VcsShowNextChangeMarker)
-map <Leader>gk <Action>(VcsShowPrevChangeMarker)
-map <Leader>gr <Action>(Vcs.RollbackChangedLines)
-
-map <A-j> <Action>(VcsShowNextChangeMarker)
-map <A-k> <Action>(VcsShowPrevChangeMarker)
+map <A-n> <Action>(VcsShowNextChangeMarker)
+map <A-p> <Action>(VcsShowPrevChangeMarker)
 map <A-r> <Action>(Vcs.RollbackChangedLines)
+map <leader>hr <Action>(Vcs.RollbackChangedLines)
+map <leader>hp <Action>(VcsShowCurrentChangeMarker)
 
 map <Leader>å <Action>(ManageRecentProjects)
 

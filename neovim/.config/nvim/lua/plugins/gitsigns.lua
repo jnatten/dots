@@ -41,5 +41,16 @@ return {
 				col = 1,
 			},
 		})
+
+		local map = vim.keymap.set
+		map("n", "<A-r>", gitsigns.reset_hunk)
+		map("n", "<leader>hr", gitsigns.reset_hunk)
+		map("n", "<leader>hp", gitsigns.preview_hunk)
+		map("n", "<A-n>", function()
+			gitsigns.nav_hunk("next")
+		end)
+		map("n", "<A-p>", function()
+			gitsigns.nav_hunk("prev")
+		end)
 	end,
 }
