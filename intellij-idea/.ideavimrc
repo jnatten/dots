@@ -100,6 +100,7 @@ map <A-p> <Action>(VcsShowPrevChangeMarker)
 map <A-r> <Action>(Vcs.RollbackChangedLines)
 map <leader>hr <Action>(Vcs.RollbackChangedLines)
 map <leader>hp <Action>(VcsShowCurrentChangeMarker)
+map <leader>hs <Action>(Git.Add)
 
 map <Leader>å <Action>(ManageRecentProjects)
 
