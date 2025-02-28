@@ -101,6 +101,8 @@ map <A-r> <Action>(Vcs.RollbackChangedLines)
 map <leader>hr <Action>(Vcs.RollbackChangedLines)
 map <leader>hp <Action>(VcsShowCurrentChangeMarker)
 map <leader>hs <Action>(Git.Add)
+map <A-.> <Action>(NextTab)
+map <A-,> <Action>(PreviousTab)
 
 map <Leader>å <Action>(ManageRecentProjects)
 

@@ -18,6 +18,8 @@ map("i", "<C-l>", "<Right>", options)
 map(vn, "<Space>", "/", cmd_options)
 map(vn, "<C-l>", ":noh<CR>", cmd_options)
 map(mall, "<A-w>", ":bd<CR>", cmd_options)
+map("n", "<A-,>", ":bprev<CR>", cmd_options)
+map("n", "<A-.>", ":bnext<CR>", cmd_options)
 
 map(mall, "<leader>t", ":Neotree toggle<CR>", cmd_options)
 
