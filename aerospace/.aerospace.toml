@@ -17,7 +17,7 @@ exec-on-workspace-change = [
 ]
 
 [mode.main.binding]
-    alt-enter = 'exec-and-forget open -n /Applications/kitty.app'
+    # alt-enter = 'exec-and-forget open -n /Applications/kitty.app'
 
     # i3 wraps focus by default
     # cmd-h = 'focus --boundaries-action wrap-around-the-workspace left'
@@ -87,5 +87,5 @@ exec-on-workspace-change = [
     inner.vertical =   0
     outer.left =       0
     outer.bottom =     0
-    outer.top =        5
+    outer.top =        0
     outer.right =      0
