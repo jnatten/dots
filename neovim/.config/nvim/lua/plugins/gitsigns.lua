@@ -43,16 +43,16 @@ return {
 		})
 
 		local map = vim.keymap.set
-		map("n", "<A-r>", gitsigns.reset_hunk)
-		map("n", "<leader>hr", gitsigns.reset_hunk)
-		map("n", "<leader>hp", gitsigns.preview_hunk)
-		map("n", "<leader>hs", gitsigns.stage_hunk)
-		map("n", "<leader>hS", gitsigns.stage_buffer)
+		map("n", "<A-r>", gitsigns.reset_hunk, { desc = "git: Reset hunk" })
+		map("n", "<leader>hr", gitsigns.reset_hunk, { desc = "git: Reset hunk" })
+		map("n", "<leader>hp", gitsigns.preview_hunk, { desc = "git: Preview hunk" })
+		map("n", "<leader>hs", gitsigns.stage_hunk, { desc = "git: Stage/unstage hunk" })
+		map("n", "<leader>hS", gitsigns.stage_buffer, { desc = "git: Stage/unstage buffer" })
 		map("n", "<A-n>", function()
 			gitsigns.nav_hunk("next")
-		end)
+		end, { desc = "git: Goto next hunk" })
 		map("n", "<A-p>", function()
 			gitsigns.nav_hunk("prev")
-		end)
+		end, { desc = "git: Goto prev hunk" })
 	end,
 }
