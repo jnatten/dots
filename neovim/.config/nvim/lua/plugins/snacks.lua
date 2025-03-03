@@ -38,6 +38,13 @@ return {
 			end,
 			desc = "Search History",
 		},
+		{
+			"<leader>p",
+			function()
+				Snacks.picker.commands()
+			end,
+			desc = "Search commands",
+		},
 	},
 	opts = {
 		bigfile = { enabled = true },
