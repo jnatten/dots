@@ -32,6 +32,13 @@ return {
 			desc = "Resume",
 		},
 		{
+			"<leader>sr",
+			function()
+				Snacks.picker.resume()
+			end,
+			desc = "Resume",
+		},
+		{
 			"<leader>ss",
 			function()
 				Snacks.picker()
