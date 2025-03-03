@@ -23,3 +23,5 @@ o.inccommand = "split" -- When nonempty, shows the effects of :substitute, :smag
 o.splitright = true
 o.splitbelow = true
 o.termguicolors = true
+o.smartcase = true
+o.ignorecase = true
