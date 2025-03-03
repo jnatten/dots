@@ -12,7 +12,7 @@ return {
 		offsets = {
 			{
 				filetype = "neo-tree",
-				text = "🤯",
+				text = "",
 				highlight = "NeoTreeNormal",
 				text_align = "left",
 			},
