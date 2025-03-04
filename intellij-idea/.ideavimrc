@@ -103,6 +103,8 @@ map <leader>hp <Action>(VcsShowCurrentChangeMarker)
 map <leader>hs <Action>(Git.Add)
 map <A-.> <Action>(NextTab)
 map <A-,> <Action>(PreviousTab)
+map <leader>t :NERDTreeToggle<CR>
+map <leader>T <Action>(SelectInProjectView)
 
 map <Leader>å <Action>(ManageRecentProjects)
 
