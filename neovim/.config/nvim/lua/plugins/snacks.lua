@@ -13,6 +13,13 @@ return {
 		{
 			"<leader>l",
 			function()
+				Snacks.picker.smart()
+			end,
+			desc = "Find Files",
+		},
+		{
+			"<leader>f",
+			function()
 				Snacks.picker.files()
 			end,
 			desc = "Find Files",
@@ -59,6 +66,27 @@ return {
 			end,
 			desc = "Search commands",
 		},
+		{
+			"<leader><space>",
+			function()
+				local word = vim.fn.expand("<cword>")
+				if word ~= "" then
+					Snacks.picker.grep({ search = word })
+				else
+					Snacks.picker.grep()
+				end
+			end,
+			desc = "Visual selection or word",
+			mode = { "v" },
+		},
+		-- {
+		-- 	"<leader>sw",
+		-- 	function()
+		-- 		Snacks.picker.grep_word()
+		-- 	end,
+		-- 	desc = "Visual selection or word",
+		-- 	mode = { "n", "x" },
+		-- },
 	},
 	opts = {
 		bigfile = { enabled = true },
