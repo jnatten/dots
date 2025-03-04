@@ -22,6 +22,7 @@ map("n", "<A-,>", ":bprev<CR>", cmd_options)
 map("n", "<A-.>", ":bnext<CR>", cmd_options)
 
 map(mall, "<leader>t", ":Neotree toggle<CR>", cmd_options)
+map(mall, "<leader>T", ":Neotree reveal<CR>", cmd_options)
 
 map("v", "<leader>f", '"ay:FzfLua grep<CR><C-r>a<CR>', cmd_options)
 map("v", "<leader>F", '"ay:FzfLua grep<CR><C-r>a', cmd_options)
