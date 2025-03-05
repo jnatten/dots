@@ -35,6 +35,7 @@ map("n", "<leader><leader>l", ":Lazy<CR>", cmd_options)
 map("n", "gd", "<cmd>lua Snacks.picker.lsp_definitions()<CR>", { desc = "lsp: Goto definition" })
 map("n", "gi", "<cmd>lua Snacks.picker.lsp_implementations()<CR>", { desc = "lsp: Goto implementation" })
 map("n", "gr", "<cmd>lua Snacks.picker.lsp_references()<CR>", { desc = "lsp: Goto references" })
+map("n", "gt", "<cmd>lua Snacks.picker.lsp_type_definitions()<CR>", { desc = "lsp: Goto type definitions" })
 map("n", "gds", "<cmd>lua Snacks.picker.lsp_symbols()<CR>", { desc = "lsp: Symbols" })
 map("n", "gws", "<cmd>lua Snacks.picker.lsp_workspace_symbols()<CR>", { desc = "lsp: Workspace symbols" })
 --
