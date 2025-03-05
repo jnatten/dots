@@ -9,7 +9,7 @@ map("i", "jj", "<Esc>", options)
 map(vn, "<C-j>", "5j", options)
 map(vn, "<C-k>", "5k", options)
 
-map(vn, "<leader>j", "i<CR><Esc>k$", options) -- Split to newline and go back
+map(vn, "<leader>j", "i<CR><Esc>k$", { desc = "Split line at cursor position while staying on line" })
 
 map("i", "<C-j>", "<Down>", options)
 map("i", "<C-k>", "<Up>", options)
@@ -17,7 +17,7 @@ map("i", "<C-h>", "<Left>", options)
 map("i", "<C-l>", "<Right>", options)
 map(vn, "<Space>", "/", cmd_options)
 map(vn, "<C-l>", ":noh<CR>", cmd_options)
-map(mall, "<A-w>", ":bd<CR>", cmd_options)
+map(mall, "<A-w>", "<cmd>lua Snacks.bufdelete()<CR>", { desc = "Close buffer" })
 map("n", "<A-,>", ":bprev<CR>", cmd_options)
 map("n", "<A-.>", ":bnext<CR>", cmd_options)
 
@@ -30,6 +30,7 @@ map("n", "<leader><leader>f", ":FzfLua live_grep<CR>", cmd_options)
 map("n", "<leader><leader>f", ":FzfLua live_grep<CR>", cmd_options)
 map("n", "<leader><leader>g", ":Neogit<CR>", cmd_options)
 map("n", "<leader><leader>l", ":Lazy<CR>", cmd_options)
+map("n", "<leader><leader>m", ":Mason<CR>", cmd_options)
 
 -- lsp binds
 map("n", "gd", "<cmd>lua Snacks.picker.lsp_definitions()<CR>", { desc = "lsp: Goto definition" })
