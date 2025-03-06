@@ -34,16 +34,16 @@ exec-on-workspace-change = [
     # cmd-shift-l = 'move right'
 
     # Consider using 'join-with' command as a 'split' replacement if you want to enable normalizations
-    alt-g = 'split horizontal'
-    alt-v = 'split vertical'
+    # alt-g = 'split horizontal'
+    # alt-v = 'split vertical'
 
     # alt-f = 'fullscreen'
 
-    alt-s = 'layout v_accordion' # 'layout stacking' in i3
-    alt-w = 'layout h_accordion' # 'layout tabbed' in i3
-    alt-e = 'layout tiles horizontal vertical' # 'layout toggle split' in i3
+    # alt-s = 'layout v_accordion' # 'layout stacking' in i3
+    #alt-w = 'layout h_accordion' # 'layout tabbed' in i3
+    # alt-e = 'layout tiles horizontal vertical' # 'layout toggle split' in i3
 
-    alt-shift-space = 'layout floating tiling' # 'floating toggle' in i3
+    # alt-shift-space = 'layout floating tiling' # 'floating toggle' in i3
 
     # cmd-1 = 'workspace 1'
     # cmd-2 = 'workspace 2'
@@ -69,7 +69,7 @@ exec-on-workspace-change = [
 
     alt-shift-c = 'reload-config'
 
-    alt-r = 'mode resize'
+    # alt-r = 'mode resize'
 
     cmd-h = [] # Disable "hide application"
     cmd-alt-h = [] # Disable "hide others"

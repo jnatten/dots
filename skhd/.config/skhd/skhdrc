@@ -3,35 +3,48 @@
 ctrl - right: aerospace workspace next
 ctrl - left: aerospace workspace prev
 
-lalt - h: aerospace focus --boundaries-action wrap-around-the-workspace left
-lalt - j: aerospace focus --boundaries-action wrap-around-the-workspace down
-lalt - k: aerospace focus --boundaries-action wrap-around-the-workspace up
-lalt - l: aerospace focus --boundaries-action wrap-around-the-workspace right
+# fn-right: aerospace workspace next 
+# fn-left: aerospace workspace prev
 
-lalt+shift-h: aerospace move left
-lalt+shift-j: aerospace move down
-lalt+shift-k: aerospace move up
-lalt+shift-l: aerospace move right
-lalt-f: aerospace fullscreen
+fn - h: aerospace focus --boundaries-action wrap-around-the-workspace left
+fn - j: aerospace focus --boundaries-action wrap-around-the-workspace down
+fn - k: aerospace focus --boundaries-action wrap-around-the-workspace up
+fn - l: aerospace focus --boundaries-action wrap-around-the-workspace right
 
-lalt-1: aerospace workspace 1
-lalt-2: aerospace workspace 2
-lalt-3: aerospace workspace 3
-lalt-4: aerospace workspace 4
-lalt-5: aerospace workspace 5
-lalt-6: aerospace workspace 6
-lalt-7: aerospace workspace 7
-lalt-8: aerospace workspace 8
-lalt-9: aerospace workspace 9
-lalt-0: aerospace workspace 10
+fn+shift-h: aerospace move left
+fn+shift-j: aerospace move down
+fn+shift-k: aerospace move up
+fn+shift-l: aerospace move right
+fn-f: aerospace fullscreen
+fn-g: aerospace split horizontal
+fn-v: aerospace split vertical
 
-lalt+shift-1: aerospace move-node-to-workspace 1
-lalt+shift-2: aerospace move-node-to-workspace 2
-lalt+shift-3: aerospace move-node-to-workspace 3
-lalt+shift-4: aerospace move-node-to-workspace 4
-lalt+shift-5: aerospace move-node-to-workspace 5
-lalt+shift-6: aerospace move-node-to-workspace 6
-lalt+shift-7: aerospace move-node-to-workspace 7
-lalt+shift-8: aerospace move-node-to-workspace 8
-lalt+shift-9: aerospace move-node-to-workspace 9
-lalt+shift-0: aerospace move-node-to-workspace 10
+fn-s: aerospace layout v_accordion
+fn-e: aerospace layout tiles horizontal vertical
+fn-w: aerospace layout h_accordion
+fn+shift-space: aerospace layout floating tiling
+
+fn-1: aerospace workspace 1
+fn-2: aerospace workspace 2
+fn-3: aerospace workspace 3
+fn-4: aerospace workspace 4
+fn-5: aerospace workspace 5
+fn-6: aerospace workspace 6
+fn-7: aerospace workspace 7
+fn-8: aerospace workspace 8
+fn-9: aerospace workspace 9
+fn-0: aerospace workspace 10
+
+fn+shift-1: aerospace move-node-to-workspace 1
+fn+shift-2: aerospace move-node-to-workspace 2
+fn+shift-3: aerospace move-node-to-workspace 3
+fn+shift-4: aerospace move-node-to-workspace 4
+fn+shift-5: aerospace move-node-to-workspace 5
+fn+shift-6: aerospace move-node-to-workspace 6
+fn+shift-7: aerospace move-node-to-workspace 7
+fn+shift-8: aerospace move-node-to-workspace 8
+fn+shift-9: aerospace move-node-to-workspace 9
+fn+shift-0: aerospace move-node-to-workspace 10
+
+
+fn-r: aerospace mode resize
