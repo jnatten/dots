@@ -60,6 +60,13 @@ return {
 			desc = "Search History",
 		},
 		{
+			"<leader>sb",
+			function()
+				Snacks.picker.buffers()
+			end,
+			desc = "Search open buffers",
+		},
+		{
 			"<leader>p",
 			function()
 				Snacks.picker.commands()
