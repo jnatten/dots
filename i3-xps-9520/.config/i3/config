@@ -272,3 +272,4 @@ bindsym $mod+n mode "(s)leep (h)ybernate (r)estart shut(d)own"
 
 bindsym $mod+Shift+y exec i3-input -F 'move container to workspace %s' -P
 
+for_window [class="Slack"] move to workspace number 10
