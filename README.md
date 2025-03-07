@@ -15,19 +15,6 @@ $ stow neovim --target ~
 
 ## Dependencies
 
-### neovim
-
-The neovim config has some dependencies:
-
-- https://github.com/pappasam/jedi-language-server
-- https://rust-analyzer.github.io/manual.html#installation
-
-```bash
-pipx install python-lsp-server
-pipx install pylsp-mypy
-pipx inject python-lsp-server pylsp-mypy
-```
-
 ### zsh
 
 The .zshrc config is using [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh/)
