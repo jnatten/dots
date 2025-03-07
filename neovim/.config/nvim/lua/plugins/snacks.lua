@@ -86,6 +86,13 @@ return {
 			desc = "Visual selection or word",
 			mode = { "v" },
 		},
+		{
+			"<leader>z",
+			function()
+				Snacks.zen.zoom()
+			end,
+			desc = "Zoom current pane",
+		},
 		-- {
 		-- 	"<leader>sw",
 		-- 	function()
