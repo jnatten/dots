@@ -93,6 +93,13 @@ return {
 			end,
 			desc = "Zoom current pane",
 		},
+		{
+			"<leader>Z",
+			function()
+				Snacks.zen()
+			end,
+			desc = "Zen mode!",
+		},
 		-- {
 		-- 	"<leader>sw",
 		-- 	function()
