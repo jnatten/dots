@@ -1,10 +1,5 @@
-# ctrl - right: aerospace list-workspaces --monitor focused --empty no | aerospace workspace next
-# ctrl - left: aerospace list-workspaces --monitor focused --empty no | aerospace workspace prev
 ctrl - right: aerospace workspace next
 ctrl - left: aerospace workspace prev
-
-# fn-right: aerospace workspace next 
-# fn-left: aerospace workspace prev
 
 fn - h: aerospace focus --boundaries-action wrap-around-the-workspace left
 fn - j: aerospace focus --boundaries-action wrap-around-the-workspace down
