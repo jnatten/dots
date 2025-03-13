@@ -62,6 +62,12 @@ return {
 					capabilities = capabilities,
 				})
 			end,
+			["terraformls"] = function()
+				nvim_lsp["terraformls"].setup({
+					on_attach = on_attach,
+					capabilities = capabilities,
+				})
+			end,
 			["eslint"] = function()
 				nvim_lsp["eslint"].setup({
 					on_attach = on_attach,

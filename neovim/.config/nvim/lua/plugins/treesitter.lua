@@ -27,6 +27,7 @@ return {
 				"bash",
 				"lua",
 				"vim",
+				"terraform",
 				"dockerfile",
 				"gitignore",
 				"c",

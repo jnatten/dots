@@ -16,6 +16,7 @@ return {
 				"jsonls",
 				"vtsls",
 				"pyright",
+				"terraformls",
 				"tailwindcss",
 			},
 		})
