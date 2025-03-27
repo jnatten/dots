@@ -1,7 +1,7 @@
 set $mod Mod4
 set $smod Mod1
 
-set $terminal_emulator kitty
+set $terminal_emulator ghostty
 
 font pango:monospace 8
 
