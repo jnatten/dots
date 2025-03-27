@@ -1,0 +1,25 @@
+font-family = "JetBrainsMono NFP Bold"
+font-size = 10
+# font-thicken = true
+# font-style-bold = true
+
+theme = catppuccin-mocha
+bold-is-bright = true
+keybind = ctrl+shift+r=reload_config
+
+window-decoration = false
+window-height = 200
+window-width = 300
+window-padding-x = 0
+window-padding-y = 0
+
+app-notifications = no-clipboard-copy
+
+background-opacity = 1
+background-blur-radius = 0
+
+keybind = super+t=unbind
+keybind = super+w=text:\x1Bw
+keybind = super+s=text:\x1Bs
+keybind = ctrl+tab=text:\x1b[9;5u
+keybind = ctrl+shift+tab=text:\x1b[1;5Z
