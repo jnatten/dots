@@ -21,7 +21,20 @@ basename = os.path.basename(marked_path)
 dirname = os.path.dirname(marked_path)
 marked_is_absolute = os.path.isabs(marked_path)
 
-# TODO: Handle lines and columns at the end of basename
+line = None
+column = None
+
+if ":" in basename:
+    s = basename.split(":")
+    if len(s) == 3 and s[1].isnumeric() and s[2].isnumeric():
+        basename = s[0]
+        line = s[1]
+        column = s[2]
+    elif len(s) == 2 and s[1].isnumeric():
+        basename = s[0]
+        line = s[1]
+
+
 log(f"basename: {basename}")
 log(f"dirname: {dirname}")
 log(f"abs: {marked_is_absolute}")
@@ -48,6 +61,16 @@ files = get_possible_files()
 def open_file(filename):
     log(f"opening: {filename}")
 
+    if line is not None and column is not None:
+        os.system(f"idea --line {line} --column {column} {filename}")
+        return
+
+    if line is not None:
+        os.system(f"idea --line {line} {filename}")
+        return
+
+    os.system(f"idea {filename}")
+
 
 def choose_files(files):
     selections = "\n".join(files)
@@ -67,28 +90,9 @@ if len(files) == 1:
     open_file(files[0])
 elif len(files) == 0:
     warn_no_file()
+    sys.exit(1)
 else:
     chosen = choose_files(files)
-
-
-# path = full_path.removeprefix("[error] ").strip()
-# os.chdir(cwd)
-
-# log("hei" + str(out))
-
-# splits = path.split(":")
-
-# os.system("tmux display-popup echo hei")
-# if len(splits) == 3 and splits[-1].isnumeric() and splits[-2].isnumeric():
-#     os.system(f"idea --line {splits[1]} --column {splits[2]} {splits[0]}")
-#
-# if len(splits) == 2 and splits[-1].isnumeric():
-#     os.system(f"idea --line {splits[1]} {splits[0]}")
-#
-# if len(splits) == 1:
-#     os.system(f"idea {splits[0]}")
-
-
-# os.system(f'code -g {path}')
+    open_file(chosen)
 
 f.close()
