@@ -53,6 +53,10 @@ map("n", "<leader>ae", [[<cmd>lua vim.diagnostic.setqflist({severity = "E"})<CR>
 map("n", "<leader>aw", [[<cmd>lua vim.diagnostic.setqflist({severity = "W"})<CR>]]) -- all workspace warnings
 map("n", "<leader>d", "<cmd>lua vim.diagnostic.setloclist()<CR>") -- buffer diagnostics only
 
+map("n", "<leader>qs", "<cmd>lua require('kulala').run()<CR>", { desc = "kulala: Run request" })
+map("n", "<leader>qe", "<cmd>lua require('kulala').set_selected_env()<CR>", { desc = "kulala: Select environment" })
+map("n", "<leader>qf", "<cmd>lua require('kulala').set_selected_env()<CR>", { desc = "kulala: Select environment" })
+
 map(
 	"n",
 	"<leader><leader>e",
