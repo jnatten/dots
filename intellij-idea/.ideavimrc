@@ -106,6 +106,7 @@ map <A-.> <Action>(NextTab)
 map <A-,> <Action>(PreviousTab)
 map <leader>t :NERDTreeToggle<CR>
 map <leader>T <Action>(SelectInProjectView)
+map <leader><space> <Action>(FindInPath)
 
 map <Leader>å <Action>(ManageRecentProjects)
 
