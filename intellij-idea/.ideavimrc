@@ -109,6 +109,10 @@ map <leader>T <Action>(SelectInProjectView)
 
 map <Leader>å <Action>(ManageRecentProjects)
 
+map <leader>m <Action>(ToggleBookmark)
+map <leader>b <Action>(GotoNextBookmark)
+map <leader><S-b> <Action>(GotoPreviousBookmark)
+
 map <C--> <Action>(Back)
 map <C-,> <Action>(Back)
 map <C-.> <Action>(Forward)
