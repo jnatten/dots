@@ -60,6 +60,13 @@ return {
 			desc = "Search History",
 		},
 		{
+			"<leader>sp",
+			function()
+				Snacks.picker.projects()
+			end,
+			desc = "List projects",
+		},
+		{
 			"<leader>sn",
 			function()
 				Snacks.notifier.show_history()
