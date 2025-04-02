@@ -60,6 +60,13 @@ return {
 			desc = "Search History",
 		},
 		{
+			"<leader>sn",
+			function()
+				Snacks.notifier.show_history()
+			end,
+			desc = "Show notification history",
+		},
+		{
 			"<leader>sb",
 			function()
 				Snacks.picker.buffers()
