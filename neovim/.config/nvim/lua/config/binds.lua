@@ -21,6 +21,13 @@ map(mall, "<A-w>", "<cmd>lua Snacks.bufdelete()<CR>", { desc = "Close buffer" })
 map(mall, "<A-q>", "<cmd>:q<CR>", { desc = "Close pane" })
 map("n", "<A-,>", ":bprev<CR>", cmd_options)
 map("n", "<A-.>", ":bnext<CR>", cmd_options)
+map("n", "<A-<>", ":vertical resize +5<CR>", cmd_options)
+map("n", "<A->>", ":vertical resize -5<CR>", cmd_options)
+
+map("n", "<A-H>", ":vertical resize +5<CR>", cmd_options)
+map("n", "<A-L>", ":vertical resize -5<CR>", cmd_options)
+map("n", "<A-J>", ":resize -5<CR>", cmd_options)
+map("n", "<A-K>", ":resize +5<CR>", cmd_options)
 
 map(mall, "<leader>t", ":Neotree toggle right<CR>", cmd_options)
 map(mall, "<leader>T", ":Neotree reveal right<CR>", cmd_options)
