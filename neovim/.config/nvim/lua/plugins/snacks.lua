@@ -101,6 +101,19 @@ return {
 			mode = { "v" },
 		},
 		{
+			"<leader><",
+			function()
+				local word = vim.fn.expand("<cword>")
+				if word ~= "" then
+					Snacks.picker.grep({ search = "<" .. word })
+				else
+					Snacks.picker.grep()
+				end
+			end,
+			desc = "Visual selection or word",
+			mode = { "v" },
+		},
+		{
 			"<leader>z",
 			function()
 				Snacks.zen.zoom()
