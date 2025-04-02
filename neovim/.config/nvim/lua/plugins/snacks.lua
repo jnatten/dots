@@ -67,6 +67,13 @@ return {
 			desc = "Show notification history",
 		},
 		{
+			"<leader>N",
+			function()
+				Snacks.notifier.hide()
+			end,
+			desc = "Hide notifications",
+		},
+		{
 			"<leader>sb",
 			function()
 				Snacks.picker.buffers()
