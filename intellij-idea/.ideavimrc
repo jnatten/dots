@@ -118,5 +118,8 @@ map <C--> <Action>(Back)
 map <C-,> <Action>(Back)
 map <C-.> <Action>(Forward)
 
+map <leader>z <Action>(TabShiftActions.ToggleMaximizeRestore)
+map <leader><leader>z <Action>(ToggleDistractionFreeMode)
+
 " map <C-l> [w
 " map <C-h> [b
