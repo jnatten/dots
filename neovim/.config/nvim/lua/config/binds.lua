@@ -18,6 +18,7 @@ map("i", "<C-l>", "<Right>", options)
 map(vn, "<Space>", "/", cmd_options)
 map(vn, "<C-l>", ":noh<CR>", cmd_options)
 map(mall, "<A-w>", "<cmd>lua Snacks.bufdelete()<CR>", { desc = "Close buffer" })
+map(mall, "<A-q>", "<cmd>:q<CR>", { desc = "Close pane" })
 map("n", "<A-,>", ":bprev<CR>", cmd_options)
 map("n", "<A-.>", ":bnext<CR>", cmd_options)
 
