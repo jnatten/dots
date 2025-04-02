@@ -3,7 +3,6 @@ return {
 	dependencies = { "saghen/blink.cmp" },
 	opts = {
 		servers = {
-			ts_ls = {},
 			cssls = {},
 			tailwindcss = {},
 			html = {},
