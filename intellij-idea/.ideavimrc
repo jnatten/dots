@@ -121,5 +121,7 @@ map <C-.> <Action>(Forward)
 map <leader>z <Action>(TabShiftActions.ToggleMaximizeRestore)
 map <leader><leader>z <Action>(ToggleDistractionFreeMode)
 
+nmap gr <Action>(FindUsages)
+
 " map <C-l> [w
 " map <C-h> [b
