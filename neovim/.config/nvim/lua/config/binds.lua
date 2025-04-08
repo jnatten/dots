@@ -64,6 +64,7 @@ map("n", "gws", "<cmd>lua Snacks.picker.lsp_workspace_symbols()<CR>", { desc = "
 --
 map("n", "gD", "<cmd>lua Snacks.picker.lsp_declarations()<CR>")
 map("n", "K", "<cmd>lua vim.lsp.buf.hover()<CR>")
+map("n", "<leader>k", "<cmd>lua vim.diagnostic.open_float()<CR>")
 map("n", "<leader>cl", [[<cmd>lua vim.lsp.codelens.run()<CR>]])
 map("n", "<leader>sh", [[<cmd>lua vim.lsp.buf.signature_help()<CR>]])
 map("n", "<leader>r", "<cmd>lua vim.lsp.buf.rename()<CR>", { desc = "lsp: Rename" })
