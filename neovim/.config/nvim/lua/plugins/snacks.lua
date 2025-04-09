@@ -13,12 +13,12 @@ return {
 		{
 			"<leader>l",
 			function()
-				Snacks.picker.smart()
+				Snacks.picker.files()
 			end,
 			desc = "Find Files",
 		},
 		{
-			"<leader>f",
+			"<leader><leader>f",
 			function()
 				Snacks.picker.files()
 			end,
