@@ -1,4 +1,5 @@
 local map = vim.keymap.set
+local del = vim.keymap.del
 local options = { noremap = true }
 local cmd_options = { noremap = true, silent = true }
 
@@ -77,6 +78,13 @@ map("n", "<leader>d", "<cmd>lua vim.diagnostic.setloclist()<CR>") -- buffer diag
 map("n", "<leader>qs", "<cmd>lua require('kulala').run()<CR>", { desc = "kulala: Run request" })
 map("n", "<leader>qe", "<cmd>lua require('kulala').set_selected_env()<CR>", { desc = "kulala: Select environment" })
 map("n", "<leader>qf", "<cmd>lua require('kulala').set_selected_env()<CR>", { desc = "kulala: Select environment" })
+
+-- These seem to be default binds that conflict with `gr`
+-- That makes stuff slow so lets not do that
+del("n", "grr")
+del("n", "gra")
+del("n", "gri")
+del("n", "grn")
 
 map(
 	"n",
