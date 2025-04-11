@@ -95,6 +95,13 @@ return {
 			desc = "Search commands",
 		},
 		{
+			"<leader>sj",
+			function()
+				Snacks.picker.jumps()
+			end,
+			desc = "Search jumps",
+		},
+		{
 			"<leader><space>",
 			function()
 				local word = vim.fn.expand("<cword>")
