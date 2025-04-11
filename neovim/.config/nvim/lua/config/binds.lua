@@ -55,7 +55,7 @@ map("n", "gr", function()
 end, { desc = "lsp: Goto references" })
 
 map("n", "gt", "<cmd>lua Snacks.picker.lsp_type_definitions()<CR>", { desc = "lsp: Goto type definitions" })
-map("n", "gds", "<cmd>lua Snacks.picker.lsp_symbols()<CR>", { desc = "lsp: Symbols" })
+map("n", "gss", "<cmd>lua Snacks.picker.lsp_symbols()<CR>", { desc = "lsp: Symbols" })
 map("n", "gws", "<cmd>lua Snacks.picker.lsp_workspace_symbols()<CR>", { desc = "lsp: Workspace symbols" })
 map("n", "<leader>y", "<cmd>lua require('package-info').show()<cr>", { desc = "Update package.json" })
 map("n", "<leader><leader>y", "<cmd>lua require('package-info').update()<cr>", { desc = "Update package.json" })
