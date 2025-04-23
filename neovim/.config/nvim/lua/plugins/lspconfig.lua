@@ -10,6 +10,7 @@ return {
 			terraformls = {},
 			eslint = {},
 			pyright = {},
+			rust_analyzer = {},
 			vtsls = {
 				filetypes = {
 					"javascript",
