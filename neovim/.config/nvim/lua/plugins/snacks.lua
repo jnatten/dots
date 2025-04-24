@@ -141,14 +141,20 @@ return {
 			end,
 			desc = "Zen mode!",
 		},
-		-- {
-		-- 	"<leader>sw",
-		-- 	function()
-		-- 		Snacks.picker.grep_word()
-		-- 	end,
-		-- 	desc = "Visual selection or word",
-		-- 	mode = { "n", "x" },
-		-- },
+		{
+			"<leader>sd",
+			function()
+				Snacks.dim.enable()
+			end,
+			desc = "Snacks: Dim the scopes!",
+		},
+		{
+			"<leader>sD",
+			function()
+				Snacks.dim.disable()
+			end,
+			desc = "Snacks: Disable dim the scopes!",
+		},
 	},
 	opts = {
 		bigfile = { enabled = true },
