@@ -20,6 +20,15 @@ map(vn, "<Space>", "/", options)
 map(vn, "<C-l>", ":noh<CR>", cmd_options)
 map(mall, "<A-w>", "<cmd>lua Snacks.bufdelete()<CR>", { desc = "Close buffer" })
 map(mall, "<A-b>", "<cmd>lua Snacks.picker.buffers()<CR>", { desc = "Search open buffers" })
+map("n", "<leader>qs", "<cmd>lua require('persistence').load()<CR>", { desc = "Session: Load last session" })
+map("n", "<leader>qS", "<cmd>lua require('persistence').select()<CR>", { desc = "Session: Select" })
+map(
+	"n",
+	"<leader>ql",
+	"<cmd>lua require('persistence').load({ last = true })<CR>",
+	{ desc = "Session: Load last session" }
+)
+map("n", "<leader>qd", "<cmd>lua require('persistence').stop()<CR>", { desc = "Session: Stop" })
 map(mall, "<A-q>", "<cmd>:close<CR>", { desc = "Close pane" })
 map("n", "<A-,>", ":bprev<CR>", cmd_options)
 map("n", "<A-.>", ":bnext<CR>", cmd_options)
@@ -75,10 +84,6 @@ map("n", "<leader>aa", [[<cmd>lua vim.diagnostic.setqflist()<CR>]]) -- all works
 map("n", "<leader>ae", [[<cmd>lua vim.diagnostic.setqflist({severity = "E"})<CR>]]) -- all workspace errors
 map("n", "<leader>aw", [[<cmd>lua vim.diagnostic.setqflist({severity = "W"})<CR>]]) -- all workspace warnings
 map("n", "<leader>d", "<cmd>lua vim.diagnostic.setloclist()<CR>") -- buffer diagnostics only
-
-map("n", "<leader>qs", "<cmd>lua require('kulala').run()<CR>", { desc = "kulala: Run request" })
-map("n", "<leader>qe", "<cmd>lua require('kulala').set_selected_env()<CR>", { desc = "kulala: Select environment" })
-map("n", "<leader>qf", "<cmd>lua require('kulala').set_selected_env()<CR>", { desc = "kulala: Select environment" })
 
 -- These seem to be default binds that conflict with `gr`
 -- That makes stuff slow so lets not do that
