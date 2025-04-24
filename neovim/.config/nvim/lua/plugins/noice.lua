@@ -4,7 +4,8 @@ return {
 	enabled = true,
 	opts = {
 		cmdline = {
-			enabled = false,
+			enabled = true,
+			view = "cmdline",
 		},
 		messages = {
 			enabled = true,
