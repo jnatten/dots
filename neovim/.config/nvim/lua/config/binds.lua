@@ -40,8 +40,8 @@ map("n", "<A-L>", ":vertical resize -5<CR>", cmd_options)
 map("n", "<A-J>", ":resize -5<CR>", cmd_options)
 map("n", "<A-K>", ":resize +5<CR>", cmd_options)
 
-map(mall, "<leader>t", ":Neotree toggle right<CR>", cmd_options)
-map(mall, "<leader>T", ":Neotree reveal right<CR>", cmd_options)
+map(mall, "<leader>t", ":Neotree toggle float<CR>", cmd_options)
+map(mall, "<leader>T", ":Neotree reveal float<CR>", cmd_options)
 
 map("n", "<leader><leader>g", ":Neogit<CR>", cmd_options)
 map("n", "<leader><leader>l", ":Lazy<CR>", cmd_options)
