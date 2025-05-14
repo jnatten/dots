@@ -25,11 +25,3 @@ o.splitbelow = true
 o.termguicolors = true
 o.smartcase = true
 o.ignorecase = true
-
-vim.api.nvim_create_autocmd("LspAttach", {
-	callback = function(args)
-		local client = vim.lsp.get_client_by_id(args.data.client_id)
-		vim.notify("LSP attached: " .. client.name .. client.id, vim.log.levels.INFO, { title = "LSP" })
-		print("LSP attached: " .. client.name)
-	end,
-})
