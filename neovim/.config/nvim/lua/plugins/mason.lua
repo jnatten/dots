@@ -7,28 +7,22 @@ return {
 	config = function()
 		require("mason").setup()
 
-		require("mason-lspconfig").setup({
-			automatic_installation = true,
-			ensure_installed = {
-				"cssls",
-				"eslint",
-				"html",
-				"jsonls",
-				"vtsls",
-				"pyright",
-				"terraformls",
-				"tailwindcss",
-			},
-		})
-
 		require("mason-tool-installer").setup({
 			ensure_installed = {
-				"prettier",
-				"stylua", -- lua formatter
-				"isort", -- python formatter
-				"black", -- python formatter
-				"pylint",
+				"black",
+				"cssls",
+				"eslint",
 				"eslint_d",
+				"html",
+				"isort",
+				"jsonls",
+				"prettier",
+				"pylint",
+				"pyright",
+				"stylua",
+				"tailwindcss",
+				"terraformls",
+				"vtsls",
 			},
 		})
 	end,
