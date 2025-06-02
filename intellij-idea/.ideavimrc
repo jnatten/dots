@@ -93,6 +93,11 @@ map <A-S-l> <Action>(TabShiftActions.ShiftRight)
 map <A-S-k> <Action>(TabShiftActions.ShiftUp)
 map <A-S-j> <Action>(TabShiftActions.ShiftDown)
 
+map <C-w><S-h> <Action>(TabShiftActions.ShiftLeft)
+map <C-w><S-l> <Action>(TabShiftActions.ShiftRight)
+map <C-w><S-k> <Action>(TabShiftActions.ShiftUp)
+map <C-w><S-j> <Action>(TabShiftActions.ShiftDown)
+
 map <Leader>wo <Action>(UnsplitAll)
 map <Leader>wc <Action>(Unsplit)
 map <Leader>w= <Action>(tabshifter.Actions.EqualSizeSplit)
