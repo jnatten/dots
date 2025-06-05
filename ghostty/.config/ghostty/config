@@ -26,3 +26,14 @@ keybind = super+w=text:\x1Bw
 keybind = super+s=text:\x1Bs
 keybind = ctrl+tab=text:\x1b[9;5u
 keybind = ctrl+shift+tab=text:\x1b[1;5Z
+
+keybind = alt+shift+8=text:{
+keybind = alt+shift+9=text:}
+keybind = alt+8=text:[
+keybind = alt+9=text:]
+keybind = alt+shift+7=text:\
+keybind = alt+7=text:|
+
+
+macos-option-as-alt = left
+
