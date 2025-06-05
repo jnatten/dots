@@ -2,7 +2,7 @@
 source ~/.zshcustom
 
 
-if [[ -z $ALACRITTY_LOG && -z $WEINKITTY ]]; then
+if [[ -z $ALACRITTY_LOG && -z $WEINKITTY && "$TERM_PROGRAM" != "ghostty" ]]; then
   # Disable auto spawning tmux if not in alacritty (Nice in intellij since it sucks with tmux)
   case $(tty) in
     (/dev/tty[1-9]) ;;
