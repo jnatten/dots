@@ -10,6 +10,12 @@ fn+shift-h: aerospace move left
 fn+shift-j: aerospace move down
 fn+shift-k: aerospace move up
 fn+shift-l: aerospace move right
+
+fn+ctrl+shift-h: aerospace move-node-to-monitor left; aerospace focus --boundaries all-monitors-outer-frame left
+fn+ctrl+shift-j: aerospace move-node-to-monitor down; aerospace focus --boundaries all-monitors-outer-frame down
+fn+ctrl+shift-k: aerospace move-node-to-monitor up; aerospace focus --boundaries all-monitors-outer-frame up
+fn+ctrl+shift-l: aerospace move-node-to-monitor right; aerospace focus --boundaries all-monitors-outer-frame right
+
 fn-f: aerospace fullscreen
 fn-g: aerospace split horizontal
 fn-v: aerospace split vertical
