@@ -43,7 +43,7 @@
     file-style = bold yellow ul
     file-decoration-style = none
     hunk-header-decoration-style = omit
-    hunk-header-style = file line-number syntax
+    hunk-header-style = omit
     hunk-header-decoration = omit
 
 [delta "line-numbers"]
