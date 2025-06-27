@@ -53,3 +53,6 @@ fn+ctrl-j: aerospace move-workspace-to-monitor --wrap-around down
 fn+ctrl-k: aerospace move-workspace-to-monitor --wrap-around up
 
 fn-r: aerospace mode resize
+
+
+fn-d: open -a "Raycast" -g
