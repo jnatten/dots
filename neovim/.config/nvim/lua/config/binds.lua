@@ -99,3 +99,5 @@ map(
 	{ desc = "lsp: Goto prev error" }
 )
 map("n", "<leader>e", "<cmd>lua vim.diagnostic.goto_next { wrap = true }<CR>", { desc = "lsp: Goto next error" })
+map("n", "<leader>ai", ":CodeCompanionChat toggle<CR>", { desc = "Code companion chat" })
+map("n", "<leader><leader>ai", ":CodeCompanionActions<CR>", { desc = "Code companion actions select" })
