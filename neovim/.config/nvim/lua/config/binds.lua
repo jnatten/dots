@@ -91,6 +91,7 @@ del("n", "grr")
 del("n", "gra")
 del("n", "gri")
 del("n", "grn")
+del("n", "grt")
 
 map(
 	"n",
