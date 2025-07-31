@@ -84,6 +84,9 @@ map("n", "<leader>aa", [[<cmd>lua vim.diagnostic.setqflist()<CR>]]) -- all works
 map("n", "<leader>ae", [[<cmd>lua vim.diagnostic.setqflist({severity = "E"})<CR>]]) -- all workspace errors
 map("n", "<leader>aw", [[<cmd>lua vim.diagnostic.setqflist({severity = "W"})<CR>]]) -- all workspace warnings
 map("n", "<leader>d", "<cmd>lua vim.diagnostic.setloclist()<CR>") -- buffer diagnostics only
+map("n", "<leader>dc", "<cmd>:DapContinue<CR>", { desc = "lsp: Start / continue debugging" })
+map("n", "<leader>dt", "<cmd>:DapToggleBreakpoint<CR>", { desc = "lsp: Toggle breakpoint on line" })
+map("n", "<leader><leader>d", "<cmd>lua require('dapui').toggle()<CR>", { desc = "lsp: Toggle debugging UI" })
 
 -- These seem to be default binds that conflict with `gr`
 -- That makes stuff slow so lets not do that
