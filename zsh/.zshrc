@@ -113,14 +113,14 @@ function supervim() {
   tmux split -t $NAME -l 10
   tmux send-keys -t $NAME cd Space $COMP_PATH Enter
   tmux select-pane -t $NAME -D
-
-
 }
 
 eval "$(mise activate zsh)"
 eval "$(mise completion zsh)"
 eval "$(uv generate-shell-completion zsh)"
 
+
+alias mill='MILL_OUTPUT_DIR=out-term ./mill'
 
 source ~/.zsh_ndla
 

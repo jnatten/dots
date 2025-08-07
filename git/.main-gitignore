@@ -16,6 +16,7 @@
 .factorypath
 .project
 .settings/
+out-term/
 
 /src/messages/convertTheFilesNeverCommitNeverDie.ts
 http-requests/
