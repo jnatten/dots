@@ -7,7 +7,7 @@ return {
 			preset = "default",
 			["<CR>"] = { "accept", "fallback" },
 			["<C-Space>"] = { "show", "show_documentation", "hide_documentation" },
-			["("] = { "accept", "fallback" },
+			-- ["("] = { "accept", "fallback" },
 			["<C-k>"] = { "select_prev", "fallback" },
 			["<C-j>"] = { "select_next", "fallback" },
 		},
