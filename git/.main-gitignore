@@ -17,6 +17,7 @@
 .project
 .settings/
 out-term/
+out-metals/
 
 /src/messages/convertTheFilesNeverCommitNeverDie.ts
 http-requests/

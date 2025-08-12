@@ -121,6 +121,7 @@ eval "$(uv generate-shell-completion zsh)"
 
 
 alias mill='MILL_OUTPUT_DIR=out-term ./mill'
+export MILL_OUTPUT_DIR=out-term
 
 source ~/.zsh_ndla
 
