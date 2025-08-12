@@ -52,6 +52,10 @@ fn+ctrl-l: aerospace move-workspace-to-monitor --wrap-around right
 fn+ctrl-j: aerospace move-workspace-to-monitor --wrap-around down
 fn+ctrl-k: aerospace move-workspace-to-monitor --wrap-around up
 
+fn-n: aerospace workspace --wrap-around next
+fn-p: aerospace workspace --wrap-around prev
+
+
 fn-r: aerospace mode resize
 
 
