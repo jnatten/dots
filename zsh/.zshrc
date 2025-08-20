@@ -118,6 +118,7 @@ function supervim() {
 eval "$(mise activate zsh)"
 eval "$(mise completion zsh)"
 eval "$(uv generate-shell-completion zsh)"
+source ~/.cache/mill/download/mill-completion.sh
 
 if [ "$TERM_PROGRAM" = "tmux"  ]; then
   # Since intellij sources zshrc for some reason when running mill, we need to set the output dir in a if statement
