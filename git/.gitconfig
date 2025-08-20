@@ -9,7 +9,7 @@
     commentChar = ";"
     # pager = "diff-so-fancy | less --tabs=4 -RFX"
     pager = delta
-    excludesfile = "~/.main-gitignore"
+    excludesfile = "~/.gitignore-global"
     # hooksPath = /home/jonas/.config/git/hooks/
 [color]
     ui = true
