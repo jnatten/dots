@@ -18,9 +18,9 @@ return {
 			desc = "Find Files",
 		},
 		{
-			"<leader><leader>f",
+			"<leader>ff",
 			function()
-				Snacks.picker.files()
+				Snacks.picker.files({ hidden = true })
 			end,
 			desc = "Find Files",
 		},
@@ -28,6 +28,13 @@ return {
 			"<leader>fg",
 			function()
 				Snacks.picker.git_files()
+			end,
+			desc = "Find Git Files",
+		},
+		{
+			"<leader>fs",
+			function()
+				Snacks.picker.git_status()
 			end,
 			desc = "Find Git Files",
 		},
