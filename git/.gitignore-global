@@ -12,6 +12,7 @@
 .idea/
 .mise.toml
 .claude/
+CLAUDE.md
 
 .classpath
 .factorypath
