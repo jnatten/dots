@@ -51,7 +51,7 @@ return {
 				yaml = { "prettier" },
 				markdown = { "prettier" },
 				lua = { "stylua" },
-				python = { "isort", "black" },
+				-- python = { "isort", "black" },
 				rust = { "rustfmt", lsp_format = "fallback" },
 			},
 			format_on_save = function(bufnr)
