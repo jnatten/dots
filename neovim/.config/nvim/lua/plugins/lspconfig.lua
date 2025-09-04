@@ -10,6 +10,12 @@ return {
 			terraformls = {},
 			eslint = {},
 			ruff = {},
+			["helm-ls"] = {
+				yamlls = {
+					path = "yaml-language-server",
+				},
+			},
+			yamlls = {},
 			basedpyright = {
 				settings = {
 					basedpyright = {
