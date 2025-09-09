@@ -11,25 +11,27 @@
     pager = delta
     excludesfile = "~/.gitignore-global"
     # hooksPath = /home/jonas/.config/git/hooks/
+
 [color]
     ui = true
+
+[alias]
+    gss = 'status'
+    fwl = push --force-with-lease
+    graph = log --all --decorate --oneline --graph 
+    stashu = stash --include-untracked
+    find-merge = "!sh -c 'commit=$0 && branch=${1:-HEAD} && (git rev-list $commit..$branch --ancestry-path | cat -n; git rev-list $commit..$branch --first-parent | cat -n) | sort -k2 -s | uniq -f1 -d | sort -n | tail -1 | cut -f2'"
+    show-merge = "!sh -c 'merge=$(git find-merge $0 $1) && [ -n \"$merge\" ] && git show $merge'"
+    root = rev-parse --show-toplevel
+    dft = difftool
+    ru = reset --hard @{upstream}
+
 [filter "lfs"]
     process = git-lfs filter-process
     required = true
     clean = git-lfs clean -- %f
     smudge = git-lfs smudge -- %f
-# [color "diff-highlight"]
-#     oldNormal = red bold
-#     oldHighlight = red bold 52
-#     newNormal = green bold
-#     newHighlight = green bold 22
-# [color "diff"]
-#     meta = yellow
-#     frag = magenta bold
-#     commit = yellow bold
-#     old = red bold
-#     new = green bold
-#     whitespace = red reverse
+
 [delta]
     features = line-numbers decorations navigate # side-by-side
     syntax-theme = Dracula
@@ -52,18 +54,9 @@
     line-numbers-minus-style = 124
     line-numbers-plus-style = 28
 
-[alias]
-    gss = 'status'
-    fwl = push --force-with-lease
-    graph = log --all --decorate --oneline --graph 
-    stashu = stash --include-untracked
-    find-merge = "!sh -c 'commit=$0 && branch=${1:-HEAD} && (git rev-list $commit..$branch --ancestry-path | cat -n; git rev-list $commit..$branch --first-parent | cat -n) | sort -k2 -s | uniq -f1 -d | sort -n | tail -1 | cut -f2'"
-    show-merge = "!sh -c 'merge=$(git find-merge $0 $1) && [ -n \"$merge\" ] && git show $merge'"
-    root = rev-parse --show-toplevel
-    dft = difftool
-    ru = reset --hard @{upstream}
 [diff]
     tool = difftastic
+
 [difftool]
     prompt = false
 
@@ -75,12 +68,16 @@
 
 [pull]
     ff = only
+
 [commit]
     gpgsign = true
 
 [init]
     defaultBranch = main
+
 [push]
     autoSetupRemote = true
+
 [rerere]
     enabled = true
+
