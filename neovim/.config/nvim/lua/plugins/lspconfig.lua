@@ -9,7 +9,15 @@ return {
 			jsonls = {},
 			terraformls = {},
 			eslint = {},
-			ruff = {},
+			ruff = {
+				-- init_options = {
+				-- 	settings = {
+				-- 		lint = {
+				-- 			enable = false,
+				-- 		},
+				-- 	},
+				-- },
+			},
 			["helm-ls"] = {
 				yamlls = {
 					path = "yaml-language-server",
