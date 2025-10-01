@@ -1,0 +1,14 @@
+k9s:
+  # General K9s styles
+  body:
+    bgColor: "transparent"
+
+  frame:
+    title:
+      bgColor: "transparent"
+
+  views:
+    table:
+      bgColor: "transparent"
+      header:
+        bgColor: "transparent"
