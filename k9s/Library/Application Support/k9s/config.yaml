@@ -7,7 +7,7 @@ k9s:
   noExitOnCtrlC: false
   ui:
     enableMouse: true
-    skin: test
+    skin: transparent
     headless: true
     splashless: true
     logoless: true
