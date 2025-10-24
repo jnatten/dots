@@ -9,32 +9,23 @@ return {
 			jsonls = {},
 			terraformls = {},
 			eslint = {},
-			ruff = {
-				-- init_options = {
-				-- 	settings = {
-				-- 		lint = {
-				-- 			enable = false,
-				-- 		},
-				-- 	},
-				-- },
-			},
+			-- ruff = {},
 			["helm-ls"] = {
 				yamlls = {
 					path = "yaml-language-server",
 				},
 			},
 			yamlls = {},
-			basedpyright = {
+			rust_analyzer = {},
+			pyrefly = {
 				settings = {
-					basedpyright = {
-						disableOrganizeImports = true,
-						analysis = {
-							ignore = { "*" },
+					python = {
+						pyrefly = {
+							displayTypeErrors = "force-on",
 						},
 					},
 				},
 			},
-			rust_analyzer = {},
 			vtsls = {
 				root_markers = { "tsconfig.json", "jsconfig.json", ".git" },
 				filetypes = {
