@@ -8,6 +8,7 @@ return {
 			html = {},
 			jsonls = {},
 			terraformls = {},
+			kulalals = {},
 			eslint = {},
 			-- ruff = {},
 			["helm-ls"] = {
