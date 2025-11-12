@@ -20,7 +20,6 @@ $helm\
 $rust\
 $scala\
 $terraform\
-$aws\
 $env_var\
 $sudo\
 $cmd_duration\
@@ -32,6 +31,7 @@ $shell """
 right_format = """
 $python\
 $jobs\
+$aws\
 $custom\
 """
 
@@ -70,8 +70,8 @@ symbol = ""
 format = '\[[$symbol$number]($style)\]'
 
 [aws]
-disabled = true
-format = '\[[$symbol($profile)(\($region\))(\[$duration\])]($style)\]'
+disabled = false
+format = '\[[$profile+($region)(\[$duration\])]($style)\]'
 
 [c]
 disabled = true
