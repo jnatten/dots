@@ -2,6 +2,7 @@ add_newline = false
 
 format = """
 $character\
+$aws\
 $username\
 $hostname\
 $localip\
@@ -31,7 +32,6 @@ $shell """
 right_format = """
 $python\
 $jobs\
-$aws\
 $custom\
 """
 
@@ -71,7 +71,7 @@ format = '\[[$symbol$number]($style)\]'
 
 [aws]
 disabled = false
-format = '\[[$profile+($region)(\[$duration\])]($style)\]'
+format = '(\[[$profile]($style)\] )'
 
 [c]
 disabled = true
