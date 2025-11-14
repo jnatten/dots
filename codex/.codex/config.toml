@@ -1,3 +1,4 @@
+model = "gpt-5.1-codex"
 [projects."/Users/jonasnatten/dev/ndla/backend"]
 trust_level = "trusted"
 
@@ -17,6 +18,9 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/Users/jonasnatten/dev/ndla/ndla-frontend"]
+trust_level = "trusted"
+
+[projects."/Users/jonasnatten/dev/ndla/taxonomy-api"]
 trust_level = "trusted"
 
 [mcp_servers.context7]
@@ -45,4 +49,7 @@ args = ["chrome-devtools-mcp@latest"]
 
 [mcp_servers.aws-knowledge-mcp]
 url = "https://knowledge-mcp.global.api.aws"
+
+[notice]
+hide_gpt5_1_migration_prompt = true
 
