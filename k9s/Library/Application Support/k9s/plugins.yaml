@@ -2,11 +2,11 @@ plugins:
   yamlLogs:
     args:
       - -c
-      - kubectl logs --context="$CONTEXT" --namespace="$NAMESPACE" "$RESOURCE_NAME/$NAME" | jq -cR ". as \$line | try (fromjson | .) catch \$line" | yq --input-format="json" --colors "${1:-.}" - | less -R # -R is necessary for colorization
+      - kubectl logs --context="$CONTEXT" --namespace="$NAMESPACE" "$RESOURCE_NAME/$NAME" | logtui
     background: false
     command: sh
     confirm: false
-    description: Logs (as YAML)
+    description: logtui
     scopes:
       - daemonset
       - deploy
