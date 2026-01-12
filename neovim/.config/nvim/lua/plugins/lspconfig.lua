@@ -10,7 +10,8 @@ return {
 			terraformls = {},
 			kulalals = {},
 			eslint = {},
-			-- ruff = {},
+			ruff = {},
+			ty = {},
 			["helm-ls"] = {
 				yamlls = {
 					path = "yaml-language-server",
@@ -18,15 +19,15 @@ return {
 			},
 			yamlls = {},
 			rust_analyzer = {},
-			pyrefly = {
-				settings = {
-					python = {
-						pyrefly = {
-							displayTypeErrors = "force-on",
-						},
-					},
-				},
-			},
+			-- pyrefly = {
+			-- 	settings = {
+			-- 		python = {
+			-- 			pyrefly = {
+			-- 				displayTypeErrors = "force-on",
+			-- 			},
+			-- 		},
+			-- 	},
+			-- },
 			vtsls = {
 				root_markers = { "tsconfig.json", "jsconfig.json", ".git" },
 				filetypes = {
