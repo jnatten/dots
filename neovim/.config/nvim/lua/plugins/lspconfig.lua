@@ -12,6 +12,7 @@ return {
 			eslint = {},
 			ruff = {},
 			ty = {},
+			oxfmt = {},
 			["helm-ls"] = {
 				yamlls = {
 					path = "yaml-language-server",
