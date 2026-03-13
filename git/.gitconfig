@@ -17,7 +17,7 @@
 
 [alias]
     gss = 'status'
-    fwl = push --force-with-lease
+    fwl = push --force-with-lease --force-if-includes
     graph = log --all --decorate --oneline --graph 
     stashu = stash --include-untracked
     find-merge = "!sh -c 'commit=$0 && branch=${1:-HEAD} && (git rev-list $commit..$branch --ancestry-path | cat -n; git rev-list $commit..$branch --first-parent | cat -n) | sort -k2 -s | uniq -f1 -d | sort -n | tail -1 | cut -f2'"
