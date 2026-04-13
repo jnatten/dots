@@ -1,0 +1,29 @@
+"$schema" = "https://jj-vcs.github.io/jj/latest/config-schema.json"
+
+[user]
+email = "jonas@natten.it"
+name = "Jonas Natten"
+
+[signing]
+behavior = "drop"
+backend = "ssh"
+key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDgNU6hAVIkGr8Twj3pSlmAN2quVh9fYdA1h6kwMqfduD0ERAwxTeiHtYVU2o8PIY5H+JySSeUeyNlhBDRL4j/IEf5lMfklIK4XizU5LWF7SaICY91HtOKXhmGxZarIXMjihZ9kxZu4t0808rYRBPLjN541n/9ykpyhW/ZTHc4iWl5s3dA/WJ5oM1SQho8iags2dBUih5CagiE2GRPrMieETvmaDIRn1EtBqBHJCJ2gXnJ4KlZOln0hjpD2FGHu+ZTbbgHvThUtwEQAO42+2e/8tv22HYSX43byKiqrY7Hai/HwdNW8NtGKyzA8ROYMrewuzObI3HMLuJabUlww/RDCHqvZUFDKwf0U/FSMPWG6VlWhkuywtxu2BExkiMWIfXSSW/iwO6MuY+InzVZqrHSzaGt0FbkBvg61CB2SUD3nOwejMufuGWx0/ZFS+qB+tfj3tdNNnDUGgLbFOwntmqDn+0u8J09oNkVHJUS6U6FyYkwK/r7Z5BhmpBpjdwRF/fd5RpVzQmApma+nE43Wtv7igGIhgJBT8QhdOPiCJyrK/+1ca154kQfBTGSK60k6e3F2wy7VbEuMXBaCoj0R5Ob6jZ0ar2aHxfiMvGwa1wyLN4UXLfTtYs1skRfds2Je3iFyxdMKubRc7YFH/Vf2eTVL71sGaXVaHCY4N6T771EvYw=="
+
+[git]
+sign-on-push = true
+
+[ui]
+diff-formatter = ["difft", "--color=always", "$left", "$right"]
+# pager = ["delta", "--pager", "less -FRX"]
+diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
+conflict-marker-style = "git"
+default-command = "st"
+
+[revsets]
+bookmark-advance-to = "@-"
+
+# For diff and show, clear screen after exiting pager
+# [[--scope]]
+# --when.commands = ["diff", "show"]
+# [--scope.ui]
+# pager = ["delta", "--pager", "less -FR"]
