@@ -117,6 +117,7 @@ function supervim() {
 
 eval "$(mise activate zsh)"
 eval "$(mise completion zsh)"
+eval "$(but completions zsh)"
 eval "$(uv generate-shell-completion zsh)"
 source <(jj util completion zsh)
 source ~/.cache/mill/download/mill-completion.sh
