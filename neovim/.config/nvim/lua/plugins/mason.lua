@@ -22,6 +22,7 @@ return {
 				"stylua",
 				"tailwindcss",
 				"terraformls",
+				"tree-sitter-cli",
 				"vtsls",
 			},
 		})
