@@ -21,6 +21,7 @@ CLAUDE.md
 out-term/
 out-metals/
 out-*/
+.rtk/
 
 
 /src/messages/convertTheFilesNeverCommitNeverDie.ts
