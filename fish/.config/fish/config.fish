@@ -31,9 +31,10 @@ set --global fish_key_bindings fish_vi_key_bindings
 # Ctrl-C to clear prompt and new line no matter what
 function __ctrl_c_newline
     commandline ""
-    echo
-    commandline -f repaint
+    printf "\n"
+    commandline -f force-repaint
 end
+
 bind \cc __ctrl_c_newline
 bind -M insert \cc __ctrl_c_newline
 
