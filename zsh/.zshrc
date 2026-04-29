@@ -1,7 +1,6 @@
 # Custom configuration that is specific to THIS system
 source ~/.zshcustom
 
-
 if [[ -z $ALACRITTY_LOG && -z $WEINKITTY && "$TERM_PROGRAM" != "ghostty" ]]; then
   # Disable auto spawning tmux if not in alacritty (Nice in intellij since it sucks with tmux)
   case $(tty) in
@@ -31,32 +30,12 @@ export SAVEHIST=100000
 plugins=(
 	git 
 	vi-mode 
-	kubectl 
 	zsh-autosuggestions
-	web-search
 	yarn
-	docker
 )
 
-function gwl() {
-  WLS=$(git worktree list)
-  FOUND=$(echo $WLS | fzf)
-  if [ -z "${FOUND}" ]; then
-    echo "Cancelled..."
-  else
-    echo "Going to worktree -> $FOUND"
-    CDDIR=$(echo $FOUND | cut -d' ' -f1)
-    cd $CDDIR
-  fi
-
-}
-
-
 source $ZSH/oh-my-zsh.sh
-
-
 source ~/.zshcustom_late
-
 
 export PATH=$PATH:~/.bin
 export PATH=$PATH:~/.rd/bin
@@ -88,39 +67,11 @@ source ~/.zoxiderc
 alias cd='z'
 alias cat='bat'
 
-# Created by `pipx` on 2022-08-03 07:25:25
 export PATH="$PATH:/home/jonas/.local/bin"
-# eval "$(register-python-argcomplete pipx)" # Also slow, probably useful if we use pipx?
 eval "$(starship init zsh)"
-
-function bwcopy() {
-  if [[ -z "$BW_SESSION" ]]; then
-    export BW_SESSION=$(bw unlock --passwordfile ~/.bw --raw)
-  fi
-  if hash bw 2>/dev/null; then
-    bw get item "$(bw list items | jq '.[] | "\(.name) | username: \(.login.username) | id: \(.id)" ' | fzf-tmux | awk '{print $(NF -0)}' | sed 's/\"//g')" | jq '.login.password' | sed 's/\"//g' | pbcopy
-  fi
-}
-
-function supervim() {
-  WHERE=$1
-  COMP_PATH=$(readlink -f $WHERE)
-  NAME=$(basename $COMP_PATH)
-
-  tmux neww -n $NAME
-  tmux send-keys -t $NAME cd Space $COMP_PATH Enter
-  tmux send-keys -t $NAME vim Enter
-  tmux split -t $NAME -l 10
-  tmux send-keys -t $NAME cd Space $COMP_PATH Enter
-  tmux select-pane -t $NAME -D
-}
-
 eval "$(mise activate zsh)"
-eval "$(mise completion zsh)"
-eval "$(but completions zsh)"
 eval "$(uv generate-shell-completion zsh)"
-source <(jj util completion zsh)
-source ~/.cache/mill/download/mill-completion.sh
+# source ~/.cache/mill/download/mill-completion.sh
 
 source "$HOME/.cargo/env"
 
