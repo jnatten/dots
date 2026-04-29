@@ -41,4 +41,5 @@ set --global fish_key_bindings fish_vi_key_bindings
 source $__fish_config_dir/bindings.fish
 source $__fish_config_dir/aliases.fish
 source $__fish_config_dir/theme.fish
+source $__fish_config_dir/ndla.fish
 
