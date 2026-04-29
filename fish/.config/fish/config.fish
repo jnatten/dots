@@ -12,6 +12,7 @@ end
 if not status is-interactive
     return
 end
+### Everything after this line is only executed in interactive shells
 
 
 set fish_greeting
