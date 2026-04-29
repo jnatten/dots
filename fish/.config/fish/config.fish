@@ -1,12 +1,20 @@
 if status is-login
-    test "$(uname -s)" = "Darwin"; and /opt/homebrew/bin/brew shellenv | source
 
-    # Make global Mise tools available in system PATH
-    mise hook-env -s fish | source
+  if test "$(uname -s)" = "Darwin"
+    /opt/homebrew/bin/brew shellenv | source
+    fish_add_path -aP "/Users/jonasnatten/Library/Application Support/JetBrains/Toolbox/scripts"
+    fish_add_path -aP "/Users/jonasnatten/Library/Application Support/Coursier/bin"
+  end
 
-    test -e ~/.cargo/env.fish; and source ~/.cargo/env.fish
+  # Make global Mise tools available in system PATH
+  mise hook-env -s fish | source
 
-    functions -q autostart-compositor; and autostart-compositor
+  test -e ~/.cargo/env.fish; and source ~/.cargo/env.fish
+
+  functions -q autostart-compositor; and autostart-compositor
+
+  fish_add_path -aP ~/.local/bin
+  fish_add_path -aP ~/.bin
 end
 
 if not status is-interactive
