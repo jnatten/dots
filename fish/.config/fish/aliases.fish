@@ -38,3 +38,5 @@ abbr -a gco 'git checkout'
 abbr -a gcm 'git checkout master'
 abbr -a kc 'kubie ctx'
 abbr -a kn 'kubie ns'
+abbr -a mill './mill'
+
