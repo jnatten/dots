@@ -20,3 +20,6 @@ bind -M insert \cp down-or-search
 
 bind \cf accept-autosuggestion
 bind -M insert \cf accept-autosuggestion
+
+bind \cg accept-autosuggestion execute
+bind -M insert \cg accept-autosuggestion execute
