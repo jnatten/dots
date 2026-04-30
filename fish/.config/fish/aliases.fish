@@ -27,6 +27,7 @@ abbr -a gd git dft
 abbr -a gdd git diff
 abbr -a gds git dft --staged
 abbr -a gdds git diff --staged
+abbr -a gap git add -p
 
 abbr -a gpr 'cd (git root)'
 abbr -a gpo 'git push -u origin (git branch --show-current)'
