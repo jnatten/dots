@@ -20,6 +20,7 @@ alias cat="bat"
 alias vim="nvim"
 alias cd="z"
 
+abbr -a ng 'nvim -c Neogit'
 abbr -a g git
 abbr -a gs git status
 abbr -a gd git dft
