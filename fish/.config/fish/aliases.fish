@@ -36,6 +36,7 @@ abbr -a k kubectl
 abbr -a groh 'git reset origin/(git_current_branch) --hard'
 abbr -a gp 'git push'
 abbr -a gl 'git pull'
+abbr -a gL 'git log'
 abbr -a gco 'git checkout'
 abbr -a gfwl 'git push --force-with-lease --force-if-includes'
 abbr -a gcm 'git checkout master'
