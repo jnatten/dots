@@ -44,4 +44,5 @@ abbr -a gcm 'git checkout master'
 abbr -a kc 'kubie ctx'
 abbr -a kn 'kubie ns'
 abbr -a mill './mill'
-
+abbr -a tfp 'terraform plan'
+abbr -a tfa 'terraform apply'
