@@ -72,6 +72,9 @@
 [commit]
     gpgsign = true
 
+[gpg]
+    format = ssh
+
 [init]
     defaultBranch = main
 
@@ -81,3 +84,5 @@
 [rerere]
     enabled = true
 
+[gpg "ssh"]
+	allowedSignersFile = ~/.ssh/allowed_signers

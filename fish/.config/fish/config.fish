@@ -2,8 +2,10 @@ if status is-login
 
   if test "$(uname -s)" = "Darwin"
     /opt/homebrew/bin/brew shellenv | source
-    fish_add_path -aP "/Users/jonasnatten/Library/Application Support/JetBrains/Toolbox/scripts"
-    fish_add_path -aP "/Users/jonasnatten/Library/Application Support/Coursier/bin"
+    fish_add_path -aP "~/Library/Application Support/JetBrains/Toolbox/scripts"
+    fish_add_path -aP "~/Library/Application Support/Coursier/bin"
+
+    set -x SSH_AUTH_SOCK ~/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock
   end
 
   # Make global Mise tools available in system PATH
