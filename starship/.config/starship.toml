@@ -32,7 +32,9 @@ $shell """
 right_format = """
 $python\
 $jobs\
-$custom\
+${custom.tmux}\
+${custom.tmuxsessions}\
+${custom.colima}\
 """
 
 [custom.tmux]
@@ -48,6 +50,7 @@ when = """ true """
 style = "bold green"
 
 [custom.colima]
+disabled = true
 command = """echo 🐋"""
 format = '\[[$symbol($output)]($style)\]'
 when = """test -e ~/.colima/docker.sock"""
