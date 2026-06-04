@@ -8,6 +8,7 @@ theme = "GitHub Dark Default"
 # theme = ayu
 # bold-is-bright = true
 keybind = ctrl+shift+r=reload_config
+shell-integration-features = no-cursor,ssh-terminfo,ssh-env
 
 window-decoration = false
 window-height = 200
