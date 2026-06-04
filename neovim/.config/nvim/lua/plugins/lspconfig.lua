@@ -11,7 +11,6 @@ return {
 			kulalals = {},
 			eslint = {},
 			ruff = {},
-			ty = {},
 			oxfmt = {},
 			["helm-ls"] = {
 				yamlls = {
@@ -20,6 +19,7 @@ return {
 			},
 			yamlls = {},
 			rust_analyzer = {},
+			-- ty = {},
 			-- pyrefly = {
 			-- 	settings = {
 			-- 		python = {
@@ -29,6 +29,7 @@ return {
 			-- 		},
 			-- 	},
 			-- },
+			zuban = {},
 			vtsls = {
 				root_markers = { "tsconfig.json", "jsconfig.json", ".git" },
 				filetypes = {
