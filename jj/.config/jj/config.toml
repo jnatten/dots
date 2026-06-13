@@ -4,6 +4,12 @@
 email = "jonas@natten.it"
 name = "Jonas Natten"
 
+[[--scope]]
+--when.repositories = ["~/dev/ndla"]
+
+[--scope.user]
+email = "jonas.natten@knowit.no"
+
 [signing]
 behavior = "drop"
 backend = "ssh"
