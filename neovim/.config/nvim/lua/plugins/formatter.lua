@@ -5,6 +5,9 @@ return {
 		local conform = require("conform")
 		conform.setup({
 			formatters = {
+				oxfmt = {
+					require_cwd = true,
+				},
 				prettier = {
 					require_cwd = true,
 					cwd = require("conform.util").root_file({
@@ -25,15 +28,15 @@ return {
 				},
 			},
 			formatters_by_ft = {
-				javascript = { "prettier" },
-				typescript = { "prettier" },
-				javascriptreact = { "prettier" },
-				typescriptreact = { "prettier" },
-				css = { "prettier" },
-				html = { "prettier" },
-				json = { "prettier" },
-				yaml = { "prettier" },
-				markdown = { "prettier" },
+				javascript = { "oxfmt", "prettier" },
+				typescript = { "oxfmt", "prettier" },
+				javascriptreact = { "oxfmt", "prettier" },
+				typescriptreact = { "oxfmt", "prettier" },
+				css = { "oxfmt", "prettier" },
+				html = { "oxfmt", "prettier" },
+				json = { "oxfmt", "prettier" },
+				yaml = { "oxfmt", "prettier" },
+				markdown = { "oxfmt", "prettier" },
 				lua = { "stylua" },
 				rust = { "rustfmt", lsp_format = "fallback" },
 			},
