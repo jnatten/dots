@@ -42,6 +42,7 @@ ${custom.colima}\
 [custom.tmux]
 command = """echo T"""
 format = '\[[$symbol($output)]($style)\]'
+shell = "sh"
 when = """ test -z "$TMUX" """
 style = "bold red"
 
@@ -49,6 +50,7 @@ style = "bold red"
 command = """tmux list-sessions | wc -l"""
 format = '\[[$symbol($output)]($style)\]'
 when = """ true """
+shell = "sh"
 style = "bold green"
 
 [custom.colima]
@@ -56,6 +58,7 @@ disabled = true
 command = """echo 🐋"""
 format = '\[[$symbol($output)]($style)\]'
 when = """test -e ~/.colima/docker.sock"""
+shell = "sh"
 style = "bold green"
 
 [line_break]
