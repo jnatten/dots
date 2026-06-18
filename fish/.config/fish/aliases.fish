@@ -29,6 +29,7 @@ abbr -a gds git dft --staged
 abbr -a gdds git diff --staged
 abbr -a gap git add -p
 abbr -a gc --set-cursor 'git commit -m "%"'
+abbr -a jl 'jj log'
 
 abbr -a gpr 'cd (git root)'
 abbr -a gpo 'git push -u origin (git branch --show-current)'
