@@ -6,7 +6,7 @@ local cmd_options = { noremap = true, silent = true }
 local mall = { "i", "n", "v" }
 local vn = { "n", "v" }
 
-map("i", "jj", "<Esc>", options)
+-- map("i", "jj", "<Esc>", options)
 map(vn, "<C-j>", "5j", options)
 map(vn, "<C-k>", "5k", options)
 
