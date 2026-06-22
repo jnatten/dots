@@ -135,11 +135,12 @@ format = '\[[$symbol$branch]($style)\]'
 format = '([\[$all_status$ahead_behind\]]($style))'
 
 [custom.loading]
+disabled = true
 command = '''
-  echo "..."
+  echo "…"
 '''
 shell = ['sh']
-when = " ! test -z \"$STARSHIP_DISABLE_JJ\" "
+when = "jj --ignore-working-copy root && ! test -z \"$STARSHIP_DISABLE_JJ\" "
 format = '(\[[$output]($style)\])'
 style = "bold purple"
 

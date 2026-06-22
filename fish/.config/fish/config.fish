@@ -19,14 +19,13 @@ if status is-login
   fish_add_path -aP ~/.bin
 end
 
-function fish_prompt_loading_indicator
-  echo (STARSHIP_DISABLE_JJ=1 starship prompt)
+function fish_prompt_loading_indicator -a last_prompt
+  echo (LAST_PROMPT="$last_prompt" STARSHIP_DISABLE_JJ=1 starship prompt)
 end
 
-# function fish_right_prompt_loading_indicator
-#   echo (STARSHIP_DISABLE_JJ=1 starship prompt --right)
-#   # echo ".."
-# end
+function fish_focus_in --on-event fish_focus_in
+    type -q __async_prompt_fire && __async_prompt_fire
+end
 
 starship init fish | source
 
