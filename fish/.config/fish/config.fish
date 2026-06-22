@@ -19,10 +19,16 @@ if status is-login
   fish_add_path -aP ~/.bin
 end
 
-starship init fish | source
 function fish_prompt_loading_indicator
-    echo (STARSHIP_DISABLE_JJ=1 starship prompt)
+  echo (STARSHIP_DISABLE_JJ=1 starship prompt)
 end
+
+# function fish_right_prompt_loading_indicator
+#   echo (STARSHIP_DISABLE_JJ=1 starship prompt --right)
+#   # echo ".."
+# end
+
+starship init fish | source
 
 if not status is-interactive
     return
