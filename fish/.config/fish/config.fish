@@ -19,6 +19,11 @@ if status is-login
   fish_add_path -aP ~/.bin
 end
 
+starship init fish | source
+function fish_prompt_loading_indicator
+    echo (STARSHIP_DISABLE_JJ=1 starship prompt)
+end
+
 if not status is-interactive
     return
 end
@@ -35,7 +40,6 @@ end
 fzf --fish | source
 mise activate fish | source
 zoxide init fish | source
-starship init fish | source
 
 set --global fish_key_bindings fish_vi_key_bindings
 
