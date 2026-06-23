@@ -148,14 +148,25 @@ style = "bold purple"
 command = '''
 bookmarks=$(jj log --revisions 'heads(::@ & (bookmarks() | remote_bookmarks()))' --ignore-working-copy --no-graph --template 'bookmarks ++ "\n"')
 bookmark_len=$(echo "$bookmarks" | wc -l | tr -d '[:space:]')
+
+ahead=""
+if [ -n "$bookmarks" ]; then
+  count=$(jj log --revisions 'heads(::@ & (bookmarks() | remote_bookmarks()))..@ ~ @' --ignore-working-copy --no-graph --template '"x"')
+  count=$(printf "%s" "$count" | wc -c | tr -d '[:space:]')
+  if [ "$count" -gt 0 ]; then
+    ahead="~$count"
+  fi
+fi
+
 if [ $bookmark_len -gt 1 ]; then
   printf "$bookmark_len bookmarks"
   case "$bookmarks" in
     *"*"*) printf "*" ;;
   esac
 else
-  echo "$bookmarks"
+  printf "%s" "$bookmarks"
 fi
+printf "%s" "$ahead"
 '''
 shell = ['sh']
 when = "jj --ignore-working-copy root"
