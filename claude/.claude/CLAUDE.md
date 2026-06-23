@@ -13,4 +13,3 @@ Avoid using `git` unless the repository is not `jj` initialized.
 
 
 Avoid writing comments in code unless absolutely necessary to make understandable. 
-Assume the readers have quite a bit of domain and code knowledge before writing comments.
