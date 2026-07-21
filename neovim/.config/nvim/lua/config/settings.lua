@@ -25,3 +25,5 @@ o.splitbelow = true
 o.termguicolors = true
 o.smartcase = true
 o.ignorecase = true
+o.diffopt:append("algorithm:histogram")
+o.diffopt:append("linematch:60")
