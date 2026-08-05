@@ -22,7 +22,7 @@ sign-on-push = true
 diff-formatter = ["difft", "--color=always", "$left", "$right"]
 # pager = ["delta", "--pager", "less -FRX"]
 diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
-merge-editor = "diffview"
+merge-editor = "idea"
 conflict-marker-style = "git"
 default-command = "st"
 
@@ -31,6 +31,12 @@ program = "nvim"
 merge-args = ["-c", "DiffviewMergeFiles $output $base $left $right"]
 merge-tool-edits-conflict-markers = true
 conflict-marker-style = "git"
+
+[merge-tools.idea]
+program = "idea"
+diff-args = ["diff",  "$left", "$right"]
+edit-args = ["diff",  "$left", "$right"]
+merge-args = ["merge", "$left", "$right", "$base", "$output"]
 
 [revsets]
 bookmark-advance-to = "@-"
