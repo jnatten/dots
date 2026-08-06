@@ -38,6 +38,9 @@ diff-args = ["diff",  "$left", "$right"]
 edit-args = ["diff",  "$left", "$right"]
 merge-args = ["merge", "$left", "$right", "$base", "$output"]
 
+[aliases]
+ws-add = ["util", "exec", "--", "bash", "-c", 'exec "$HOME/.config/jj/workspace-add.sh" "$@"', "jj ws-add"]
+
 [revsets]
 bookmark-advance-to = "@-"
 
