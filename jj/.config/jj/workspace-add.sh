@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PRUNE_DIRS=(.jj .git node_modules target dist build .venv __pycache__ .gradle .next)
+# Rebuildable output; skipped wholesale so the scan never descends into them
+PRUNE_DIRS=(
+  .jj .git
+  node_modules .yarn .pnpm-store
+  target out .bsp .gradle .stack-work
+  dist build es lib
+  .next .nx .turbo .vite .parcel-cache .svelte-kit
+  .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache
+  coverage
+)
 SYMLINK_PATHS=(.claude)
 VALUE_OPTS=(--name -r --revision -m --message --sparse-patterns -R --repository --at-operation --at-op --config --config-file --config-toml)
 
@@ -77,15 +86,15 @@ for path in "${SYMLINK_PATHS[@]}"; do
   fi
 done
 
-copied=0
+pending=()
 while IFS= read -r file; do
   [ -n "$file" ] || continue
-  if [ -e "$dest/$file" ]; then
-    continue
-  fi
-  mkdir -p "$dest/$(dirname "$file")"
-  cp -a "$file" "$dest/$file"
-  copied=$((copied + 1))
+  [ -e "$dest/$file" ] || pending+=("$file")
 done <<<"$untracked"
+
+copied=${#pending[@]}
+if [ "$copied" -gt 0 ]; then
+  printf '%s\n' "${pending[@]}" | tar -cf - -T - | tar -C "$dest" -xpf -
+fi
 
 echo "Copied $copied ignored file(s) and symlinked $linked path(s) into $dest"
