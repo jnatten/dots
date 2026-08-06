@@ -48,6 +48,7 @@ abbr -a jn 'jj new'
 abbr -a js 'jj status'
 
 abbr -a gpr 'cd (git root)'
+abbr -a jpr 'cd (jj root)'
 abbr -a gpo 'git push -u origin (git branch --show-current)'
 abbr -a gch 'git checkout (git branch --sort=-committerdate -a | sed "s/remotes\/origin\///g" | uniq | fzf --no-sort)'
 abbr -a k kubectl
