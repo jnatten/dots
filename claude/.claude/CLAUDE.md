@@ -12,4 +12,6 @@ Commands that you might want to use if interacting with vcs:
 Avoid using `git` unless the repository is not `jj` initialized.
 
 
-Avoid writing comments in code unless absolutely necessary to make understandable. 
+Limit the amount of comments you put in the code to a strict minimum. You should almost never add comments, except sometimes on non-trivial code, function definitions if the arguments aren't self-explanatory, and class definitions and their members.
+
+Do not remove existing comments unless they are directly related to what you are changing.
