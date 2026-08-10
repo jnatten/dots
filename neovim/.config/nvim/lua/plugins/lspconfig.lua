@@ -7,7 +7,10 @@ return {
 			-- tailwindcss = {},
 			html = {},
 			jsonls = {},
-			terraformls = {},
+			-- terraformls = {},
+			tofu_ls = {
+				root_markers = { ".git" },
+			},
 			kulalals = {},
 			eslint = {},
 			ruff = {},
