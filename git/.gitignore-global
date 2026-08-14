@@ -11,7 +11,7 @@
 *.iml
 .idea/
 .mise.toml
-.claude/
+/.claude/
 CLAUDE.md
 
 .classpath
