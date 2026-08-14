@@ -9,6 +9,9 @@
       }
     }
   },
+  "skillOverrides": {
+    "code-review": "user-invocable-only"
+  },
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "preferredNotifChannel": "auto",
