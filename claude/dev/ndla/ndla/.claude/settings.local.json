@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(jj commit *)",
+      "Bash(jj desc *)"
+    ],
+    "allow": [
+      "Bash(./mill -i *)",
+      "Bash(PGPASSWORD=hemmelig psql *)",
+      "Bash(curl *)",
+      "Bash(docker info:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker stats:*)",
+      "Bash(echo \"exit $?\")",
+      "Bash(find:*)",
+      "Bash(gh pr *)",
+      "Bash(gh run view *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git stash *)",
+      "Bash(git status *)",
+      "Bash(grep:*)",
+      "Bash(jar tf *)",
+      "Bash(jj diff *)",
+      "Bash(jj log *)",
+      "Bash(jj status *)",
+      "Bash(ls:*)",
+      "Bash(python3 -m json.tool)",
+      "Bash(sed:*)",
+      "Bash(xargs cat)",
+      "Bash(yarn *)",
+      "mcp__jetbrains__create_new_file",
+      "mcp__jetbrains__execute_run_configuration",
+      "mcp__jetbrains__execute_sql_query",
+      "mcp__jetbrains__find_files_by_glob",
+      "mcp__jetbrains__find_files_by_name_keyword",
+      "mcp__jetbrains__get_file_text_by_path",
+      "mcp__jetbrains__get_run_configurations",
+      "mcp__jetbrains__list_database_connections",
+      "mcp__jetbrains__list_database_schemas",
+      "mcp__jetbrains__list_directory_tree",
+      "mcp__jetbrains__replace_text_in_file",
+      "mcp__jetbrains__search_in_files_by_regex",
+      "mcp__jetbrains__search_in_files_by_text",
+      "WebSearch"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "model": "opus[1m]",
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {
+    "tmux-status-dev": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/haxybaxy/claude-tmux-status.git"
+      }
+    }
+  },
+  "tui": "fullscreen",
+  "autoMemoryEnabled": false,
+  "preferredNotifChannel": "auto",
+  "inputNeededNotifEnabled": true,
+  "skipWorkflowUsageWarning": true
+}
