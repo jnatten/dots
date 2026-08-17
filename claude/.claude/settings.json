@@ -1,5 +1,8 @@
 {
   "model": "opus[1m]",
+  "skillOverrides": {
+    "code-review": "user-invocable-only"
+  },
   "enabledPlugins": {},
   "extraKnownMarketplaces": {
     "tmux-status-dev": {
@@ -9,12 +12,37 @@
       }
     }
   },
-  "skillOverrides": {
-    "code-review": "user-invocable-only"
-  },
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
+  "skipWorkflowUsageWarning": true,
   "preferredNotifChannel": "auto",
   "inputNeededNotifEnabled": true,
-  "skipWorkflowUsageWarning": true
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: NDLA (ndlano) — GitHub org github.com/ndlano",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: PUBLIC — ndlano/ndla (confirmed via gh); any push here is publishing",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: Default branch `main`; no protected branches or rulesets listed via gh for ndlano/ndla",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo (ndlano/ndla) and its remote `origin` (github.com:ndlano/ndla.git) only — no additional orgs configured",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None",
+      "**Internal package registry**: registry.npmjs.org (contacted from this project during recent usage)",
+      "**Sensitive data locations & audiences**: backend/.env and backend/.env.* files (article-api, audio-api, concept-api, draft-api, frontpage-api, image-api, learningpath-api, monolith, myndla-api, oembed-proxy, search-api, taxonomy-api); CI secret names referenced in config (CI_AWS_CLIENT_ID, CI_AWS_CLIENT_SECRET, CI_GITHUB_TOKEN, CI_NOW_GH_TOKEN, CI_RELEASE_ROLE, DOCKER_HUB_PASSWORD, DOCKER_HUB_USERNAME, KNOWIT_EMAIL, NDLA_AWS_ECR_REPO, NDLA_RELEASES, VERCEL_TOKEN) — values not gathered, only names; share only with audiences cleared at the named+specifics bar",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development (backend JVM/Mill services and frontend TypeScript/React workspace for NDLA)",
+      "**Trusted repo**: /Users/jonasnatten/dev/ndla/ndla (ndlano/ndla), remote `origin` — public repo, GPL-3.0 licensed; confidential material (secrets, sensitive data) is never cleared into it by visibility alone, only this repo's own work should be pushed here",
+      "**Org-specific CLIs**: jj (91×, primary VCS per CLAUDE.md), ndla (90× in shell history), mill (44×), mise (28×)",
+      "routine `jj diff` / `jj status` / `jj log` under this repo's working directory are standard per CLAUDE.md guidance"
+    ]
+  }
 }
