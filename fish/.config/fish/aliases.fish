@@ -48,6 +48,7 @@ abbr -a jdm 'jj diff -f "trunk()"'
 abbr -a jcm 'jj new "trunk()"'
 abbr -a jn 'jj new'
 abbr -a js 'jj status'
+abbr -a pn 'pnpm'
 
 abbr -a gpr 'cd (git root)'
 abbr -a jpr 'cd (jj root)'
