@@ -173,6 +173,7 @@ return {
 			enabled = true,
 			sources = {
 				grep = { hidden = true },
+				files = { hidden = true },
 			},
 		},
 	},
