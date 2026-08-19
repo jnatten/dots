@@ -11,7 +11,6 @@ return {
 			tofu_ls = {
 				root_markers = { ".git" },
 			},
-			kulalals = {},
 			eslint = {},
 			ruff = {},
 			oxfmt = {},
