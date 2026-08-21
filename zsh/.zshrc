@@ -76,11 +76,11 @@ eval "$(uv generate-shell-completion zsh)"
 source "$HOME/.cargo/env"
 
 if [ "$TERM_PROGRAM" = "tmux"  ]; then
-  # Since intellij sources zshrc for some reason when running mill, we need to set the output dir in a if statement
-  export MILL_OUTPUT_DIR=out-term
+  # Since intellij sources zshrc for some reason when running mill, we need to set the output dir in a if statement.
+  export MILL_OUTPUT_DIR=out/term
 fi
 
-alias mill='MILL_OUTPUT_DIR=out-term ./mill'
+alias mill='MILL_OUTPUT_DIR=out/term ./mill'
 
 source ~/.zsh_ndla
 

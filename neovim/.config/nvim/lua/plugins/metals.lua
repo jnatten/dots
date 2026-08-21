@@ -14,10 +14,6 @@ return {
 			serverProperties = { "-Xmx4g" },
 		}
 
-		metals_config.cmd_env = {
-			MILL_OUTPUT_DIR = "out-metals",
-		}
-
 		metals_config.init_options.statusBarProvider = "on"
 		metals_config.on_attach = function(client, bufnr)
 			require("metals").setup_dap()
