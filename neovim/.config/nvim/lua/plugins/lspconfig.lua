@@ -1,6 +1,7 @@
 return {
 	"neovim/nvim-lspconfig",
-	dependencies = { "saghen/blink.cmp" },
+	event = { "BufReadPre", "BufNewFile" },
+	dependencies = { "saghen/blink.cmp", "williamboman/mason.nvim" },
 	opts = {
 		servers = {
 			cssls = {},

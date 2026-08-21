@@ -1,13 +1,21 @@
 return {
-	"williamboman/mason.nvim",
-	dependencies = {
-		"williamboman/mason-lspconfig.nvim",
-		"WhoIsSethDaniel/mason-tool-installer.nvim",
+	{
+		"williamboman/mason.nvim",
+		cmd = { "Mason", "MasonInstall", "MasonUpdate", "MasonUninstall", "MasonUninstallAll", "MasonLog" },
+		dependencies = {
+			"williamboman/mason-lspconfig.nvim",
+		},
+		config = function()
+			require("mason").setup()
+		end,
 	},
-	config = function()
-		require("mason").setup()
-
-		require("mason-tool-installer").setup({
+	{
+		"WhoIsSethDaniel/mason-tool-installer.nvim",
+		cmd = { "MasonToolsInstall", "MasonToolsUpdate", "MasonToolsClean" },
+		dependencies = { "williamboman/mason.nvim" },
+		opts = {
+			-- installs are driven by :MasonToolsInstall, not on every startup
+			run_on_start = false,
 			ensure_installed = {
 				"black",
 				"cssls",
@@ -25,6 +33,6 @@ return {
 				"tree-sitter-cli",
 				"vtsls",
 			},
-		})
-	end,
+		},
+	},
 }

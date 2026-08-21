@@ -1,13 +1,14 @@
 return {
 	"NeogitOrg/neogit",
+	cmd = { "Neogit", "NeogitCommit", "NeogitLogCurrent", "NeogitResetState" },
 	dependencies = {
 		"nvim-lua/plenary.nvim", -- required
-		"dlyongemallo/diffview.nvim", -- optional - Diff integration
+		{ "dlyongemallo/diffview.nvim", optional = true }, -- optional - Diff integration
 
 		-- Only one of these is needed.
-		"nvim-telescope/telescope.nvim", -- optional
-		"ibhagwan/fzf-lua", -- optional
-		"echasnovski/mini.pick", -- optional
+		{ "nvim-telescope/telescope.nvim", optional = true }, -- optional
+		{ "ibhagwan/fzf-lua", optional = true }, -- optional
+		{ "echasnovski/mini.pick", optional = true }, -- optional
 	},
 	config = true,
 }
