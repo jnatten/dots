@@ -49,9 +49,13 @@ ws-add = [
   "jj ws-add",
 ]
 l = ["log", "-r", "log_this_workspace()"]
+lb = ["log", "-r", "log_this_branch()"]
 
 [revsets]
 bookmark-advance-to = "@-"
 
 [revset-aliases]
-'log_this_workspace()' = 'builtin_log() ~ ((working_copies() ~ @) & empty() & description(exact:""))'
+'other_workspaces()' = '(working_copies() ~ @) & empty() & description(exact:"")'
+'log_this_workspace()' = 'builtin_log() ~ other_workspaces()'
+'this_branch()' = 'fork_point(@ | trunk())::(@ | (@:: ~ ::trunk()))'
+'log_this_branch()' = '(this_branch() | trunk()) ~ other_workspaces()'
