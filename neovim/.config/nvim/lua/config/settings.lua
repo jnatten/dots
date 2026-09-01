@@ -27,3 +27,6 @@ o.smartcase = true
 o.ignorecase = true
 o.diffopt:append("algorithm:histogram")
 o.diffopt:append("linematch:60")
+
+-- add mason to path because its lazy + treesitter
+vim.env.PATH = vim.fn.stdpath("data") .. "/mason/bin" .. ":" .. vim.env.PATH
