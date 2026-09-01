@@ -18,6 +18,18 @@
   "preferredNotifChannel": "auto",
   "inputNeededNotifEnabled": true,
   "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash(jj st:*)",
+      "Bash(jj log:*)",
+      "Bash(jj diff:*)"
+    ],
+    "hard_deny": [
+      "$defaults",
+      "Bash(jj git push:*)",
+      "Bash(tofu destroy:*)",
+      "Bash(ndla deploy prod:*)"
+    ],
     "environment": [
       "### Org-wide",
       "**Organization**: NDLA (ndlano) — GitHub org github.com/ndlano",
@@ -43,18 +55,9 @@
       "**Trusted repo**: ~/dev/ndla/ndla (ndlano/ndla), remote `origin` — public repo, GPL-3.0 licensed; confidential material (secrets, sensitive data) is never cleared into it by visibility alone, only this repo's own work should be pushed here",
       "**Org-specific CLIs**: jj, ndla , mill, mise",
       "routine `jj diff` / `jj status` / `jj log` under this repo's working directory are standard per CLAUDE.md guidance"
-    ],
-    "allow": [
-      "$defaults",
-      "Bash(jj st:*)",
-      "Bash(jj log:*)",
-      "Bash(jj diff:*)"
-    ],
-    "hard_deny": [
-      "$defaults",
-      "Bash(jj git push:*)",
-      "Bash(tofu destroy:*)",
-      "Bash(ndla deploy prod:*)"
     ]
-  }
+  },
+  "editorMode": "vim",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true
 }
