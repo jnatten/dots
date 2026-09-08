@@ -134,13 +134,18 @@ format = '\[[$symbol$branch]($style)\]'
 [git_status]
 format = '([\[$all_status$ahead_behind\]]($style))'
 
+# jj repo detection walks up for a `.jj` dir instead of shelling out to
+# `jj root`: every `when` below runs on every prompt, and jj is what times out.
 [custom.loading]
 disabled = true
 command = '''
   echo "…"
 '''
 shell = ['sh']
-when = "jj --ignore-working-copy root && ! test -z \"$STARSHIP_DISABLE_JJ\" "
+when = """
+test -z "$STARSHIP_DISABLE_JJ" && exit 1
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 0; d=${d%/*}; done; exit 1
+"""
 format = '(\[[$output]($style)\])'
 style = "bold purple"
 
@@ -169,43 +174,55 @@ fi
 printf "%s" "$ahead"
 '''
 shell = ['sh']
-when = "jj --ignore-working-copy root"
+when = """
+test -n "$STARSHIP_DISABLE_JJ" && exit 1
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 0; d=${d%/*}; done; exit 1
+"""
 format = '(\[[$output]($style)\])'
 style = "bold purple"
 
 [custom.jj_status]
 command = '''
-if [ "$STARSHIP_DISABLE_JJ" != "1" ]; then
-  jj log --revisions @ --limit 1 --no-graph --template 'if(!empty, "+")'
-fi
+jj log --revisions @ --limit 1 --no-graph --template 'if(!empty, "+")'
 '''
 ignore_timeout = true
 shell = ['sh']
-when = "jj --ignore-working-copy root"
+when = """
+test -n "$STARSHIP_DISABLE_JJ" && exit 1
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 0; d=${d%/*}; done; exit 1
+"""
 format = '(\[[$output]($style)\])'
 style = "bold red"
 
 [custom.git_status]
-when = "! jj --ignore-working-copy root"
+when = """
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
+"""
 command = "starship module git_status"
 shell = ['sh']
 format = '[$output]($style)'
 description = "Only show git_status if we're not in a jj repo"
 
 [custom.git_commit]
-when = "! jj --ignore-working-copy root"
+when = """
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
+"""
 command = "starship module git_commit"
 shell = ['sh']
 description = "Only show git_commit if we're not in a jj repo"
 
 [custom.git_metrics]
-when = "! jj --ignore-working-copy root"
+when = """
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
+"""
 command = "starship module git_metrics"
 shell = ['sh']
 description = "Only show git_metrics if we're not in a jj repo"
 
 [custom.git_branch]
-when = "! jj --ignore-working-copy root"
+when = """
+d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
+"""
 command = "starship module git_branch"
 shell = ['sh']
 description = "Only show git_branch if we're not in a jj repo"
