@@ -39,7 +39,7 @@ imap <C-k> <Up>
 
 map gx gd
 
-nmap ø <Plug>(easymotion-s)
+nmap æ <Plug>(easymotion-s)
 
 nmap <C-n> <Plug>NextWholeOccurrence
 nmap <C-x> <Plug>SkipOccurrence
@@ -104,9 +104,8 @@ map <Leader>wo <Action>(UnsplitAll)
 map <Leader>wc <Action>(Unsplit)
 map <Leader>w= <Action>(tabshifter.Actions.EqualSizeSplit)
 
-map <A-n> <Action>(VcsShowNextChangeMarker)
-map <A-p> <Action>(VcsShowPrevChangeMarker)
-map <A-r> <Action>(Vcs.RollbackChangedLines)
+map ø <Action>(VcsShowNextChangeMarker)
+map Ø <Action>(VcsShowPrevChangeMarker)
 map <leader>hr <Action>(Vcs.RollbackChangedLines)
 map <leader>hp <Action>(VcsShowCurrentChangeMarker)
 map <leader>hs <Action>(Git.Add)
