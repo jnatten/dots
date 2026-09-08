@@ -173,6 +173,7 @@ else
 fi
 printf "%s" "$ahead"
 '''
+ignore_timeout = true
 shell = ['sh']
 when = """
 test -n "$STARSHIP_DISABLE_JJ" && exit 1
