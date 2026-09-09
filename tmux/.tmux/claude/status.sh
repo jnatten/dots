@@ -15,15 +15,19 @@ read -r working waiting idle waiting_unseen idle_unseen <<<"$("$here/sessions.sh
 
 # A state with no sessions keeps its slot, dimmed, so the dots never shift
 # about. The picker behind prefix+u is where the sessions are counted.
-# The gap after a dot is inside its mouse range, to click at more than one cell
+#
+# A dot is one cell, so its gap is folded into the mouse range to click at.
+# tmux runs a range one cell past its #[norange] though, so the last space
+# always stays outside: the range covers the dot and its gap without reaching
+# the cell of the next dot, which would answer for it on every click.
 dot() { # range colour count unseen
   if [ "${4:-0}" -gt 0 ]; then
-    printf '#[range=user|%s]#[fg=%s,bg=#{@c-bg}]#{@pill-l}#[fg=#{@c-deep},bg=%s,bold]●#[fg=%s,bg=#{@c-bg},nobold]#{@pill-r}#[default] #[norange]' \
+    printf '#[range=user|%s]#[fg=%s,bg=#{@c-bg}]#{@pill-l}#[fg=#{@c-deep},bg=%s,bold]●#[fg=%s,bg=#{@c-bg},nobold]#{@pill-r}#[norange]#[default] ' \
       "$1" "$2" "$2" "$2"
   elif [ "$3" -gt 0 ]; then
-    printf '#[range=user|%s]#[fg=%s,bold]●#[default]  #[norange]' "$1" "$2"
+    printf '#[range=user|%s]#[fg=%s,bold]●#[default] #[norange] ' "$1" "$2"
   else
-    printf '#[range=user|%s]#[fg=#{@c-dim}]●#[default]  #[norange]' "$1"
+    printf '#[range=user|%s]#[fg=#{@c-dim}]●#[default] #[norange] ' "$1"
   fi
 }
 
