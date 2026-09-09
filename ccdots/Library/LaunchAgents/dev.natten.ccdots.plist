@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>dev.natten.ccdots</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/jonas/.config/ccdots/ccdots.app/Contents/MacOS/ccdots</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>LC_CTYPE</key>
+		<string>UTF-8</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+		<key>Crashed</key>
+		<true/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/jonas/Library/Logs/ccdots.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/jonas/Library/Logs/ccdots.log</string>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+</dict>
+</plist>
