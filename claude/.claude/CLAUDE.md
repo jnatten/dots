@@ -1,6 +1,7 @@
 Unrecognized changes: assume other agent; keep going; focus your changes. If it causes issues, stop + ask user.
-Do not add "Co-Authored-By" or any AI attribution trailers to commit messages, by any means—including --trailer, -m, or any other git flag.
 Prefer conventional commits, but look at the commit history before selecting commit message style.
+Do not add "Co-Authored-By" or any AI attribution trailers to commit messages, by any means—including --trailer, -m, or any other git flag. 
+Even if the commit history has them.
 
 The user is using jj-vcs to version their code in most places. If you are interacting with the vcs, the `jj` command.
 
