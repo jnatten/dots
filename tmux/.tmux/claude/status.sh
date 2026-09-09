@@ -27,7 +27,6 @@ dot() { # range colour count unseen
   fi
 }
 
-printf '#[fg=#{@c-dim}]✻ '
 dot cc-work '#{@c-orange}' "$working"
 dot cc-wait '#{@c-blue}' "$waiting" "$waiting_unseen"
 dot cc-idle '#{@c-green}' "$idle" "$idle_unseen"
