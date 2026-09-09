@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Lists the Claude Code sessions in one state as a menu; picking one focuses it.
+# A dot marks the ones you have not seen since they changed state.
 # $1 = cc-work|cc-wait|cc-idle, $2 = target client, $3 = mouse column
 set -u
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,9 +8,9 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 items=()
 count=0
-while IFS=$'\t' read -r pane _ session window_index pane_index _ name detail; do
+while IFS=$'\t' read -r pane _ session window_index pane_index _ unseen name detail; do
   count=$((count + 1))
-  label="$session:$window_index.$pane_index  $name"
+  label="$([ "$unseen" = 1 ] && printf '●' || printf ' ') $session:$window_index.$pane_index  $name"
   [ -n "$detail" ] && label="$label — $detail"
   items+=("${label//\#/\#\#}" "$([ "$count" -le 9 ] && printf '%d' "$count")" \
     "run-shell \"$here/goto.sh $pane $client\"")
