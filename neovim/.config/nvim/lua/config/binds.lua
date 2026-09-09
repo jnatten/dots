@@ -96,12 +96,11 @@ del("n", "gri")
 del("n", "grn")
 del("n", "grt")
 
-map(
-	"n",
-	"<leader><leader>e",
-	"<cmd>lua vim.diagnostic.goto_prev { wrap = false }<CR>",
-	{ desc = "lsp: Goto prev error" }
-)
-map("n", "<leader>e", "<cmd>lua vim.diagnostic.goto_next { wrap = true }<CR>", { desc = "lsp: Goto next error" })
+map("n", "<leader><leader>e", function()
+	vim.diagnostic.jump { count = -1, wrap = false, float = true }
+end, { desc = "lsp: Goto prev error" })
+map("n", "<leader>e", function()
+	vim.diagnostic.jump { count = 1, wrap = true, float = true }
+end, { desc = "lsp: Goto next error" })
 map("n", "<leader>ai", ":CodeCompanionChat toggle<CR>", { desc = "Code companion chat" })
 map("n", "<leader><leader>ai", ":CodeCompanionActions<CR>", { desc = "Code companion actions select" })
