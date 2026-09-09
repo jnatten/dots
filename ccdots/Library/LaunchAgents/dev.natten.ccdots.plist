@@ -4,9 +4,14 @@
 <dict>
 	<key>Label</key>
 	<string>dev.natten.ccdots</string>
+	<!-- launchd expands neither ~ nor $HOME, and these machines do not share a
+	     username, so sh resolves the paths instead. exec keeps launchd
+	     supervising the app itself rather than a shell wrapping it -->
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Users/jonas/.config/ccdots/ccdots.app/Contents/MacOS/ccdots</string>
+		<string>/bin/sh</string>
+		<string>-c</string>
+		<string>exec "$HOME/.config/ccdots/ccdots.app/Contents/MacOS/ccdots" &gt;&gt; "$HOME/Library/Logs/ccdots.log" 2&gt;&amp;1</string>
 	</array>
 	<key>EnvironmentVariables</key>
 	<dict>
@@ -26,10 +31,6 @@
 	</dict>
 	<key>ThrottleInterval</key>
 	<integer>10</integer>
-	<key>StandardOutPath</key>
-	<string>/Users/jonas/Library/Logs/ccdots.log</string>
-	<key>StandardErrorPath</key>
-	<string>/Users/jonas/Library/Logs/ccdots.log</string>
 	<key>ProcessType</key>
 	<string>Interactive</string>
 </dict>

@@ -35,13 +35,12 @@ cd ~/.config/ccdots && make load
 
 `make load` bootstraps the LaunchAgent, which starts it now and at every login.
 No build step: `ccdots.app` is committed, because launchd must not wait on a
-compiler at login. Two things to know if it does not come up:
+compiler at login. Nothing in the plist names a user, so the same one works on
+every machine: launchd expands neither `~` nor `$HOME`, so it launches the app
+through `/bin/sh`, which does.
 
-- The plist hardcodes `/Users/jonas`, since launchd expands neither `~` nor
-  `$HOME`. A different username means editing
-  `ccdots/Library/LaunchAgents/dev.natten.ccdots.plist`.
-- The committed binary is arm64. Run `make` on anything else, which needs the
-  Xcode command line tools.
+The one thing to know if it does not come up: the committed binary is arm64, so
+run `make` on anything else, which needs the Xcode command line tools.
 
 After changing the Swift, `make reload` rebuilds and restarts the agent.
 `make unload` stops it, and it logs to `~/Library/Logs/ccdots.log`.
