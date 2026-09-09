@@ -7,7 +7,7 @@ set -u
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/bucket.sh"
 
-rows=$("$here/sessions.sh" | awk -F'\t' -v s="$state" '$2 == s { print $1 "\t" $7 }')
+rows=$("$here/sessions.sh" | awk -F'\t' -v s="$state" '$2 == s { print $1 "\t" $3 }')
 if [ -z "$rows" ]; then
   tmux display-message ${client:+-c "$client"} "no $state Claude sessions"
   exit 0

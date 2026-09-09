@@ -7,7 +7,7 @@ set -u
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 read -r working waiting idle waiting_unseen idle_unseen <<<"$("$here/sessions.sh" | awk -F'\t' '
-  { n[$2]++; if ($7 == 1) u[$2]++ }
+  { n[$2]++; if ($3 == 1) u[$2]++ }
   END { printf "%d %d %d %d %d\n", n["working"] + 0, n["waiting"] + 0, n["idle"] + 0,
                                    u["waiting"] + 0, u["idle"] + 0 }')"
 [ $((working + waiting + idle)) -gt 0 ] || exit 0

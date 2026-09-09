@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Lists the Claude Code sessions running in panes of this tmux server, ordered
 # by session, window and pane, as tab-separated:
-#   pane_id  state  session  window_index  pane_index  window_id  unseen  name  detail
-# where state is working, waiting or idle, and unseen is 1 when the pane has
-# not been on screen since the session last changed state.
+#   pane_id  state  unseen  session  window_index  pane_index  window_id  pid
+#   changed  name  detail
+# where state is working, waiting or idle, unseen is 1 when the pane has not
+# been on screen since the session last changed state, and changed is when it
+# last did so, in epoch milliseconds.
 #
 # Claude Code registers every running session in
 # $CLAUDE_CONFIG_DIR/sessions/<pid>.json with the pane it occupies and a live
@@ -50,7 +52,8 @@ awk -F'\t' -v pids="$live_pids" -v now="$now" -v stamps="$(tmux show -gqv @cc-se
     if (onscreen[id]) at = now
     kept = kept id ":" at " "
 
-    print id "\t" state "\t" pane[id] "\t" (changed + 0 > at ? 1 : 0) "\t" $4 "\t" $5
+    print id "\t" state "\t" (changed + 0 > at ? 1 : 0) "\t" pane[id] "\t" pid "\t" \
+          (changed + 0) "\t" $4 "\t" $5
   }
   END { system("tmux set -g @cc-seen \"" kept "\"") }
 ' \
@@ -63,4 +66,4 @@ awk -F'\t' -v pids="$live_pids" -v now="$now" -v stamps="$(tmux show -gqv @cc-se
                (.waitingFor // ((.cwd // "") | split("/") | last)),
                (.statusUpdatedAt // .updatedAt // 0)
              ] | @tsv' "${files[@]}" 2>/dev/null) \
-| sort -t'	' -k3,3 -k4,4n -k5,5n
+| sort -t'	' -k4,4 -k5,5n -k6,6n
