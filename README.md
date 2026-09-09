@@ -42,6 +42,11 @@ through `/bin/sh`, which does.
 The one thing to know if it does not come up: the committed binary is arm64, so
 run `make` on anything else, which needs the Xcode command line tools.
 
+A session changing into a state that wants something from you, while you are
+not looking at its pane, also raises a toast in the top right for five seconds;
+clicking it goes to that session. It is drawn by the app rather than posted to
+Notification Center, so it needs no authorisation and leaves no history behind.
+
 After changing the Swift, `make reload` rebuilds and restarts the agent.
 `make unload` stops it, and it logs to `~/Library/Logs/ccdots.log`.
 `CCDOTS_DEBUG=1` adds a line per poll saying where in the menu bar macOS

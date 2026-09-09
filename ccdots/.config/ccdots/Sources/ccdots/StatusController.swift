@@ -15,6 +15,7 @@ final class StatusController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var failures = 0
     private var timer: Timer?
     private var lastFront = 0
+    private var seenStates: [String: State]?
 
     private var sessionsScript: String { claudeDir + "/sessions.sh" }
     private var activateScript: String { claudeDir + "/activate.sh" }
@@ -92,9 +93,27 @@ final class StatusController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             failures = 0
             sessions = Session.parse(output.stdout).sorted(by: Session.order)
+            announce()
         }
         redraw()
         if menuIsOpen { rebuild() }
+    }
+
+    // A toast per session that has just changed into a state wanting something
+    // from you, while you were not looking at its pane. The first poll only
+    // records where everything stands, or logging in would raise a toast for
+    // every session at once
+    private func announce() {
+        let states = Dictionary(sessions.map { ($0.pane, $0.state) }, uniquingKeysWith: { a, _ in a })
+        defer { seenStates = states }
+        guard let before = seenStates else { return }
+        for session in sessions where session.unseen && before[session.pane] != session.state {
+            guard before[session.pane] != nil else { continue }
+            if ProcessInfo.processInfo.environment["CCDOTS_DEBUG"] != nil {
+                note("toast: \(session.name) \(before[session.pane]?.rawValue ?? "?") -> \(session.state.rawValue)")
+            }
+            Toast.show(session) { [weak self] pane in self?.focus(pane) }
+        }
     }
 
     @objc private func redraw() {
@@ -180,6 +199,10 @@ final class StatusController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func pick(_ sender: NSMenuItem) {
         guard let pane = sender.representedObject as? String else { return }
+        focus(pane)
+    }
+
+    private func focus(_ pane: String) {
         let script = activateScript
         shellQueue.async { _ = Shell.run(script, [pane], timeout: 10) }
     }
