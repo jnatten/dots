@@ -3,7 +3,8 @@
 # prefix + u. Rows are ordered by what wants attention: the ones you have not
 # seen since they changed state first, then waiting, idle and working, longest
 # since the change first. Type to filter, enter jumps to the pane, ctrl-x asks
-# the session to quit. The list reloads itself, so it keeps up with the dots.
+# the session to quit, ctrl-/ folds the preview away. The list reloads itself,
+# so it keeps up with the dots.
 #
 # Subcommands exist for the fzf bindings to call back into:
 #   list, preview <pane>, stop <pid>
@@ -87,10 +88,11 @@ cmd_launch() {
     --delimiter="$(printf '\t')" --with-nth=1 \
     --layout=reverse --info=inline --border=none \
     --prompt='claude: ' \
-    --header='enter: jump — ctrl-x: stop — shift-up/down: scroll preview' \
+    --header='enter: jump — ctrl-x: stop — ctrl-/: preview — shift-up/down: scroll' \
     --preview "$here/picker.sh preview {2}" \
     --preview-window=right:60% \
     --bind 'shift-up:preview-up,shift-down:preview-down' \
+    --bind 'ctrl-/:toggle-preview' \
     --bind "start:reload($here/picker.sh list)" \
     --bind "load:refresh-preview+reload(sleep 2; $here/picker.sh list)" \
     --bind "ctrl-x:execute-silent($here/picker.sh stop {3})+reload($here/picker.sh list)" \
