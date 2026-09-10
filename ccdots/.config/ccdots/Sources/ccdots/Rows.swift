@@ -6,7 +6,7 @@ enum Rows {
     private static let monoBold = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize,
                                                               weight: .bold)
 
-    static func title(_ session: Session, nameWidth: Int) -> NSAttributedString {
+    static func title(_ session: Session, windowWidth: Int, nameWidth: Int) -> NSAttributedString {
         let cell = ("0" as NSString).size(withAttributes: [.font: mono]).width
         let style = NSMutableParagraphStyle()
         // Tab stops rather than padded columns: the marker is not a monospaced
@@ -15,12 +15,14 @@ enum Rows {
             NSTextTab(textAlignment: .left, location: cell * 2),
             NSTextTab(textAlignment: .right, location: cell * 12),
             NSTextTab(textAlignment: .left, location: cell * 14),
-            NSTextTab(textAlignment: .left, location: cell * CGFloat(15 + nameWidth)),
+            NSTextTab(textAlignment: .left, location: cell * CGFloat(15 + windowWidth)),
+            NSTextTab(textAlignment: .left, location: cell * CGFloat(16 + windowWidth + nameWidth)),
         ]
 
         let marker = session.unseen ? "●" : " "
         var row = "\(marker)\t\(session.state.rawValue)\t\(age(session.changed))\t"
-        row += "\(fit(session.name, nameWidth))\t\(tilde(session.cwd))"
+        row += "\(fit(session.windowName, windowWidth))\t\(fit(session.name, nameWidth))"
+        row += "\t\(tilde(session.cwd))"
         // The cwd already says where a session is, so only a waiting one's
         // reason earns the space
         if session.state == .waiting, !session.detail.isEmpty {

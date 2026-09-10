@@ -8,7 +8,7 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 items=()
 count=0
-while IFS=$'\t' read -r pane _ unseen session window_index pane_index _ _ _ name detail _; do
+while IFS=$'\t' read -r pane _ unseen session window_index pane_index _ _ _ _ name detail _; do
   count=$((count + 1))
   label="$([ "$unseen" = 1 ] && printf '●' || printf ' ') $session:$window_index.$pane_index  $name"
   [ -n "$detail" ] && label="$label — $detail"

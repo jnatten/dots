@@ -171,12 +171,13 @@ final class StatusController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 : "no live Claude sessions"))
         }
 
+        let windowWidth = min(20, sessions.map { $0.windowName.count }.max() ?? 1)
         let nameWidth = min(24, sessions.map { $0.name.count }.max() ?? 1)
         for (index, session) in sessions.enumerated() {
             let item = NSMenuItem(title: "", action: #selector(pick(_:)),
                                   keyEquivalent: index < 9 ? String(index + 1) : "")
             item.keyEquivalentModifierMask = []
-            item.attributedTitle = Rows.title(session, nameWidth: nameWidth)
+            item.attributedTitle = Rows.title(session, windowWidth: windowWidth, nameWidth: nameWidth)
             item.target = self
             item.representedObject = session.pane
             menu.addItem(item)

@@ -44,7 +44,7 @@ cmd_list() {
     }
     {
       pane = $1; state = $2; unseen = $3; session = $4; window = $5; index_ = $6
-      pid = $8; changed = $9; name = $10; detail = $11
+      winname = $8; pid = $9; changed = $10; name = $11; detail = $12
       c = colour[state]
 
       # Working never counts as unseen: it is the one state that asks nothing of
@@ -53,8 +53,8 @@ cmd_list() {
 
       dot = sprintf("\033[38;2;%sm●" off, c)
       label = unseen ? sprintf("\033[1;7;38;2;%sm %-7s " off, c, state) : sprintf("%-9s", state)
-      row = sprintf("%s %s %4s  %s %s %s", dot, label, ago(changed), \
-        fit(session ":" window "." index_, 16), fit(name, 24), detail)
+      row = sprintf("%s %s %4s  %s %s %s %s", dot, label, ago(changed), \
+        fit(session ":" window "." index_, 12), fit(winname, 18), fit(name, 20), detail)
 
       printf "%d\t%d\t%d\t%s\t%s\t%s\n", unseen ? 0 : 1, rank[state], changed, row, pane, pid
     }' | sort -t"$(printf '\t')" -k1,1n -k2,2n -k3,3n | cut -f4-)
@@ -76,7 +76,7 @@ cmd_preview() {
 cmd_stop() {
   local pid="${1:-}"
   case "$pid" in '' | *[!0-9]*) exit 0 ;; esac
-  "$here/sessions.sh" | awk -F'\t' -v p="$pid" '$8 == p { hit = 1 } END { exit !hit }' || exit 0
+  "$here/sessions.sh" | awk -F'\t' -v p="$pid" '$9 == p { hit = 1 } END { exit !hit }' || exit 0
   kill "$pid" 2>/dev/null
 }
 

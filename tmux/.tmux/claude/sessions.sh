@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Lists the Claude Code sessions running in panes of this tmux server, ordered
 # by session, window and pane, as tab-separated:
-#   pane_id  state  unseen  session  window_index  pane_index  window_id  pid
-#   changed  name  detail  cwd
+#   pane_id  state  unseen  session  window_index  pane_index  window_id
+#   window_name  pid  changed  name  detail  cwd
 # where state is working, waiting or idle, unseen is 1 when the pane has not
 # been on screen since the session last changed state, changed is when it last
 # did so in epoch milliseconds, detail is what the session waits for or the
@@ -55,7 +55,7 @@ awk -F'\t' -v pids="$live_pids" -v now="$now" -v stamps="$(tmux show -gqv @cc-se
   }
   # Each input tags its own lines: NR == FNR would read the first session as a
   # pane when tmux hands back no panes at all
-  $1 == "p" { pane[$2] = $3 "\t" $4 "\t" $5 "\t" $6; onscreen[$2] = $7; panes = 1; next }
+  $1 == "p" { pane[$2] = $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7; onscreen[$2] = $8; panes = 1; next }
   {
     pid = $2; status = $3; id = $4; changed = $7
     if (!(id in pane)) next
@@ -73,7 +73,7 @@ awk -F'\t' -v pids="$live_pids" -v now="$now" -v stamps="$(tmux show -gqv @cc-se
   }
   END { if (panes) system("tmux set -g @cc-seen \"" kept "\"") }
 ' \
-  <(tmux list-panes -a -F 'p	#{pane_id}	#{session_name}	#{window_index}	#{pane_index}	#{window_id}	#{&&:#{session_attached},#{&&:#{window_active},#{||:#{pane_active},#{!=:#{window_zoomed_flag},1}}}}' 2>/dev/null) \
+  <(tmux list-panes -a -F 'p	#{pane_id}	#{session_name}	#{window_index}	#{pane_index}	#{window_id}	#{window_name}	#{&&:#{session_attached},#{&&:#{window_active},#{||:#{pane_active},#{!=:#{window_zoomed_flag},1}}}}' 2>/dev/null) \
   <(jq -r 'select(.tmux != null and (.kind == "interactive" or .kind == "bg"))
            | [ "s",
                .pid,

@@ -21,6 +21,7 @@ struct Session {
     let sessionName: String
     let windowIndex: String
     let paneIndex: String
+    let windowName: String
     let pid: String
     let changed: TimeInterval
     let name: String
@@ -34,18 +35,19 @@ struct Session {
             let field = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
             // A short row means sessions.sh has changed shape, and dropping it
             // beats mapping the columns onto the wrong fields
-            guard field.count == 12, let state = State(rawValue: field[1]) else { return nil }
+            guard field.count == 13, let state = State(rawValue: field[1]) else { return nil }
             return Session(pane: field[0],
                            state: state,
                            unseen: field[2] == "1" && state != .working,
                            sessionName: field[3],
                            windowIndex: field[4],
                            paneIndex: field[5],
-                           pid: field[7],
-                           changed: TimeInterval(field[8]) ?? 0,
-                           name: field[9],
-                           detail: field[10],
-                           cwd: field[11])
+                           windowName: field[7],
+                           pid: field[8],
+                           changed: TimeInterval(field[9]) ?? 0,
+                           name: field[10],
+                           detail: field[11],
+                           cwd: field[12])
         }
     }
 
