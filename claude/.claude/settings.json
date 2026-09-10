@@ -12,11 +12,19 @@
       }
     }
   },
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "xhigh"
+    }
+  },
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipWorkflowUsageWarning": true,
+  "editorMode": "vim",
   "preferredNotifChannel": "auto",
+  "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
   "autoMode": {
     "allow": [
       "$defaults",
@@ -56,8 +64,5 @@
       "**Org-specific CLIs**: jj, ndla , mill, mise",
       "routine `jj diff` / `jj status` / `jj log` under this repo's working directory are standard per CLAUDE.md guidance"
     ]
-  },
-  "editorMode": "vim",
-  "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true
+  }
 }
