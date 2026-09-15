@@ -1,3 +1,12 @@
+local function root(markers)
+	return function(bufnr, on_dir)
+		local dir = vim.fs.root(bufnr, markers)
+		if dir then
+			on_dir(dir)
+		end
+	end
+end
+
 return {
 	"neovim/nvim-lspconfig",
 	event = { "BufReadPre", "BufNewFile" },
@@ -5,17 +14,19 @@ return {
 	opts = {
 		servers = {
 			cssls = {},
-			-- tailwindcss = {},
 			html = {},
 			jsonls = {},
-			-- terraformls = {},
 			tofu_ls = {
 				root_markers = { ".git" },
 			},
 			eslint = {},
 			ruff = {},
-			oxfmt = {},
-			oxlint = {},
+			oxfmt = {
+				root_dir = root({ ".oxfmtrc.json", ".oxfmtrc.jsonc", "oxfmt.config.ts" }),
+			},
+			oxlint = {
+				root_dir = root({ ".oxlintrc.json", ".oxlintrc.jsonc", "oxlint.config.ts" }),
+			},
 			["helm-ls"] = {
 				yamlls = {
 					path = "yaml-language-server",
@@ -23,41 +34,8 @@ return {
 			},
 			yamlls = {},
 			rust_analyzer = {},
-			-- ty = {},
-			-- pyrefly = {
-			-- 	settings = {
-			-- 		python = {
-			-- 			pyrefly = {
-			-- 				displayTypeErrors = "force-on",
-			-- 			},
-			-- 		},
-			-- 	},
-			-- },
 			zuban = {},
-			vtsls = {
-				root_markers = { "tsconfig.json", "jsconfig.json", ".git" },
-				filetypes = {
-					"javascript",
-					"javascriptreact",
-					"javascript.jsx",
-					"typescript",
-					"typescriptreact",
-					"typescript.tsx",
-					"vue",
-				},
-				settings = {
-					typescript = {
-						preferences = {
-							importModuleSpecifier = "relative",
-						},
-					},
-					javascript = {
-						preferences = {
-							importModuleSpecifier = "relative",
-						},
-					},
-				},
-			},
+			tsc = {},
 		},
 	},
 	config = function(_, opts)
@@ -78,8 +56,8 @@ return {
 		})
 
 		for server, config in pairs(opts.servers) do
-			vim.lsp.enable(server)
 			vim.lsp.config(server, config)
+			vim.lsp.enable(server)
 		end
 	end,
 }
