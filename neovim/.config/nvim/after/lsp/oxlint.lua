@@ -5,7 +5,9 @@ return {
 			on_dir(root)
 		end
 	end,
-	-- pull diagnostics bypass `run` and queue a type-aware lint per keystroke; push + onSave lints once per (auto)save
-	settings = { run = "onSave" },
+	settings = {
+		run = "onSave",
+		fixKind = "dangerous_fix_or_suggestion",
+	},
 	capabilities = { textDocument = { diagnostic = vim.NIL } },
 }
