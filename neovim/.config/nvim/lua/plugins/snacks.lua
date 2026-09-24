@@ -36,14 +36,7 @@ return {
 			function()
 				Snacks.picker.git_status()
 			end,
-			desc = "Find Git Files",
-		},
-		{
-			"<leader>sR",
-			function()
-				Snacks.picker.resume()
-			end,
-			desc = "Resume",
+			desc = "Find Git status",
 		},
 		{
 			"<leader>sr",
@@ -172,7 +165,24 @@ return {
 		picker = {
 			enabled = true,
 			sources = {
-				grep = { hidden = true },
+				grep = {
+					hidden = true,
+					toggles = { hide_text = "T" },
+					-- This transform function hides the search match from the file tree so we can avoid truncating file paths
+					-- Useful if full filepath is more useful to skim than the text result
+					transform = function(item, ctx)
+						if ctx.picker.opts.hide_text then
+							item.resolve = nil
+						end
+					end,
+					win = {
+						input = {
+							keys = {
+								["<a-t>"] = { "toggle_hide_text", mode = { "i", "n" } },
+							},
+						},
+					},
+				},
 				files = { hidden = true },
 			},
 		},
