@@ -81,6 +81,64 @@ return {
 			desc = "GitHub pull requests (all)",
 		},
 		{
+			"<leader>fr",
+			function()
+				Snacks.picker.gh_pr({ confirm = "gh_diff" })
+			end,
+			desc = "GitHub: pick a pull request and review its diff",
+		},
+		{
+			"<leader>fd",
+			function()
+				Snacks.picker.diagnostics_buffer()
+			end,
+			desc = "Diagnostics in current buffer",
+		},
+		{
+			"<leader>fD",
+			function()
+				Snacks.picker.diagnostics()
+			end,
+			desc = "Diagnostics in workspace",
+		},
+		{
+			"<leader>fw",
+			function()
+				Snacks.picker.grep_word()
+			end,
+			desc = "Grep word under cursor / selection",
+			mode = { "n", "x" },
+		},
+		{
+			"<leader>fl",
+			function()
+				Snacks.picker.lines()
+			end,
+			desc = "Fuzzy find lines in current buffer",
+		},
+		{
+			"<leader>fh",
+			function()
+				Snacks.picker.git_diff()
+			end,
+			desc = "Git: changed hunks in working copy",
+		},
+		{
+			"<leader>fc",
+			function()
+				Snacks.picker.git_log_file({
+					-- default confirm checks out the file at that commit; show the commit in diffview instead
+					confirm = function(picker, item)
+						picker:close()
+						if item then
+							vim.cmd(("DiffviewOpen %s^! -- %s"):format(item.commit, vim.fn.fnameescape(item.file)))
+						end
+					end,
+				})
+			end,
+			desc = "Git: commits touching current file",
+		},
+		{
 			"<leader>sr",
 			function()
 				Snacks.picker.resume()
@@ -225,6 +283,7 @@ return {
 						},
 					},
 				},
+				grep_word = { hidden = true },
 				files = { hidden = true },
 			},
 		},
