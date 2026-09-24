@@ -35,7 +35,30 @@ return {
 			yamlls = {},
 			rust_analyzer = {},
 			zuban = {},
-			tsc = {},
+			vtsls = {
+				root_markers = { "tsconfig.json", "jsconfig.json", ".git" },
+				filetypes = {
+					"javascript",
+					"javascriptreact",
+					"javascript.jsx",
+					"typescript",
+					"typescriptreact",
+					"typescript.tsx",
+					"vue",
+				},
+				settings = {
+					typescript = {
+						preferences = {
+							importModuleSpecifier = "relative",
+						},
+					},
+					javascript = {
+						preferences = {
+							importModuleSpecifier = "relative",
+						},
+					},
+				},
+			},
 		},
 	},
 	config = function(_, opts)
