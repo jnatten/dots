@@ -19,17 +19,29 @@ return {
 			tofu_ls = {
 				root_markers = { ".git" },
 			},
-			eslint = {},
+			eslint = {
+				-- graphql-eslint only keeps its documents cache when NODE is set (as under npm/pnpm);
+				-- without it the first lint after 10s idle re-parses every gql document in the project
+				cmd = { "vscode-eslint-language-server", "--stdio" },
+				cmd_env = { NODE = vim.fn.exepath("node") },
+			},
 			ruff = {},
 			oxfmt = {
 				root_dir = root({ ".oxfmtrc.json", ".oxfmtrc.jsonc", "oxfmt.config.ts" }),
 			},
 			oxlint = {
 				root_dir = root({ ".oxlintrc.json", ".oxlintrc.jsonc", "oxlint.config.ts" }),
+				-- pull diagnostics bypass `run` and queue a type-aware lint per keystroke; push + onSave lints once per (auto)save
+				settings = { run = "onSave" },
+				capabilities = { textDocument = { diagnostic = vim.NIL } },
 			},
-			["helm-ls"] = {
-				yamlls = {
-					path = "yaml-language-server",
+			helm_ls = {
+				settings = {
+					["helm-ls"] = {
+						yamlls = {
+							path = "yaml-language-server",
+						},
+					},
 				},
 			},
 			yamlls = {},

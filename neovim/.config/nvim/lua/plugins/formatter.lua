@@ -44,6 +44,9 @@ return {
 				if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat then
 					return
 				end
+				if #vim.lsp.get_clients({ bufnr = bufnr, name = "oxfmt" }) > 0 then
+					return { lsp_format = "prefer", name = "oxfmt", timeout_ms = 1000 }
+				end
 				return { lsp_fallback = true, async = false, timeout_ms = 1000 }
 			end,
 		})
