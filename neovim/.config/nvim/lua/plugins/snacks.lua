@@ -39,6 +39,48 @@ return {
 			desc = "Find Git status",
 		},
 		{
+			"<leader>fi",
+			function()
+				Snacks.picker.gh_issue()
+			end,
+			desc = "GitHub issues (open)",
+		},
+		{
+			"<leader>fI",
+			function()
+				Snacks.picker.gh_issue({ state = "all" })
+			end,
+			desc = "GitHub issues (all)",
+		},
+		{
+			"<leader>fn",
+			function()
+				Snacks.picker.gh_issue({ repo = "NDLANO/Issues" })
+			end,
+			desc = "NDLANO/Issues (open)",
+		},
+		{
+			"<leader>fN",
+			function()
+				Snacks.picker.gh_issue({ repo = "NDLANO/Issues", state = "all" })
+			end,
+			desc = "NDLANO/Issues (all)",
+		},
+		{
+			"<leader>fp",
+			function()
+				Snacks.picker.gh_pr()
+			end,
+			desc = "GitHub pull requests (open)",
+		},
+		{
+			"<leader>fP",
+			function()
+				Snacks.picker.gh_pr({ state = "all" })
+			end,
+			desc = "GitHub pull requests (all)",
+		},
+		{
 			"<leader>sr",
 			function()
 				Snacks.picker.resume()
