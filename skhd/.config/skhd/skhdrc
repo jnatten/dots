@@ -22,6 +22,7 @@ fn-s: rift-cli execute layout toggle-stack
 fn-e: rift-cli execute layout toggle-orientation
 fn-w: rift-cli execute layout toggle-stack
 fn+shift-space: rift-cli execute window toggle-float
+fn+shift-t: rift-cli execute space toggle-activated
 
 fn-1: rift-cli execute workspace switch 0
 fn-2: rift-cli execute workspace switch 1
