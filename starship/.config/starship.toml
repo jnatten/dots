@@ -163,7 +163,9 @@ if [ -n "$bookmarks" ]; then
   fi
 fi
 
-if [ $bookmark_len -gt 1 ]; then
+if [ -z "$bookmarks" ]; then
+  printf "?"
+elif [ $bookmark_len -gt 1 ]; then
   printf "$bookmark_len bookmarks"
   case "$bookmarks" in
     *"*"*) printf "*" ;;
