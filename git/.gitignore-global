@@ -13,6 +13,7 @@
 .mise.toml
 /.claude/
 CLAUDE.md
+/.worktreeinclude
 
 .classpath
 .factorypath
