@@ -50,6 +50,7 @@ ws-add = [
 ]
 l = ["log", "-r", "log_this_workspace()"]
 lb = ["log", "-r", "log_this_branch()"]
+bc = ["bookmark", "create", "-r", "@-"]
 
 [revsets]
 bookmark-advance-to = "@-"
