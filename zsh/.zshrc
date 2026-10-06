@@ -63,8 +63,10 @@ alias gch='git checkout $(git branch --sort=-committerdate -a | sed "s/remotes\/
 
 export PATH="/usr/local/opt/libpq/bin:$PATH"
 
-source ~/.zoxiderc
-alias cd='z'
+if [[ -z $CLAUDECODE ]]; then
+  source ~/.zoxiderc
+  alias cd='z'
+fi
 alias cat='bat'
 
 export PATH="$PATH:/home/jonas/.local/bin"
