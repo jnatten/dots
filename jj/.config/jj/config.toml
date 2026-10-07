@@ -57,7 +57,7 @@ difftastic-nvim = [
   "--",
   "bash",
   "-c",
-  '[ "$1" = -r ] && shift; exec nvim -c "Difft ${1:-@}"',
+  '[ "$1" = -r ] && shift; exec nvim -c "Difft ${1:-@}" -c "autocmd TabClosed * ++once qa"',
   "jj difftastic-nvim",
 ]
 
