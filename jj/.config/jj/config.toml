@@ -19,8 +19,8 @@ key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDgNU6hAVIkGr8Twj3pSlmAN2quVh9fYdA1h
 sign-on-push = true
 
 [ui]
-diff-formatter = ["difft", "--color=always", "$left", "$right"]
-# pager = ["delta", "--pager", "less -FRX"]
+diff-formatter = ":git"
+pager = "delta"
 diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
 merge-editor = "idea"
 conflict-marker-style = "git"
@@ -51,6 +51,15 @@ ws-add = [
 l = ["log", "-r", "log_this_workspace()"]
 lb = ["log", "-r", "log_this_branch()"]
 bc = ["bookmark", "create", "-r", "@-"]
+difftastic-nvim = [
+  "util",
+  "exec",
+  "--",
+  "bash",
+  "-c",
+  '[ "$1" = -r ] && shift; exec nvim -c "Difft ${1:-@}"',
+  "jj difftastic-nvim",
+]
 
 [revsets]
 bookmark-advance-to = "@-"

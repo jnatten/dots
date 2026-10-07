@@ -33,15 +33,17 @@
     smudge = git-lfs smudge -- %f
 
 [delta]
-    features = line-numbers decorations navigate # side-by-side
+    features = decorations 
+    line-numbers = true
+    navigate = true
+    side-by-side = true
     syntax-theme = Dracula
     plus-style = syntax "#003800"
     minus-style = syntax "#3f0001"
-    side-by-side = false
+
 
 [delta "decorations"]
     commit-decoration-style = bold yellow ul
-    # commit-decoration-style = bold yellow box ul
     file-style = bold yellow ul
     file-decoration-style = none
     hunk-header-decoration-style = omit
@@ -49,10 +51,8 @@
     hunk-header-decoration = omit
 
 [delta "line-numbers"]
-    line-numbers-left-style = cyan
-    line-numbers-right-style = cyan
-    line-numbers-minus-style = 124
-    line-numbers-plus-style = 28
+    line-numbers-left-style = hidden
+    line-numbers-right-style = hidden
 
 [diff]
     tool = difftastic
