@@ -27,8 +27,21 @@ conflict-marker-style = "git"
 default-command = "st"
 
 [merge-tools.diffview]
-program = "nvim"
-merge-args = ["-c", "DiffviewMergeFiles $output $base $left $right"]
+program = "bash"
+diff-args = [
+  "-c",
+  'exec nvim -c "DiffviewDiffDirs $1 $2" -c "autocmd TabClosed * ++once qa" </dev/tty >/dev/tty',
+  "jj diff --tool diffview",
+  "$left",
+  "$right",
+]
+merge-args = [
+  "-c",
+  'exec nvim "$@"',
+  "jj resolve --tool diffview",
+  "-c",
+  "DiffviewMergeFiles $output $base $left $right",
+]
 merge-tool-edits-conflict-markers = true
 conflict-marker-style = "git"
 
