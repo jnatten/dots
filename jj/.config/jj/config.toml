@@ -89,7 +89,7 @@ bookmark-advance-to = "@-"
 [revset-aliases]
 'other_workspaces()' = '(working_copies() ~ @) & empty() & description(exact:"")'
 'log_this_workspace()' = 'builtin_log() ~ other_workspaces()'
-'branch(x)' = 'fork_point(x | trunk()) | trunk()..x | (x ~ ::trunk())::'
+'branch(x)' = 'fork_point(x | trunk()) | (trunk()..x)::'
 'log_branch(x)' = '(branch(x) | trunk()) ~ other_workspaces()'
 'this_branch()' = 'branch(@)'
 'log_this_branch()' = 'log_branch(@)'
