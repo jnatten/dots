@@ -62,7 +62,15 @@ ws-add = [
   "jj ws-add",
 ]
 l = ["log", "-r", "log_this_workspace()"]
-lb = ["log", "-r", "log_this_branch()"]
+lb = [
+  "util",
+  "exec",
+  "--",
+  "bash",
+  "-c",
+  'if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then rev=$1; shift; else rev=@; fi; exec jj -R "$JJ_WORKSPACE_ROOT" log -r "log_branch($rev)" "$@"',
+  "jj lb",
+]
 bc = ["bookmark", "create", "-r", "@-"]
 difftastic-nvim = [
   "util",
@@ -80,5 +88,7 @@ bookmark-advance-to = "@-"
 [revset-aliases]
 'other_workspaces()' = '(working_copies() ~ @) & empty() & description(exact:"")'
 'log_this_workspace()' = 'builtin_log() ~ other_workspaces()'
-'this_branch()' = 'fork_point(@ | trunk())::(@ | (@:: ~ ::trunk()))'
-'log_this_branch()' = '(this_branch() | trunk()) ~ other_workspaces()'
+'branch(x)' = 'fork_point(x | trunk()) | trunk()..x | (x ~ ::trunk())::'
+'log_branch(x)' = '(branch(x) | trunk()) ~ other_workspaces()'
+'this_branch()' = 'branch(@)'
+'log_this_branch()' = 'log_branch(@)'
