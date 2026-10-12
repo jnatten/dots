@@ -17,6 +17,7 @@ key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDgNU6hAVIkGr8Twj3pSlmAN2quVh9fYdA1h
 
 [git]
 sign-on-push = true
+colocate = true
 
 [ui]
 diff-formatter = ":git"
