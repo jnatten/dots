@@ -763,11 +763,11 @@ binding = "Unassigned"
 id = "toggleColumnTabbed"
 
 [[hotkeys]]
-binding = "Option+Home"
+binding = "Unassigned"
 id = "focusColumnFirst"
 
 [[hotkeys]]
-binding = "Option+End"
+binding = "Unassigned"
 id = "focusColumnLast"
 
 [[hotkeys]]
