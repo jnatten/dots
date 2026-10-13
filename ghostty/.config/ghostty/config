@@ -10,11 +10,12 @@ theme = "GitHub Dark Default"
 keybind = ctrl+shift+r=reload_config
 shell-integration-features = no-cursor,ssh-terminfo,ssh-env
 
-window-decoration = false
+macos-titlebar-style = hidden
 window-height = 200
 window-width = 300
-window-padding-x = 0
-window-padding-y = 0
+window-padding-x = 6
+window-padding-y = 6
+window-padding-balance = true
 
 app-notifications = no-clipboard-copy
 
