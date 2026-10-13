@@ -1,0 +1,8 @@
+[keys.navigation]
+half_page_up = "ctrl-u"
+half_page_down = "ctrl-d"
+
+[keys.table]
+delete = "alt-d"
+# ctrl-k moves 5 rows up via tmux; force delete is still f in the delete confirm
+force_delete = []
