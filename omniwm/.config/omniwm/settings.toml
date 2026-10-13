@@ -55,7 +55,7 @@ top = 0.0
 
 [general]
 animationSpeed = 1.0
-animationsEnabled = true
+animationsEnabled = false
 defaultLayoutType = "niri"
 hotkeysEnabled = true
 hyperKeyModifiers = "Control+Option+Shift+Command"
