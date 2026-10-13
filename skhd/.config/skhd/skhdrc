@@ -9,6 +9,11 @@ fn+shift-j: omniwmctl command move-column down
 fn+shift-k: omniwmctl command move-column up
 fn+shift-l: omniwmctl command move-column right
 
+fn+ctrl-h: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" left --force
+fn+ctrl-j: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" down --force
+fn+ctrl-k: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" up --force
+fn+ctrl-l: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" right --force
+
 fn-f: omniwmctl command toggle-fullscreen
 
 fn - 0x2F: omniwmctl command cycle-size forward
