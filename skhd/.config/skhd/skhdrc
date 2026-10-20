@@ -1,46 +1,46 @@
-fn - h: omniwmctl command focus left
-fn - j: omniwmctl command focus down
-fn - k: omniwmctl command focus up
-fn - l: omniwmctl command focus right
-fn - tab: omniwmctl command focus previous
-
-fn+shift-h: omniwmctl command move-column left
-fn+shift-j: omniwmctl command move-column down
-fn+shift-k: omniwmctl command move-column up
-fn+shift-l: omniwmctl command move-column right
-
-fn+ctrl-h: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" left --force
-fn+ctrl-j: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" down --force
-fn+ctrl-k: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" up --force
-fn+ctrl-l: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" right --force
-
-fn-f: omniwmctl command toggle-fullscreen
-
-fn - 0x2F: omniwmctl command cycle-size forward
-fn - 0x2B: omniwmctl command cycle-size backward
-fn+shift-b: omniwmctl command balance-sizes
-fn+shift-r: omniwmctl command raise-all-floating-windows
-fn+shift-o: omniwmctl command toggle-overview
-
-fn-1: omniwmctl command switch-workspace 1
-fn-2: omniwmctl command switch-workspace 2
-fn-3: omniwmctl command switch-workspace 3
-fn-4: omniwmctl command switch-workspace 4
-fn-5: omniwmctl command switch-workspace 5
-fn-6: omniwmctl command switch-workspace 6
-fn-7: omniwmctl command switch-workspace 7
-fn-8: omniwmctl command switch-workspace 8
-fn-9: omniwmctl command switch-workspace 9
-
-fn+shift-1: omniwmctl command move-to-workspace 1
-fn+shift-2: omniwmctl command move-to-workspace 2
-fn+shift-3: omniwmctl command move-to-workspace 3
-fn+shift-4: omniwmctl command move-to-workspace 4
-fn+shift-5: omniwmctl command move-to-workspace 5
-fn+shift-6: omniwmctl command move-to-workspace 6
-fn+shift-7: omniwmctl command move-to-workspace 7
-fn+shift-8: omniwmctl command move-to-workspace 8
-fn+shift-9: omniwmctl command move-to-workspace 9
-
-
-fn-d: open -a "Raycast" -g
+# fn - h: omniwmctl command focus left
+# fn - j: omniwmctl command focus down
+# fn - k: omniwmctl command focus up
+# fn - l: omniwmctl command focus right
+# fn - tab: omniwmctl command focus previous
+#
+# fn+shift-h: omniwmctl command move-column left
+# fn+shift-j: omniwmctl command move-column down
+# fn+shift-k: omniwmctl command move-column up
+# fn+shift-l: omniwmctl command move-column right
+#
+# fn+ctrl-h: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" left --force
+# fn+ctrl-j: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" down --force
+# fn+ctrl-k: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" up --force
+# fn+ctrl-l: omniwmctl workspace move-to-monitor "$(omniwmctl query workspaces --current --fields raw-name --format tsv | awk -F'\t' 'NR==2{print $2}')" right --force
+#
+# fn-f: omniwmctl command toggle-fullscreen
+#
+# fn - 0x2F: omniwmctl command cycle-size forward
+# fn - 0x2B: omniwmctl command cycle-size backward
+# fn+shift-b: omniwmctl command balance-sizes
+# fn+shift-r: omniwmctl command raise-all-floating-windows
+# fn+shift-o: omniwmctl command toggle-overview
+#
+# fn-1: omniwmctl command switch-workspace 1
+# fn-2: omniwmctl command switch-workspace 2
+# fn-3: omniwmctl command switch-workspace 3
+# fn-4: omniwmctl command switch-workspace 4
+# fn-5: omniwmctl command switch-workspace 5
+# fn-6: omniwmctl command switch-workspace 6
+# fn-7: omniwmctl command switch-workspace 7
+# fn-8: omniwmctl command switch-workspace 8
+# fn-9: omniwmctl command switch-workspace 9
+#
+# fn+shift-1: omniwmctl command move-to-workspace 1
+# fn+shift-2: omniwmctl command move-to-workspace 2
+# fn+shift-3: omniwmctl command move-to-workspace 3
+# fn+shift-4: omniwmctl command move-to-workspace 4
+# fn+shift-5: omniwmctl command move-to-workspace 5
+# fn+shift-6: omniwmctl command move-to-workspace 6
+# fn+shift-7: omniwmctl command move-to-workspace 7
+# fn+shift-8: omniwmctl command move-to-workspace 8
+# fn+shift-9: omniwmctl command move-to-workspace 9
+#
+#
+# fn-d: open -a "Raycast" -g
