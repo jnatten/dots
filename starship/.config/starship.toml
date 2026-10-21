@@ -1,4 +1,5 @@
 add_newline = false
+command_timeout = 3000
 
 format = """
 $character\
@@ -9,14 +10,7 @@ $localip\
 $shlvl\
 $kubernetes\
 $directory\
-${custom.jj_bookmarks}\
-${custom.jj_status}\
-${custom.git_branch}\
-${custom.git_commit}\
-${custom.loading}\
-${git_state}\
-${custom.git_metrics}\
-${custom.git_status}\
+$vcs\
 $hg_branch\
 $package\
 $buf\
@@ -40,17 +34,44 @@ ${custom.tmuxsessions}\
 ${custom.colima}\
 """
 
+# Rendered synchronously by fish_prompt_loading_indicator while the full
+# prompt renders async. Mirrors `format` minus `$vcs`.
+[profiles]
+sync = """
+$character\
+$aws\
+$username\
+$hostname\
+$localip\
+$shlvl\
+$kubernetes\
+$directory\
+$hg_branch\
+$package\
+$buf\
+$helm\
+$rust\
+$scala\
+$terraform\
+$env_var\
+$sudo\
+$cmd_duration\
+$line_break\
+$time\
+$status\
+$shell """
+
 [custom.tmux]
-command = """echo T"""
-format = '\[[$symbol($output)]($style)\]'
+command = """test -z "$TMUX" && echo T"""
+format = '(\[[$symbol$output]($style)\])'
 shell = "sh"
-when = """ test -z "$TMUX" """
+when = true
 style = "bold red"
 
 [custom.tmuxsessions]
 command = """tmux list-sessions | wc -l"""
 format = '\[[$symbol($output)]($style)\]'
-when = """ true """
+when = true
 shell = "sh"
 style = "bold green"
 
@@ -134,20 +155,9 @@ format = '\[[$symbol$branch]($style)\]'
 [git_status]
 format = '([\[$all_status$ahead_behind\]]($style))'
 
-# jj repo detection walks up for a `.jj` dir instead of shelling out to
-# `jj root`: every `when` below runs on every prompt, and jj is what times out.
-[custom.loading]
-disabled = true
-command = '''
-  echo "…"
-'''
-shell = ['sh']
-when = """
-test -z "$STARSHIP_DISABLE_JJ" && exit 1
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 0; d=${d%/*}; done; exit 1
-"""
-format = '(\[[$output]($style)\])'
-style = "bold purple"
+[vcs]
+order = ["jj", "git"]
+jj_modules = "${custom.jj_bookmarks}${custom.jj_status}"
 
 [custom.jj_bookmarks]
 command = '''
@@ -177,10 +187,7 @@ printf "%s" "$ahead"
 '''
 ignore_timeout = true
 shell = ['sh']
-when = """
-test -n "$STARSHIP_DISABLE_JJ" && exit 1
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 0; d=${d%/*}; done; exit 1
-"""
+when = true
 format = '(\[[$output]($style)\])'
 style = "bold purple"
 
@@ -190,48 +197,9 @@ jj log --revisions @ --limit 1 --no-graph --template 'if(!empty, "+")'
 '''
 ignore_timeout = true
 shell = ['sh']
-when = """
-test -n "$STARSHIP_DISABLE_JJ" && exit 1
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 0; d=${d%/*}; done; exit 1
-"""
+when = true
 format = '(\[[$output]($style)\])'
 style = "bold red"
-
-[custom.git_status]
-when = """
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
-"""
-command = "starship module git_status"
-shell = ['sh']
-format = '[$output]($style)'
-description = "Only show git_status if we're not in a jj repo"
-
-[custom.git_commit]
-when = """
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
-"""
-command = "starship module git_commit"
-shell = ['sh']
-description = "Only show git_commit if we're not in a jj repo"
-
-[custom.git_metrics]
-when = """
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
-"""
-command = "starship module git_metrics"
-shell = ['sh']
-description = "Only show git_metrics if we're not in a jj repo"
-
-[custom.git_branch]
-when = """
-d=$PWD; while [ -n "$d" ]; do [ -d "$d/.jj" ] && exit 1; d=${d%/*}; done; exit 0
-"""
-command = "starship module git_branch"
-shell = ['sh']
-description = "Only show git_branch if we're not in a jj repo"
-# $output already contains the rendered, bracketed branch; the default custom
-# format ("[$symbol($output)]($style) ") would add a trailing space.
-format = '[$output]($style)'
 
 [golang]
 disabled = true
