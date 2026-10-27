@@ -48,7 +48,6 @@ abbr -a jci 'jj commit -i'
 abbr -a jd 'jj diff'
 abbr -a jdm 'jj diff -f "trunk()"'
 abbr -a jcm 'jj new "trunk()"'
-abbr -a jn 'jj new'
 abbr -a js 'jj status'
 abbr -a pn 'pnpm'
 

@@ -11,3 +11,6 @@ bind -M insert \cf accept-autosuggestion
 
 bind \cg accept-autosuggestion execute
 bind -M insert \cg accept-autosuggestion execute
+
+bind \er __jj_pick_widget
+bind -M insert \er __jj_pick_widget
