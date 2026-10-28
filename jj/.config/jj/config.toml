@@ -22,7 +22,7 @@ colocate = true
 
 [ui]
 diff-formatter = ":git"
-pager = "delta"
+pager = ["delta", "--pager", "less -RF --redraw-on-quit"]
 diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
 merge-editor = "idea"
 conflict-marker-style = "git"
