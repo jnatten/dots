@@ -94,3 +94,6 @@ bookmark-advance-to = "@-"
 'log_branch(x)' = '(branch(x) | trunk()) ~ other_workspaces()'
 'this_branch()' = 'branch(@)'
 'log_this_branch()' = 'log_branch(@)'
+
+[snapshot]
+auto-update-stale = true
