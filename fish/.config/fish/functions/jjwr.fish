@@ -1,19 +1,29 @@
 function jjwr --description "Remove picked jj workspaces from disk"
+    set -l current (jj --ignore-working-copy workspace root)
+    or return
     set -l main
+    set -l here
     set -l entries
     for line in (jj --ignore-working-copy --color=always workspace list \
             -T 'if(root, name ++ "\t" ++ root.absolute() ++ "\t" ++ pad_end(10, target.change_id().shortest(8)) ++ pad_end(32, label(if(target.current_working_copy(), "working_copy"), name)) ++ " " ++ coalesce(target.description().first_line(), description_placeholder) ++ "\n")')
-        set -l root (string replace -ra '\e\[[0-9;]*m' '' -- $line | string split -f2 \t)
-        if test -d $root/.jj/repo
-            set main $root
+        set -l fields (string replace -ra '\e\[[0-9;]*m' '' -- $line | string split -m2 \t)
+        if test -d $fields[2]/.jj/repo
+            set main $fields[2]
         else
             set -a entries $line
+            test "$fields[2]" = "$current"; and set here (string join \t $fields[1..2])
         end
     end
 
     set -l fzf_opts --ansi --delimiter \t --with-nth 3.. --accept-nth 1,2
     set -l picked
-    if set -q argv[1]
+    if test "$argv" = .
+        set -q here[1]; or begin
+            echo "jjwr: the main workspace can't be removed" >&2
+            return 1
+        end
+        set picked $here
+    else if set -q argv[1]
         set picked (printf '%s\n' $entries | fzf $fzf_opts --filter "$argv")
     end
 
