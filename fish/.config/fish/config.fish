@@ -6,7 +6,9 @@ if status is-login
     fish_add_path -P ~/Applications/IntelliJ\ IDEA.app/Contents/MacOS
     fish_add_path -aP ~/Library/Application\ Support/Coursier/bin
 
-    set -x SSH_AUTH_SOCK ~/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock
+    if not set -q SSH_CONNECTION
+      set -x SSH_AUTH_SOCK ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
+    end
   end
 
   # Make global Mise tools available in system PATH

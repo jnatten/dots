@@ -5,7 +5,7 @@
 function __refresh_tmux_env --on-event fish_prompt
     set -q TMUX; or return
 
-    for var in SSH_CONNECTION SSH_CLIENT SSH_TTY
+    for var in SSH_CONNECTION SSH_CLIENT SSH_TTY SSH_AUTH_SOCK
         set -l line (tmux show-environment $var 2>/dev/null)
         test -n "$line"; or continue
 
