@@ -1,3 +1,10 @@
+if test "$(uname -s)" = "Darwin"
+  set -g __local_ssh_auth_sock ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
+  if not set -q SSH_CONNECTION
+    set -gx SSH_AUTH_SOCK $__local_ssh_auth_sock
+  end
+end
+
 if status is-login
 
   if test "$(uname -s)" = "Darwin"
@@ -5,11 +12,6 @@ if status is-login
     fish_add_path -aP ~/Library/Application\ Support/JetBrains/Toolbox/scripts
     fish_add_path -P ~/Applications/IntelliJ\ IDEA.app/Contents/MacOS
     fish_add_path -aP ~/Library/Application\ Support/Coursier/bin
-
-    set -g __local_ssh_auth_sock ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
-    if not set -q SSH_CONNECTION
-      set -x SSH_AUTH_SOCK $__local_ssh_auth_sock
-    end
   end
 
   # Make global Mise tools available in system PATH
