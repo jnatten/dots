@@ -30,6 +30,7 @@ abbr -a gdds git diff --staged
 abbr -a gap git add -p
 abbr -a gc --set-cursor 'git commit -m "%"'
 abbr -a jl 'jj lb'
+abbr -a jL 'jj log'
 abbr -a jab 'jj abandon'
 abbr -a jabs 'jj absorb'
 abbr -a jfm 'jj git fetch && jj new \'trunk()\''
