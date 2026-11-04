@@ -47,6 +47,9 @@ function jjwr --description "Remove picked jj workspaces from disk"
         set -l name (string split -f1 \t -- $entry)
         set -l root (string split -f2 \t -- $entry)
         set -a names $name
+        if test -d $root
+            jj -R $root --quiet workspace update-stale; or return
+        end
         if string match -q -- $root $PWD; or string match -q -- "$root/*" $PWD
             cd $main; or return
         end
