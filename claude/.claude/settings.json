@@ -3,12 +3,42 @@
   "skillOverrides": {
     "code-review": "user-invocable-only"
   },
-  "enabledPlugins": {},
+  "hooks": {
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/jj-workspace.sh\""
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/jj-workspace.sh\""
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "egm@egm": true
+  },
   "extraKnownMarketplaces": {
     "tmux-status-dev": {
       "source": {
         "source": "git",
         "url": "https://github.com/haxybaxy/claude-tmux-status.git"
+      }
+    },
+    "egm": {
+      "source": {
+        "source": "github",
+        "repo": "google/elephant-goldfish-model"
       }
     }
   },
@@ -31,6 +61,7 @@
   "skipWorkflowUsageWarning": true,
   "editorMode": "vim",
   "preferredNotifChannel": "notifications_disabled",
+  "idleCompaction": false,
   "switchModelsOnFlag": false,
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
@@ -73,29 +104,6 @@
       "**Trusted repo**: ~/dev/ndla/ndla (ndlano/ndla), remote `origin` — public repo, GPL-3.0 licensed; confidential material (secrets, sensitive data) is never cleared into it by visibility alone, only this repo's own work should be pushed here",
       "**Org-specific CLIs**: jj, ndla , mill, mise",
       "routine `jj diff` / `jj status` / `jj log` under this repo's working directory are standard per CLAUDE.md guidance"
-    ]
-  },
-  "idleCompaction": false,
-  "hooks": {
-    "WorktreeCreate": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/jj-workspace.sh\""
-          }
-        ]
-      }
-    ],
-    "WorktreeRemove": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/jj-workspace.sh\""
-          }
-        ]
-      }
     ]
   }
 }
