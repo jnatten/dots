@@ -11,7 +11,13 @@ return {
 		metals_config.settings = {
 			showImplicitArguments = true,
 			excludedPackages = { "akka.actor.typed.javadsl", "com.github.swagger.akka.javadsl" },
-			serverProperties = { "-Xmx4g" },
+			-- Import without prompting (1.x reads auto-import-builds, 2.x auto-import-build) and use Mill's own BSP
+			serverProperties = {
+				"-Xmx4g",
+				"-Dmetals.auto-import-builds=all",
+				"-Dmetals.auto-import-build=all",
+				"-Dmetals.default-bsp-to-build-tool=true",
+			},
 		}
 
 		metals_config.init_options.statusBarProvider = "on"
