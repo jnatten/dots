@@ -1,3 +1,11 @@
+# Claude's terminal can start fish before anything answers its startup queries,
+# stalling for 10s. Feature flags only apply at startup, hence the re-exec.
+if status is-interactive; and test "$TERM_PROGRAM" = claude-desktop; and status test-feature query-term
+  set -l cmd (status fish-path) --features no-query-term
+  status is-login; and set -a cmd --login
+  exec $cmd
+end
+
 if test "$(uname -s)" = "Darwin"
   set -g __local_ssh_auth_sock ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
   if not set -q SSH_CONNECTION
