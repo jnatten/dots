@@ -30,6 +30,21 @@ const RAIL_CELL = 32;
 const railCell = (el) => h_flex().flex_none().justify_center().child(el);
 const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
 const base = (path) => path.replace(/\/+$/, "").split("/").pop();
+
+// The nearest bookmarks under @, as the starship prompt shows them: "main",
+// "main*~2", "2 bookmarks", "?". null outside jj.
+async function bookmarkOf(cwd, on) {
+  const nearest = "heads(::@ & (bookmarks() | remote_bookmarks()))";
+  const log = (revs, template) => exec("jj", ["--ignore-working-copy", "--color=never", "log", "--no-graph", "-r", revs, "-T", template], { cwd, on });
+  const heads = await log(nearest, 'bookmarks ++ "\\n"');
+  if (heads.code !== 0) return null;
+  const lines = heads.stdout.split("\n").filter(Boolean);
+  if (!lines.length) return "?";
+  const label = lines.length > 1 ? `${lines.length} bookmarks${lines.some((l) => l.includes("*")) ? "*" : ""}` : lines[0];
+  const ahead = await log(`${nearest}..@ ~ @`, '"x"');
+  return ahead.code === 0 && ahead.stdout.length ? `${label}~${ahead.stdout.length}` : label;
+}
+
 // Changes made outside Herdr (an editor's save, a commit in another app): looked
 // for this often, in repos the list shows, while the window is in front.
 const FALLBACK = 60000;
@@ -220,7 +235,8 @@ export default class Spaces extends View {
       ]);
       const name = repo.endsWith("/.git") ? base(repo.slice(0, -5)) : base(repo).replace(/\.git$/, "");
       const [ahead, behind] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
-      const info = { name, branch: branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)", ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git` };
+      const detached = branch.code === 0 ? null : (await bookmarkOf(cwd, on)) ?? "(detached)";
+      const info = { name, branch: detached ?? branch.stdout.trim().replace(/^refs\/heads\//, ""), ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git` };
       this.git[key] = info;
       if (!on) this.watch(repo, cx);
     } catch {
