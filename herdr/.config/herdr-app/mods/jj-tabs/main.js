@@ -16,7 +16,7 @@ export default class Tabs extends View {
     this.pressed = null;
     this.scroll = ScrollHandle.new();
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
-    // Pane keys (keys.json "jj-tabs.<command>") act on the focused terminal through jj-panes.
+    // Pane keys (keys.json "jj-tabs.<command>") act on the focused terminal through jj-panes and jj-copy.
     cx.spawn(async () => {
       for (;;) {
         const command = await nextCommand();
@@ -25,6 +25,8 @@ export default class Tabs extends View {
         if (command === "pane-space") openOverlay({ mod: "jj-panes", kind: "dialog", width: 420, height: 360, props: { action: "space", terminal } });
         else if (command === "pane-tab") openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "tab", terminal } });
         else if (command.startsWith("layout-")) openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "layout", layout: command.slice(7), terminal } });
+        else if (command === "copy-mode") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: { action: "copy", terminal } });
+        else if (command === "capture") openOverlay({ mod: "jj-copy", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "nvim", terminal, cwd: focused()?.cwd } });
       }
     });
   }

@@ -55,6 +55,8 @@
     "ctrl-a alt-3": "jj-tabs.layout-main-horizontal",
     "ctrl-a alt-4": "jj-tabs.layout-main-vertical",
     "ctrl-a alt-5": "jj-tabs.layout-tiled",
+    "ctrl-a v": "jj-tabs.copy-mode",
+    "ctrl-a shift-e": "jj-tabs.capture",
     "cmd-/": "app.help",
     "cmd-shift-/": "app.help",
     "cmd-b": "layout.toggle:sidebar",
