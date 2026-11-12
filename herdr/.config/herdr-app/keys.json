@@ -17,6 +17,8 @@
     "cmd-n": "space.new",
     "cmd-p": "mod.open:picker",
     "cmd-shift-p": "app.palette",
+    "cmd-k": "mod.open:jj-sessions",
+    "cmd-shift-a": "jj-sessions.archive",
     "cmd-,": "app.settings",
     "cmd-d": "pane.split:right",
     "cmd-shift-d": "pane.split:down",

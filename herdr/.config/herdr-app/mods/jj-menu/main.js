@@ -1,11 +1,11 @@
 // Context menus (Herdr's items). Opened as a popup with
 // props { tab: "pane" | "tab" | "space" | "global", target }.
 // ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
-// a command "worktree" or "jj-workspace" opens that dialog instead.
+// a command "worktree", "jj-workspace" or "jj-sessions" opens that dialog instead.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, panes, exec } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, panes, agents, exec } from "herdr";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s) {
@@ -26,6 +26,8 @@ async function checkout(folder, on) {
   if (top.code !== 0 || common.code !== 0) return null;
   return common.stdout.trim() === `${top.stdout.trim()}/.git` ? "main" : "linked";
 }
+
+const claude = (a) => !a.address.includes("/") && (a.app === "claude-code" || a.program?.key === "claude");
 
 function items(p, git) {
   p = p ?? {};
@@ -57,6 +59,7 @@ function items(p, git) {
             ]
           : []),
         ...(parent ? [[`Send back to ${parent.name || parent.address}`, "terminal.park", { terminal: term.address }]] : []),
+        ...(inTab && agents().some((a) => a.address === tg.terminal && claude(a)) ? [["Archive session", "jj-sessions", { action: "archive", terminals: [tg.terminal] }]] : []),
         ...(inTab ? [["Close pane", "pane.close", { pane: tg.pane }]] : []),
       ];
     }
@@ -79,6 +82,7 @@ function items(p, git) {
               ...(git ? [["New worktree", "worktree", { space: tg.id, action: "new" }], ["Open worktree", "worktree", { space: tg.id, action: "open" }]] : []),
               ...(git === "linked" ? [["Remove worktree", "worktree", { space: tg.id, action: "remove" }]] : []),
             ]),
+        ...(agents().some((a) => a.space === tg.id && claude(a)) ? [["Archive sessions & close", "jj-sessions", { action: "archive", space: tg.id }]] : []),
         ["Close", "space.close", { id: tg.id }],
       ];
     default:
@@ -94,7 +98,7 @@ function items(p, git) {
 }
 
 function menuIcon(command) {
-  const name = command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
+  const name = command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
   return `mods/workspace-chrome/${name}.svg`;
 }
 
@@ -127,6 +131,7 @@ export default class Menu extends View {
     if (!it) return;
     closeOverlay(props()?.overlay);
     if (it[1] === "worktree" || it[1] === "jj-workspace") openOverlay({ mod: it[1], kind: "dialog", ...(it[2].action === "open" ? { width: 560, height: 480 } : { width: 440, height: 260 }), props: it[2] });
+    else if (it[1] === "jj-sessions") openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: it[2] });
     else run(it[1], it[2]);
   }
 

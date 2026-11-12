@@ -4,7 +4,7 @@
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, spaces, panes, exec, home, readTextFile } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, spaces, panes, exec, home, readTextFile, shared } from "herdr";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s, all = panes()) {
@@ -292,7 +292,7 @@ export default class JjWorkspace extends View {
     const remove = props()?.action === "remove";
     const s = this.space();
     const r = this.repo;
-    const title = remove ? `Remove jj workspace ${s?.name ?? ""}?` : `New jj workspace${r ? ` of ${r.name}` : ""}`;
+    const title = remove ? `Remove jj workspace ${s?.name || (r?.top.split("/").pop() ?? "")}?` : `New jj workspace${r ? ` of ${r.name}` : ""}`;
     const detail =
       r === undefined
         ? "…"
@@ -301,9 +301,10 @@ export default class JjWorkspace extends View {
           : remove
             ? !r.linked
               ? "This is the repository's main workspace, which jj can't remove."
-              : `Closes the space and deletes ${tilde(r.top, this.userHome)}. Its working copy is snapshotted first, so its changes stay in jj log.`
+              : `${s?.id ? "Closes the space and deletes" : "Deletes"} ${tilde(r.top, this.userHome)}. Its working copy is snapshotted first, so its changes stay in jj log.`
             : `A new space on a workspace in ${tilde(ROOT(this.userHome), this.userHome)}/${r.name}/, on the same parent as @ here. A name already in use opens that workspace.`;
     const blocked = !r || (remove && !r.linked);
+    const archived = remove && r?.linked ? (shared("jj-sessions.archived") ?? []).filter((a) => a.cwd === r.top || a.cwd.startsWith(`${r.top}/`)).length : 0;
     return v_flex()
       .id("workspace")
       .track_focus(this.handle)
@@ -315,6 +316,7 @@ export default class JjWorkspace extends View {
       .text_size(13)
       .child(div().font_semibold().text_color(t.foreground).child(title))
       .child(div().text_color(t.muted).child(detail))
+      .when(archived > 0, (el) => el.child(div().text_color(t.blocked).child(`${archived === 1 ? "An archived Claude session lives" : `${archived} archived Claude sessions live`} here and can't be resumed after this.`)))
       .when(!remove && !blocked, (el) =>
         el.child(
           Input.new(this.input)
