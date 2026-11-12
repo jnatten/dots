@@ -44,6 +44,17 @@ function fish_focus_in --on-event fish_focus_in
     type -q __async_prompt_fire && __async_prompt_fire
 end
 
+# fish only asks for focus reports under tmux. Herdr sends them too, so ask at the
+# prompt and stop while commands run, as fish does in tmux.
+if set -q HC_TERMINAL_ID
+    function __herdr_focus_on --on-event fish_prompt
+        printf '\e[?1004h'
+    end
+    function __herdr_focus_off --on-event fish_preexec
+        printf '\e[?1004l'
+    end
+end
+
 starship init fish | source
 
 if not status is-interactive
