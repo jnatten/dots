@@ -11,17 +11,6 @@
       "type": "column",
       "children": [
         {
-          "id": "brand",
-          "type": "block",
-          "content": {
-            "mod": "workspace-chrome"
-          },
-          "size": {
-            "px": 46
-          },
-          "window_drag": true
-        },
-        {
           "id": "sidebar-lists",
           "type": "column",
           "children": [
@@ -93,7 +82,7 @@
             "mod": "jj-tabs"
           },
           "size": {
-            "px": 42
+            "px": 32
           },
           "window_drag": true
         },
@@ -112,7 +101,7 @@
                       "mod": "pane"
                     },
                     "reveal": "always",
-                    "height": 30,
+                    "height": 26,
                     "position": "top"
                   },
                   "background": "background",
@@ -124,8 +113,8 @@
                     "width": 1,
                     "color": "accent"
                   },
-                  "radius": 10,
-                  "gap": 8,
+                  "radius": 8,
+                  "gap": 6,
                   "lone": true
                 }
               }
@@ -164,8 +153,8 @@
               "hidden": true
             }
           ],
-          "padding": 8,
-          "gap": 8
+          "padding": 6,
+          "gap": 6
         },
         {
           "id": "status-bar",
@@ -190,7 +179,7 @@
             }
           ],
           "size": {
-            "px": 28
+            "px": 24
           },
           "resizable": false
         }
@@ -209,8 +198,8 @@
   },
   "titlebar": "none",
   "traffic_lights": [
-    12,
-    16
+    -100,
+    -100
   ],
   "terminal_menu": "jj-menu"
 }
