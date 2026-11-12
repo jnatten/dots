@@ -10,6 +10,8 @@ const ARCHIVE = "jj-sessions.archived";
 const FOLDED = 41;
 const LIST = 440;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
+// Space avatar colors, as the jj-spaces sidebar draws them.
+const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
 
 const archived = () => shared(ARCHIVE) ?? [];
 const forget = (id) => setShared(ARCHIVE, archived().filter((r) => r.id !== id));
@@ -118,6 +120,9 @@ function archive(targets, space) {
   }
 }
 
+// Open search overlays: cmd-shift-a archives their selection rather than the focused pane's session.
+let searching = 0;
+
 const confirmArchive = (args) => openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: { action: "archive", ...args } });
 
 export default class Sessions extends View {
@@ -132,8 +137,12 @@ export default class Sessions extends View {
     this.initSearch(cx);
   }
 
-  close() {
+  hide() {
     closeOverlay(props().overlay);
+  }
+
+  close() {
+    if (this.mode === "search") searching--;
   }
 
   initBlock(cx) {
@@ -144,7 +153,7 @@ export default class Sessions extends View {
     this.checkGone(cx, true);
     cx.spawn(async () => {
       for (;;) {
-        if ((await nextCommand()) !== "archive") continue;
+        if ((await nextCommand()) !== "archive" || searching > 0) continue;
         const terminal = focused()?.terminal;
         confirmArchive({ terminals: terminal ? [terminal] : [] });
       }
@@ -178,6 +187,15 @@ export default class Sessions extends View {
     this.history = undefined;
     this.childOf = [];
     this.scroll = ScrollHandle.new();
+    searching++;
+    cx.spawn(async (cx) => {
+      for (;;) {
+        if ((await nextCommand()) !== "archive") continue;
+        const it = this.items()[this.at];
+        if (it?.kind === "open") this.dismiss(it);
+        cx.notify();
+      }
+    });
     this.input = InputState.new({ placeholder: "Search sessions…" });
     this.input.on("change", (_e, cx) => {
       this.text = this.input.value();
@@ -199,11 +217,22 @@ export default class Sessions extends View {
 
   sections() {
     const f = this.text.trim().toLowerCase();
-    const match = (s) => !f || `${s.title} ${label(s.cwd)} ${s.cwd} ${s.prompt ?? ""}`.toLowerCase().includes(f);
+    const match = (s) => !f || `${s.title} ${label(s.cwd)} ${s.cwd} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f);
+    const ps = panes();
+    const colors = shared("space.colors") ?? {};
+    const all = spaces().map((w) => ({
+      id: w.id,
+      title: w.name,
+      cwd: place(w, ps) ?? "",
+      machine: w.machine,
+      color: colors[w.id] ?? "ansi6",
+      meta: ["blocked", "done", "working"].includes(w.status) ? w.status : `${w.tabs.length} tab${w.tabs.length === 1 ? "" : "s"}`,
+    }));
     const skip = new Set([...(this.open ?? []), ...archived()].map((s) => s.id));
     const past = (this.history ?? []).filter((s) => !skip.has(s.id) && match(s));
     return [
       { name: "Open", kind: "open", list: (this.open ?? []).filter(match), loading: this.open === undefined },
+      { name: "Spaces", kind: "space", list: all.filter(match), loading: false },
       { name: "Archived", kind: "archived", list: archived().filter(match), loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.history === undefined },
     ];
@@ -215,13 +244,13 @@ export default class Sessions extends View {
 
   go(it, cx) {
     if (!it) return;
-    if (it.kind === "open") {
-      this.close();
-      return run("pane.focus", { pane: it.s.pane });
+    if (it.kind === "open" || it.kind === "space") {
+      this.hide();
+      return it.kind === "open" ? run("pane.focus", { pane: it.s.pane }) : run("space.select", { id: it.s.id });
     }
     cx.spawn(async (cx) => {
       this.error = await resume(it.s);
-      if (!this.error) return this.close();
+      if (!this.error) return this.hide();
       cx.notify();
     });
   }
@@ -229,14 +258,14 @@ export default class Sessions extends View {
   dismiss(it) {
     if (it?.kind === "archived") forget(it.s.id);
     else if (it?.kind === "open") {
-      this.close();
+      this.hide();
       confirmArchive({ terminals: [it.s.address] });
     }
   }
 
   confirm() {
     if (!this.targets?.length) return;
-    this.close();
+    this.hide();
     archive(this.targets, props()?.space);
   }
 
@@ -364,7 +393,7 @@ export default class Sessions extends View {
       .id("arch-confirm")
       .track_focus(this.handle)
       .on_key_down((e) => {
-        if (e.key === "escape") this.close();
+        if (e.key === "escape") this.hide();
         else if (e.key === "enter") this.confirm();
       })
       .size_full()
@@ -396,7 +425,12 @@ export default class Sessions extends View {
     const selected = items[this.at];
     const row = (kind, s, i) => {
       const on = i === this.at;
-      const icon = kind === "open" ? div().size(7).rounded(4).bg(t[s.status] ?? t.idle) : svg(ICON(kind === "archived" ? "archive" : "clock")).size(13).text_color(t.dim);
+      const icon =
+        kind === "open"
+          ? div().size(7).rounded(4).bg(t[s.status] ?? t.idle)
+          : kind === "space"
+            ? h_flex().size(14).rounded(4).bg(s.color.startsWith("#") ? s.color : (MARK[s.color] ?? t[s.color])).items_center().justify_center().text_size(8.5).font_bold().text_color("#ffffff").child([...s.title][0]?.toUpperCase() ?? "?")
+            : svg(ICON(kind === "archived" ? "archive" : "clock")).size(13).text_color(t.dim);
       return h_flex()
         .id(`ss-${kind}-${s.id}`)
         .h(32)
@@ -411,8 +445,8 @@ export default class Sessions extends View {
         .on_click((_e, cx) => this.go({ kind, s }, cx))
         .child(h_flex().w(14).flex_none().justify_center().child(icon))
         .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(s.title))
-        .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(label(s.cwd)))
-        .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : ago(s.at)));
+        .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(s.machine ? `${s.machine} · ${label(s.cwd)}` : label(s.cwd)))
+        .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : ago(s.at)));
     };
     const children = [];
     this.childOf = [];
@@ -427,7 +461,7 @@ export default class Sessions extends View {
     }
     const empty = items.length === 0 && !sections.some((s) => s.loading);
     const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
-    const hint = { open: "↵ go to · ^D archive", archived: "↵ resume · ^D forget", history: "↵ resume" }[selected?.kind] ?? "";
+    const hint = { open: "↵ go to · ⌘⇧A archive", space: "↵ go to", archived: "↵ resume · ^D forget", history: "↵ resume" }[selected?.kind] ?? "";
     return v_flex()
       .id("sessions")
       .track_focus(this.handle)
@@ -436,7 +470,7 @@ export default class Sessions extends View {
         const ctrl = e.modifiers.control && !e.modifiers.platform && !e.modifiers.alt && !e.modifiers.shift;
         const down = e.key === "down" || (ctrl && (e.key === "j" || e.key === "n"));
         const up = e.key === "up" || (ctrl && (e.key === "k" || e.key === "p"));
-        if (e.key === "escape") return this.close();
+        if (e.key === "escape") return this.hide();
         if (down && count) this.at = (this.at + 1) % count;
         else if (up && count) this.at = (this.at + count - 1) % count;
         else if (e.key === "d" && e.modifiers.control) this.dismiss(selected);
