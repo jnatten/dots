@@ -2,7 +2,7 @@
 
 import { View, div, image, svg, PathBuilder } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, hc, home, readTextFile } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -81,7 +81,46 @@ function pie(fraction, size, fill, track) {
     .when(f > 0, (el) => el.child(globalThis.window.paint_path(wedge, fill).absolute().inset_0()));
 }
 
-const tokens = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e3)}k`);
+const tokens = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}k` : `${Math.round(n)}`);
+
+// Context breakdown colors, handed out in the report's order; Messages, usually the most, stays neutral.
+const PALETTE = ["ansi4", "ansi5", "ansi6", "ansi2", "ansi3", "ansi1", "ansi12", "ansi14", "ansi11", "ansi13"];
+
+// Claude's `/context` report: the totals line and its "Estimated usage by category" table.
+function parseContext(md) {
+  const num = (v) => {
+    const m = String(v).trim().toLowerCase().match(/^([\d.]+)\s*([km]?)$/);
+    return m ? Number(m[1]) * (m[2] === "m" ? 1e6 : m[2] === "k" ? 1e3 : 1) : 0;
+  };
+  const total = md.match(/\*\*Tokens:\*\*\s*([\d.]+[km]?)\s*\/\s*([\d.]+[km]?)/i);
+  const rows = [];
+  let table = false;
+  for (const line of (md.split("### Estimated usage by category")[1] ?? "").split("\n")) {
+    if (!line.startsWith("|")) {
+      if (table) break;
+      continue;
+    }
+    table = true;
+    const [name, count, pct] = line.split("|").slice(1, -1).map((c) => c.trim());
+    if (name === "Category" || /^-+$/.test(name)) continue;
+    rows.push({ name, tokens: num(count), pct: parseFloat(pct) || 0 });
+  }
+  return { used: total ? num(total[1]) : null, size: total ? num(total[2]) : null, rows };
+}
+
+// A terminal's Claude session from ~/.claude/sessions/<pid>.json: its
+// foreground process's, or a child's when a shell launched it.
+async function sessionOf(address) {
+  try {
+    const pid = JSON.parse((await hc(["get", address, "--json"])).stdout).foreground?.pid;
+    const kids = pid ? (await exec("pgrep", ["-P", String(pid)])).stdout.split(/\s+/).filter(Boolean) : [];
+    for (const p of pid ? [pid, ...kids] : []) {
+      const s = JSON.parse((await readTextFile(`${home()}/.claude/sessions/${p}.json`).catch(() => null)) ?? "null");
+      if (s?.sessionId) return { sid: s.sessionId, cwd: s.cwd };
+    }
+  } catch {}
+  return null;
+}
 
 function duration(ms) {
   const m = Math.floor(ms / 60000);
@@ -101,6 +140,8 @@ export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
     this.folded = new Set();
+    this.breakdown = new Map(); // address -> { key, loading, data, error }: its last /context
+    this.ctxOpen = null; // the agent whose context breakdown shows
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pendingPins = JSON.parse(localStorage.getItem("pins") ?? "[]");
@@ -233,6 +274,85 @@ export default class Agents extends View {
     return div().size(7).mx(3).flex_none().rounded(4).bg(a.status === "done" ? color : t.dim + "00");
   }
 
+  // Runs Claude's own /context on a throwaway, unsaved fork of the session.
+  measure(a, mine, machine, cx) {
+    const key = `${mine["claude.session"] ?? ""} ${mine["claude.context"] ?? ""}`;
+    const prev = this.breakdown.get(a.address);
+    if (prev?.loading || (prev?.key === key && prev.data)) return;
+    this.breakdown.set(a.address, { ...prev, key, loading: true, error: "" });
+    cx.spawn(async (cx) => {
+      let sid = mine["claude.session"], cwd = mine["claude.cwd"];
+      if (!sid && !machine) ({ sid, cwd } = (await sessionOf(a.address)) ?? {});
+      let data = prev?.data ?? null, error = "";
+      if (!sid || !cwd) error = "its session isn't known yet";
+      else {
+        try {
+          const r = await exec("claude", ["-p", "--resume", sid, "--fork-session", "--no-session-persistence", "/context"], { cwd, on: machine, timeout: 120000 });
+          const parsed = r.code === 0 ? parseContext(r.stdout) : null;
+          if (parsed?.rows.length) data = parsed;
+          else error = (r.stderr || r.stdout || "").trim().split("\n")[0] || "no breakdown";
+        } catch (e) {
+          error = String(e);
+        }
+      }
+      this.breakdown.set(a.address, { key, loading: false, data, error });
+      cx.notify();
+    });
+  }
+
+  contextPanel(t, a, context, size) {
+    const b = this.breakdown.get(a.address);
+    const d = b?.data;
+    const rows = d?.rows ?? [];
+    const used = rows.filter((r) => !/deferred/i.test(r.name) && !/buffer/i.test(r.name) && r.name !== "Free space" && r.tokens > 0);
+    const free = rows.find((r) => r.name === "Free space");
+    const buffer = rows.find((r) => /buffer/i.test(r.name));
+    const deferred = rows.filter((r) => /deferred/i.test(r.name) && r.tokens > 0);
+    const shades = used.filter((r) => r.name !== "Messages").map((r) => r.name);
+    const color = (name) => (name === "Messages" ? t.muted : t[PALETTE[shades.indexOf(name) % PALETTE.length]] ?? t.muted);
+    const swatch = (bg, border) => div().size(8).flex_none().rounded(2).bg(bg).when(Boolean(border), (el) => el.border_1().border_color(border));
+    const entry = (dot, name, count, pct, quiet) =>
+      h_flex()
+        .gap(7)
+        .items_center()
+        .child(dot)
+        .child(div().flex_1().min_w(0).truncate().text_color(quiet ? t.dim : t.foreground).child(name))
+        .child(div().flex_none().text_color(t.dim).child(tokens(count)))
+        .child(h_flex().w(42).flex_none().justify_end().text_color(t.dim).child(`${pct.toFixed(1)}%`));
+    const summary = d?.used != null ? `${tokens(d.used)} / ${tokens(d.size)} \u00b7 ${Math.round(context)}%` : `${Math.round(context)}% of ${size ? tokens(size) : "the window"}`;
+    return v_flex()
+      .mx(4)
+      .mt(2)
+      .mb(8)
+      .p(10)
+      .gap(5)
+      .rounded(8)
+      .bg(t.raised)
+      .border_1()
+      .border_color(t.border)
+      .text_size(11.5)
+      .child(h_flex().justify_between().items_center().child(div().font_medium().text_color(t.foreground).child("Context")).child(div().text_color(t.dim).child(summary)))
+      .child(
+        h_flex()
+          .w_full()
+          .h(8)
+          .mb(3)
+          .rounded(4)
+          .overflow_hidden()
+          .bg(t.hover)
+          .children(used.map((r) => div().h_full().flex_none().w(`${Math.max(r.pct, 0.6)}%`).bg(color(r.name))))
+          .child(div().h_full().flex_1())
+          .when(Boolean(buffer), (el) => el.child(div().h_full().flex_none().w(`${buffer.pct}%`).bg(t.dim))),
+      )
+      .when(!d, (el) => el.child(div().text_color(t.dim).child(b?.error ? `Couldn't measure: ${b.error}` : "Measuring\u2026")))
+      .children(used.map((r) => entry(swatch(color(r.name)), r.name, r.tokens, r.pct)))
+      .when(Boolean(free), (el) => el.child(entry(swatch(t.hover, t.dim), free.name, free.tokens, free.pct, true)))
+      .when(Boolean(buffer), (el) => el.child(entry(swatch(t.dim), buffer.name, buffer.tokens, buffer.pct, true)))
+      .when(deferred.length > 0, (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`Not loaded: ${deferred.map((r) => `${r.name.replace(/ \(deferred\)/i, "")} ${tokens(r.tokens)}`).join(" \u00b7 ")}`)))
+      .when(Boolean(d && b?.loading), (el) => el.child(div().text_size(10.5).text_color(t.dim).child("Updating\u2026")))
+      .when(Boolean(d && b?.error), (el) => el.child(div().text_size(10.5).text_color(t.blocked).child(`Couldn't update: ${b.error}`)));
+  }
+
   render(cx) {
     const t = theme();
     if (props()?.sortMenu) return this.sortMenu(t);
@@ -358,7 +478,7 @@ export default class Agents extends View {
       // Without a space header above (priority, pinned) the row names its space.
       const full = byPriority || isPinned;
       const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
-      return h_flex()
+      const line = h_flex()
         .id(`ag-${a.address}`)
         .px(8)
         .h(30)
@@ -388,10 +508,28 @@ export default class Agents extends View {
         .when(subs.length > 0, el => el.child(fold(a, subs)))
         .when(this.hovered === a.address, el => el.child(pin))
         .when(context !== null, el => el.child(div().id(`ctx-${a.address}`).flex_none()
-          .tooltip(`Context: ${Math.round(context)}% of ${size ? tokens(size) : "the window"} used`)
+          .on_hover((on, cx) => {
+            if (!on) return;
+            this.ctxOpen = a.address;
+            this.measure(a, mine, machine, cx);
+            cx.notify();
+          })
           .child(pie(context / 100, 12, context >= 80 ? t.blocked : context >= 60 ? t.ansi3 : t.muted, t.dim))))
         .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
         .child(this.status(t, a, byPriority && !isPinned));
+      return v_flex()
+        .id(`ag-wrap-${a.address}`)
+        .flex_none()
+        .on_hover((on, cx) => {
+          if (on || this.ctxOpen !== a.address) return;
+          this.ctxOpen = null;
+          cx.notify();
+        })
+        .child(line)
+        .when(this.ctxOpen === a.address && context !== null, el => {
+          this.measure(a, mine, machine, cx);
+          return el.child(this.contextPanel(t, a, context, size));
+        });
     };
 
     // Groups in list order: spaces (grouped) or priority sections. Agents of a
