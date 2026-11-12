@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, focused, nextCommand } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -12,10 +12,21 @@ function find(node, id) {
 }
 
 export default class Tabs extends View {
-  init() {
+  init(_props, cx) {
     this.pressed = null;
     this.scroll = ScrollHandle.new();
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
+    // Pane keys (keys.json "jj-tabs.<command>") act on the focused terminal through jj-panes.
+    cx.spawn(async () => {
+      for (;;) {
+        const command = await nextCommand();
+        const terminal = focused()?.terminal;
+        if (!terminal) continue;
+        if (command === "pane-space") openOverlay({ mod: "jj-panes", kind: "dialog", width: 420, height: 360, props: { action: "space", terminal } });
+        else if (command === "pane-tab") openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "tab", terminal } });
+        else if (command.startsWith("layout-")) openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "layout", layout: command.slice(7), terminal } });
+      }
+    });
   }
 
   // The side panel is remembered per space: switching shows that space's choice
