@@ -433,9 +433,12 @@ export default class Sessions extends View {
       .track_focus(this.handle)
       .on_key_down((e, cx) => {
         const count = items.length;
+        const ctrl = e.modifiers.control && !e.modifiers.platform && !e.modifiers.alt && !e.modifiers.shift;
+        const down = e.key === "down" || (ctrl && (e.key === "j" || e.key === "n"));
+        const up = e.key === "up" || (ctrl && (e.key === "k" || e.key === "p"));
         if (e.key === "escape") return this.close();
-        if (e.key === "down" && count) this.at = (this.at + 1) % count;
-        else if (e.key === "up" && count) this.at = (this.at + count - 1) % count;
+        if (down && count) this.at = (this.at + 1) % count;
+        else if (up && count) this.at = (this.at + count - 1) % count;
         else if (e.key === "d" && e.modifiers.control) this.dismiss(selected);
         else return;
         this.scroll.scroll_to_item(this.childOf[this.at] ?? 0);
