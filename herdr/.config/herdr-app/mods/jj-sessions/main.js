@@ -8,6 +8,7 @@ import { agents, spaces, panes, layout, focused, theme, shared, setShared, props
 
 const ARCHIVE = "jj-sessions.archived";
 const FOLDED = 41;
+const LIST = 440;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
 
 const archived = () => shared(ARCHIVE) ?? [];
@@ -200,10 +201,11 @@ export default class Sessions extends View {
     const f = this.text.trim().toLowerCase();
     const match = (s) => !f || `${s.title} ${label(s.cwd)} ${s.cwd} ${s.prompt ?? ""}`.toLowerCase().includes(f);
     const skip = new Set([...(this.open ?? []), ...archived()].map((s) => s.id));
+    const past = (this.history ?? []).filter((s) => !skip.has(s.id) && match(s));
     return [
       { name: "Open", kind: "open", list: (this.open ?? []).filter(match), loading: this.open === undefined },
       { name: "Archived", kind: "archived", list: archived().filter(match), loading: false },
-      { name: "History", kind: "history", list: (this.history ?? []).filter((s) => !skip.has(s.id) && match(s)).slice(0, 100), loading: this.history === undefined },
+      { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.history === undefined },
     ];
   }
 
@@ -410,19 +412,21 @@ export default class Sessions extends View {
         .child(h_flex().w(14).flex_none().justify_center().child(icon))
         .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(s.title))
         .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(label(s.cwd)))
-        .child(div().flex_none().w(40).text_size(11).text_color(t.dim).child(kind === "open" ? s.status : ago(s.at)));
+        .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : ago(s.at)));
     };
     const children = [];
     this.childOf = [];
     let n = 0;
-    for (const { name, kind, list, loading } of sections) {
+    for (const { name, kind, list, total, loading } of sections) {
       if (!list.length && !loading) continue;
-      children.push(div().px(10).pt(8).pb(3).flex_none().text_size(11).text_color(t.dim).child(loading ? `${name} · loading…` : `${name} · ${list.length}`));
+      children.push(h_flex().h(26).px(10).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(loading ? `${name} · loading…` : `${name} · ${total > list.length ? `${list.length} of ${total}` : list.length}`));
       for (const s of list) {
         this.childOf[n] = children.length;
         children.push(row(kind, s, n++));
       }
     }
+    const empty = items.length === 0 && !sections.some((s) => s.loading);
+    const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
     const hint = { open: "↵ go to · ^D archive", archived: "↵ resume · ^D forget", history: "↵ resume" }[selected?.kind] ?? "";
     return v_flex()
       .id("sessions")
@@ -438,7 +442,8 @@ export default class Sessions extends View {
         cx.stop_propagation();
         cx.notify();
       })
-      .size_full()
+      .w_full()
+      .min_h(0)
       .p(18)
       .gap(10)
       .bg(t.popover)
@@ -461,12 +466,12 @@ export default class Sessions extends View {
       .child(
         v_flex()
           .id("ss-list")
-          .flex_1()
-          .min_h(0)
+          .h(height)
+          .flex_none()
           .overflow_y_scrollbar()
           .track_scroll(this.scroll)
           .children(children)
-          .when(items.length === 0 && !sections.some((s) => s.loading), (el) => el.child(div().p(10).text_color(t.dim).child("No matching sessions."))),
+          .when(empty, (el) => el.child(div().p(10).text_color(t.dim).child("No matching sessions."))),
       )
       .when(Boolean(this.error), (el) => el.child(div().text_color(t.blocked).child(this.error)))
       .child(h_flex().justify_end().text_size(11).text_color(t.dim).child([hint, "esc close"].filter(Boolean).join(" · ")));

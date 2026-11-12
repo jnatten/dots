@@ -201,7 +201,12 @@ export default class JjWorkspace extends View {
     const stale = await jj(this.repo.top, ["--quiet", "workspace", "update-stale"], this.on, 600_000);
     if (!stale.ok) return stale.err || "jj workspace update-stale failed.";
     // Terminals first: a shell sitting in the folder keeps it busy on Windows.
-    if (s?.id) run("space.close", { id: s.id, confirmed: true });
+    const top = this.repo.top;
+    const ps = panes();
+    for (const x of spaces()) {
+      const at = (x.machine ?? null) === (this.on ?? null) && place(x, ps)?.replace(/\\/g, "/");
+      if (x.id === s?.id || (at && (at === top || at.startsWith(`${top}/`)))) run("space.close", { id: x.id, confirmed: true });
+    }
     const r = await jj(this.repo.main, ["workspace", "remove", current.name], this.on, 600_000);
     return r.ok ? "" : r.err || "jj workspace remove failed.";
   }
