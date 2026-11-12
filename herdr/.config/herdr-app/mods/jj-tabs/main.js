@@ -26,7 +26,7 @@ export default class Tabs extends View {
         else if (command === "pane-tab") openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "tab", terminal } });
         else if (command.startsWith("layout-")) openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "layout", layout: command.slice(7), terminal } });
         else if (command === "copy-mode") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: { action: "copy", terminal } });
-        else if (command === "capture") openOverlay({ mod: "jj-copy", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "nvim", terminal, cwd: focused()?.cwd } });
+        else if (command === "capture" || command === "capture-colors") openOverlay({ mod: "jj-copy", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "nvim", terminal, cwd: focused()?.cwd, colors: command === "capture-colors" } });
       }
     });
   }
