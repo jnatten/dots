@@ -1,13 +1,15 @@
 // Open a recent location (zoxide's ranked folders and open panes', per machine) as a new
-// space (↵), a tab in the shown space (⌘↵) or a pane beside the focused one (⇧↵).
+// space (↵), a tab in the shown space (⌘↵) or a pane beside the focused one (⇧↵); or
+// start Claude Code there in a new space (jj-open.claude, jj-open.claude-worktree).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
-import { spaces, panes, machines, theme, props, run, exec, closeOverlay } from "herdr";
+import { spaces, panes, machines, theme, props, run, exec, closeOverlay, nextCommand } from "herdr";
 
 const LIST = 440;
 const CAP = 100;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
+const CLAUDE = { claude: ["claude"], "claude-worktree": ["claude", "--worktree"] };
 const RESOLVE = 'p=$1; case $p in "~"*) p="$HOME${p#"~"}";; esac; cd "$p" 2>/dev/null && pwd';
 
 const base = (path) => path.replace(/\/+$/, "").split("/").pop();
@@ -46,6 +48,12 @@ export default class Open extends View {
     });
     this.input.on("submit", (e, cx) => this.go(this.items()[this.at], e.secondary ? "tab" : e.shift ? "pane" : "space", cx));
     this.input.focus();
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const argv = CLAUDE[await nextCommand()];
+        if (argv) this.go(this.items()[this.at], "space", cx, argv);
+      }
+    });
     for (const m of this.hosts)
       cx.spawn(async (cx) => {
         const r = await zoxide(["query", "--list"], m).catch(() => null);
@@ -92,7 +100,7 @@ export default class Open extends View {
     return this.sections().flatMap((s) => s.list);
   }
 
-  go(it, how, cx) {
+  go(it, how, cx, argv) {
     if (!it) return;
     const cur = shown();
     if (how !== "space" && cur && (cur.machine ?? null) !== it.machine) {
@@ -105,7 +113,7 @@ export default class Open extends View {
         this.error = `No such folder: ${it.path}`;
         return cx.notify();
       }
-      if (how === "space" || !cur) run("space.new", { folder, machine: it.machine ?? "" });
+      if (how === "space" || !cur) run("space.new", { folder, machine: it.machine ?? "", ...(argv && { tab: "Claude", argv }) });
       else if (how === "tab") run("tab.new", { space: cur.id, folder });
       else run("terminal.open", { folder, place: "right" });
       zoxide(["add", folder], it.machine).catch(() => {});
@@ -169,7 +177,7 @@ export default class Open extends View {
     const empty = items.length === 0 && !sections.some((s) => s.loading);
     const height = Math.min(LIST, empty ? 40 : headers * 26 + items.length * 32);
     const here = selected && (!cur || (cur.machine ?? null) === selected.machine);
-    const hint = !selected ? "" : [here ? "↵ space · ⌘↵ tab · ⇧↵ pane" : "↵ space", selected.typed ? "" : "^D forget"].filter(Boolean).join(" · ");
+    const hint = !selected ? "" : [here ? "↵ space · ⌘↵ tab · ⇧↵ pane" : "↵ space", "⌘⇧C claude · ⌥⇧C worktree", selected.typed ? "" : "^D forget"].filter(Boolean).join(" · ");
     return v_flex()
       .id("open")
       .track_focus(this.handle)
