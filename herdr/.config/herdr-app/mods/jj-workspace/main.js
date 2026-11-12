@@ -13,8 +13,9 @@ function place(s, all = panes()) {
   return all.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder || null;
 }
 
-// Workspaces go to <ROOT>/<repo>/<name, slashes as dashes>.
-const ROOT = (home) => `${home}/.herdr/workspaces`;
+// New workspaces come from Claude Code's WorktreeCreate hook, as `claude --worktree`
+// and Claude desktop make theirs: <main workspace>/.claude/worktrees/<name>.
+const HOOK = (home) => `${home}/.claude/hooks/jj-workspace.sh`;
 // Home as ~ (git says C:/Users/x where Windows says C:\Users\x).
 const tilde = (path, userHome) => {
   const [p, h] = [path, userHome].map((s) => s.replace(/\\/g, "/"));
@@ -163,14 +164,10 @@ export default class JjWorkspace extends View {
       this.show(existing, all);
       return "";
     }
-    const path = `${ROOT(this.userHome)}/${this.repo.name}/${name}`;
-    const parent = path.slice(0, path.lastIndexOf("/"));
-    if (!(await ok("mkdir", ["-p", parent], this.on))) return `Couldn't create ${tilde(parent, this.userHome)}.`;
-    const colocate = (await ok("test", ["-e", `${this.repo.main}/.git`], this.on)) ? "--colocate" : "--no-colocate";
-    const wrapped = (await jj(this.repo.top, ["config", "get", "aliases.ws-add"], this.on)).ok;
-    const flags = ["--name", name, colocate];
-    const r = await jj(this.repo.top, wrapped ? ["ws-add", path, ...flags] : ["workspace", "add", ...flags, path], this.on, 600_000);
-    if (!r.ok) return r.err || "jj workspace add failed.";
+    const input = JSON.stringify({ hook_event_name: "WorktreeCreate", cwd: this.repo.top, name });
+    const r = await exec("sh", ["-c", 'printf %s "$1" | "$2"', "sh", input, HOOK(this.userHome)], { cwd: this.repo.top, on: this.on, timeout: 600_000 });
+    const path = (r.stdout ?? "").trim().split("\n").pop();
+    if (r.code !== 0 || !path) return (r.stderr || r.stdout || "").trim().split("\n").pop() || "The WorktreeCreate hook failed.";
     const p = props();
     // Leave spaces unnamed so they follow the workspace folder and nest under the repo.
     run("space.new", { folder: path, machine: this.on ?? "", tab: p.tab, argv: p.argv });
@@ -307,7 +304,7 @@ export default class JjWorkspace extends View {
             ? !r.linked
               ? "This is the repository's main workspace, which jj can't remove."
               : `${s?.id ? "Closes the space and deletes" : "Deletes"} ${tilde(r.top, this.userHome)}. Its working copy is snapshotted first, so its changes stay in jj log.`
-            : `A new space on a workspace in ${tilde(ROOT(this.userHome), this.userHome)}/${r.name}/, on the same parent as @ here. A name already in use opens that workspace.`;
+            : `A new space on a workspace in ${tilde(r.main, this.userHome)}/.claude/worktrees/, made by Claude Code's WorktreeCreate hook like \`claude --worktree\`. A name already in use opens that workspace.`;
     const blocked = !r || (remove && !r.linked);
     const archived = remove && r?.linked ? (shared("jj-sessions.archived") ?? []).filter((a) => a.cwd === r.top || a.cwd.startsWith(`${r.top}/`)).length : 0;
     return v_flex()
