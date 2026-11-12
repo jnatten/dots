@@ -1,3 +1,5 @@
 neovim/.config/nvim/plugin/
 ccdots/.config/ccdots/.build/
 ccdots/.config/ccdots/.swiftpm/
+herdr/.config/herdr-app/mods/*/gpui-kit.d.ts
+herdr/.config/herdr-app/mods/*/jsconfig.json
