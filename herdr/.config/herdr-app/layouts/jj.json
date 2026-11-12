@@ -40,7 +40,7 @@
               "id": "agents",
               "type": "block",
               "content": {
-                "mod": "agents"
+                "mod": "jj-agents"
               },
               "size": {
                 "weight": 1
@@ -168,14 +168,31 @@
           "gap": 8
         },
         {
-          "id": "status",
-          "type": "block",
-          "content": {
-            "mod": "workspace-status"
-          },
+          "id": "status-bar",
+          "type": "row",
+          "children": [
+            {
+              "id": "status",
+              "type": "block",
+              "content": {
+                "mod": "workspace-status"
+              }
+            },
+            {
+              "id": "limits",
+              "type": "block",
+              "content": {
+                "mod": "jj-limits"
+              },
+              "size": {
+                "px": 180
+              }
+            }
+          ],
           "size": {
             "px": 28
-          }
+          },
+          "resizable": false
         }
       ],
       "resizable": false
