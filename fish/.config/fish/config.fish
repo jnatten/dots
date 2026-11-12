@@ -55,7 +55,7 @@ end
 set fish_greeting
 set -x EDITOR "nvim"
 
-if test "$TERM_PROGRAM" = "ghostty"
+if test "$TERM_PROGRAM" = "ghostty"; and not set -q HC_TERMINAL_ID
     tmux
 end
 
