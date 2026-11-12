@@ -86,6 +86,10 @@
     "ctrl-8": "space.select:8",
     "ctrl-9": "space.select:9"
   },
+  "mod:jj-open": {
+    "cmd-shift-c": "jj-open.claude",
+    "alt-shift-c": "jj-open.claude-worktree"
+  },
   "terminal": {
     "cmd-f": "terminal.search",
     "cmd-c": "terminal.copy",
