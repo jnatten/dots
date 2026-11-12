@@ -32,14 +32,6 @@ const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
 const base = (path) => path.replace(/\/+$/, "").split("/").pop();
 const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
 const ARCHIVE = "jj-sessions.archived";
-const WORKSPACES = String.raw`if(root, name ++ "\t" ++ root.absolute() ++ "\n")`;
-
-// A jj repo's workspaces other than the one at `top`: [{ name, path }].
-async function workspacesOf(top, on) {
-  const r = await exec("jj", ["--ignore-working-copy", "--color=never", "workspace", "list", "-T", WORKSPACES], { cwd: top, on });
-  if (r.code !== 0) return [];
-  return r.stdout.split("\n").map((l) => l.split("\t")).filter(([name, path]) => name && path && path !== top).map(([name, path]) => ({ name, path }));
-}
 
 // The nearest bookmarks under @, as the starship prompt shows them: "main",
 // "main*~2", "2 bookmarks", "?". null outside jj.
@@ -82,7 +74,6 @@ export default class Spaces extends View {
     this.ready = {}; // machine -> its layout was readable at the last look
     this.at = {}; // space -> its where() at the last look
     this.watching = new Set(); // local repos' git folders
-    this.ws = {}; // a jj repo's g.repo -> its other workspaces
     // Spaces made while this runs wait (at most a moment) for their git, so a
     // worktree appears under its repo instead of jumping there.
     this.shown = new Set(spaces().map((s) => s.id));
@@ -248,7 +239,6 @@ export default class Spaces extends View {
       const [ahead, behind] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
       const bookmark = branch.code === 0 ? null : await bookmarkOf(cwd, on);
       const info = { name, top, branch: bookmark ?? (branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)"), ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git` };
-      if (bookmark !== null && !info.linked) this.ws[info.repo] = await workspacesOf(top, on);
       this.git[key] = info;
       if (!on) this.watch(repo, cx);
     } catch {
@@ -322,23 +312,6 @@ export default class Spaces extends View {
     return out.filter(r => this.shown.has(r.w.id));
   }
 
-  // After each jj repo's spaces, its other workspaces that no space shows yet.
-  withWorkspaces(rows) {
-    const out = [];
-    const done = new Set();
-    for (let n = 0; n < rows.length; n++) {
-      const r = rows[n];
-      out.push(r);
-      const repo = r.g && !r.g.linked && !r.tree ? r.g.repo : null;
-      if (!repo || done.has(repo) || !this.ws[repo]?.length) continue;
-      done.add(repo);
-      while (rows[n + 1]?.tree && rows[n + 1].g?.repo === repo) out.push(rows[++n]);
-      const shown = new Set(rows.filter((k) => k.g?.repo === repo).map((k) => k.g.top));
-      out.push(...this.ws[repo].filter((ws) => !shown.has(ws.path)).map((ws) => ({ kind: "ws", ws, machine: r.w.machine ?? null })));
-    }
-    return out;
-  }
-
   // Archived Claude sessions in a workspace, leaving out those in workspaces nested inside it.
   archivedIn(path, nested = []) {
     return (shared(ARCHIVE) ?? []).filter((r) => inside(r.cwd, path) && !nested.some((p) => inside(r.cwd, p))).length;
@@ -348,36 +321,11 @@ export default class Spaces extends View {
     return h_flex().flex_none().gap(3).items_center().text_size(11.5).text_color(t.dim).child(svg("mods/workspace-chrome/archive.svg").size(11)).child(String(count));
   }
 
-  wsRow({ ws, machine }, t) {
-    const count = this.archivedIn(ws.path);
-    return v_flex()
-      .id(`ws-${ws.path}`)
-      .px(8)
-      .h(rowHeight({ tree: true }))
-      .flex_none()
-      .justify_center()
-      .rounded(8)
-      .cursor_pointer()
-      .hover((s) => s.bg(t.hover))
-      .on_click(() => run("space.new", { folder: ws.path, machine: machine ?? "" }))
-      .on_mouse_down("right", () => openOverlay({ mod: "jj-workspace", kind: "dialog", width: 440, height: 260, props: { folder: ws.path, machine, action: "remove" } }))
-      .child(
-        h_flex()
-          .pl(22)
-          .gap(9)
-          .items_center()
-          .child(svg("mods/workspace-chrome/folder.svg").size(13).text_color(t.dim))
-          .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(ws.name))
-          .when(count > 0, (el) => el.child(this.archiveBadge(count, t))),
-      );
-  }
-
   // The rows, under a header per machine once one isn't this computer.
   grouped(t, collapsed) {
-    const rows = collapsed ? this.ordered() : this.withWorkspaces(this.ordered());
-    const draw = (r) => (r.kind === "ws" ? this.wsRow(r, t) : collapsed ? this.compact(r, t) : this.row(r, t));
-    const machineOf = (r) => r.w?.machine ?? r.machine ?? null;
-    const remote = [...new Set([...rows.map(machineOf).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
+    const rows = this.ordered();
+    const draw = (r) => (collapsed ? this.compact(r, t) : this.row(r, t));
+    const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
     const loading = m => {
       const layout = machines().find(k => k.name === m)?.layout;
       return layout === "loading" || (!layout && this.machines.some(k => k.name === m && k.state === "connected"))
@@ -387,7 +335,7 @@ export default class Spaces extends View {
     if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : rows.map(draw);
     const machineNames = [null, ...remote];
     return machineNames.flatMap((m) => {
-      const mine = rows.filter((r) => machineOf(r) === m);
+      const mine = rows.filter((r) => (r.w.machine ?? null) === m);
       const repair = this.reconnecting[m];
       const machine = this.machines.find(k => k.name === m) ?? repair?.machine;
       const connected = !m || machine?.state === "connected";
@@ -518,7 +466,7 @@ export default class Spaces extends View {
           .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(w.name))
           .child(g ? this.gitTail(g, tree, w.name, t) : div().flex_1())
           .when(Boolean(g?.top), (el) => {
-            const count = this.archivedIn(g.top, tree ? [] : (this.ws[g.repo] ?? []).map((ws) => ws.path));
+            const count = this.archivedIn(g.top, tree ? [] : Object.values(this.git).filter((k) => k?.linked && k.repo === g.repo).map((k) => k.top));
             return count > 0 ? el.child(this.archiveBadge(count, t)) : el;
           }),
       );
