@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Writes a herdr-core terminal's history and screen, colours kept, as lines of
+text with SGR codes (what tmux's capture-pane -e gives): the first paint of a
+watch-only `hc attach`, without its clears, tab stops and cursor moves. A
+full-screen app that `hc read` can scroll gets that longer plain text instead.
+
+usage: capture.py <terminal> <file> [history lines]
+"""
+import fcntl
+import json
+import os
+import pty
+import re
+import select
+import signal
+import struct
+import subprocess
+import sys
+import termios
+import time
+
+CLEAR = b"\x1b[H\x1b[2J"
+
+
+def size(terminal):
+    try:
+        info = json.loads(subprocess.run(["hc", "get", terminal, "--json"], capture_output=True, text=True, timeout=10).stdout)
+        return int(info.get("rows") or 50), int(info.get("cols") or 200)
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return 50, 200
+
+
+def first_paint(terminal, history):
+    rows, cols = size(terminal)
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execvp("hc", ["hc", "attach", "--observe", "--history", history, terminal])
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+    data = bytearray()
+    start = time.time()
+    last = None
+    while time.time() - start < 8:
+        ready, _, _ = select.select([fd], [], [], 0.05)
+        if ready:
+            try:
+                chunk = os.read(fd, 1 << 16)
+            except OSError:
+                break
+            if not chunk:
+                break
+            data += chunk
+            last = time.time()
+        elif last and data.count(CLEAR) >= 2 and time.time() - last > 0.3:
+            break
+        elif last and time.time() - last > 1.5:
+            break
+    os.kill(pid, signal.SIGTERM)
+    return bytes(data)
+
+
+# Everything but SGR (colour) codes: string commands (OSC, DCS, APC, PM), other
+# CSI sequences, and two-byte escapes.
+STRINGS = re.compile(rb"\x1b[\]P_^].*?(?:\x07|\x1b\\)", re.S)
+CSI = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
+SGR = re.compile(rb"\x1b\[[0-9;:]*m")
+SHORT = re.compile(rb"\x1b[ -/]*[0-~]")
+
+
+def clean(part):
+    part = STRINGS.sub(b"", part)
+    part = CSI.sub(lambda m: m.group(0) if SGR.fullmatch(m.group(0)) else b"", part)
+    part = SHORT.sub(lambda m: m.group(0) if m.group(0).startswith(b"\x1b[") else b"", part)
+    return part.replace(b"\r\n", b"\n").replace(b"\r", b"")
+
+
+# The paint is: modes, a clear, the history as lines, newlines that push it into
+# scrollback, another clear, tab stops, then the screen as lines.
+def lines(paint):
+    first = paint.find(CLEAR)
+    second = paint.find(CLEAR, first + len(CLEAR)) if first != -1 else -1
+    history = paint[first + len(CLEAR):second] if second != -1 else b""
+    screen = paint[second + len(CLEAR):] if second != -1 else paint[first + len(CLEAR):] if first != -1 else paint
+    parts = [p for p in (clean(history).rstrip(b"\n"), clean(screen).strip(b"\n")) if p.strip()]
+    return b"\n".join(parts).replace(b"\n", b"\r\n") + b"\x1b[0m\r\n"
+
+
+def stitched(terminal, history):
+    try:
+        read = json.loads(subprocess.run(["hc", "read", terminal, "--lines", history, "--json"], capture_output=True, text=True, timeout=30).stdout)
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return None
+    return read["text"].rstrip().replace("\n", "\r\n").encode() + b"\r\n" if read.get("how") == "stitched" else None
+
+
+def main():
+    terminal, path = sys.argv[1], sys.argv[2]
+    history = sys.argv[3] if len(sys.argv) > 3 else "100000"
+    text = stitched(terminal, history) or lines(first_paint(terminal, history))
+    with open(path, "wb") as f:
+        f.write(text)
+
+
+if __name__ == "__main__":
+    main()
