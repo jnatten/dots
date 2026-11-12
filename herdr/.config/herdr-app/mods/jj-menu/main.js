@@ -65,6 +65,7 @@ function items(p, git) {
               ["Move to space\u2026", "jj-panes", { action: "space", terminal: term.address }],
               ["Copy mode", "jj-copy", { action: "copy", terminal: term.address }],
               ["Open in Neovim", "jj-copy", { action: "nvim", terminal: term.address, cwd: panes().find((pane) => pane.pane === tg.pane)?.cwd }],
+              ["Open in Neovim with colours", "jj-copy", { action: "nvim", colors: true, terminal: term.address, cwd: panes().find((pane) => pane.pane === tg.pane)?.cwd }],
             ]
           : []),
         ...(inTab && agents().some((a) => a.address === tg.terminal && claude(a)) ? [["Archive session", "jj-sessions", { action: "archive", terminals: [tg.terminal] }]] : []),

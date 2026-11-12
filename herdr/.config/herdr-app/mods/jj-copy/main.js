@@ -1,6 +1,6 @@
 // A terminal pane's screen and history, with the keyboard. Opened as an overlay
 // with props { action, terminal }: "copy" (a vim-style copy mode) or "nvim" (opens
-// the text in Neovim as a peek over the tab, then closes).
+// the text in Neovim as a peek over the tab, then closes; { colors } keeps colours).
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
@@ -10,24 +10,40 @@ import * as vim from "./vim.js";
 const HISTORY = "100000";
 const sleep = (cx, ms) => new Promise((resolve) => cx.timer.after(ms, () => resolve()));
 
-// The pane's text with its colours in a temp file (capture.py), shown as tmux's
-// capture-and-edit did: `:terminal cat` in Neovim, in the pane's folder, peeked
-// over the tab. The peek closes when Neovim quits, and the temp file goes with it.
-async function capture(cx, terminal, cwd) {
+// Neovim, found once through the login shell's PATH.
+let nvim = null;
+const neovim = async () => (nvim ??= (await exec("sh", ["-lc", "command -v nvim"])).stdout.trim() || "nvim");
+
+// The temp file each way of reading the pane writes, and how Neovim shows it. Plain
+// is `hc read`'s text, read-only. Coloured is capture.py's output through
+// `:terminal cat`, as tmux's capture-and-edit did, ending at the last line of output.
+const WAYS = {
+  plain: {
+    write: 'hc read "$1" --lines "$3" --json | jq -r .text >"$f"',
+    show: '"$2" -R -n "+normal G" "+call search(\'\\S\', \'bcW\')" "$1"; rm -f "$1"',
+  },
+  colors: {
+    write: 'python3 -I "$2" "$1" "$f" "$3"',
+    show: '"$2" -n -c "autocmd TermClose * ++once execute \'normal! G\' | call search(\'^\\[Process exited\', \'bW\') | call search(\'\\S\', \'bW\') | normal! 0" -c "terminal cat $1"; rm -f "$1"',
+  },
+};
+
+// The pane's text in a temp file, open in Neovim in the pane's folder as a peek over
+// the tab. The peek closes when Neovim quits, and the temp file goes with it.
+async function capture(cx, terminal, cwd, colors) {
+  const way = WAYS[colors ? "colors" : "plain"];
   const helper = `${appHome()}/mods/jj-copy/capture.py`;
-  const file = await exec("sh", ["-c", 'f=$(mktemp "${TMPDIR:-/tmp}/herdr-capture.XXXXXX") && python3 -I "$2" "$1" "$f" "$3" && printf %s "$f"', "sh", terminal, helper, HISTORY], { timeout: 60000 });
+  const file = await exec("sh", ["-c", `f=$(mktemp "\${TMPDIR:-/tmp}/herdr-capture.XXXXXX") && ${way.write} && printf %s "$f"`, "sh", terminal, helper, HISTORY], { timeout: 60000 });
   const path = (file.stdout ?? "").trim();
   if (file.code !== 0 || !path) throw new Error((file.stderr || "couldn't read the pane").trim());
-  const nvim = (await exec("sh", ["-lc", "command -v nvim"])).stdout.trim() || "nvim";
   const here = cwd && (await exec("test", ["-d", cwd])).code === 0 ? ["--cwd", cwd] : [];
-  const script = '"$2" -n -c "autocmd TermClose * ++once execute \'normal! G\' | call search(\'^\\[Process exited\', \'bW\') | call search(\'\\S\', \'bW\') | normal! 0" -c "terminal cat $1"; rm -f "$1"';
-  const r = await exec("hc", ["run", "--json", "--bg", "--rm", "--no-parent", ...here, "--", "sh", "-c", script, "sh", path, nvim]);
+  const r = await exec("hc", ["run", "--json", "--bg", "--rm", "--no-parent", ...here, "--", "sh", "-c", way.show, "sh", path, await neovim()]);
   let address = null;
   try {
     address = r.code === 0 ? JSON.parse(r.stdout).address : null;
   } catch {}
   if (!address) throw new Error((r.stderr || r.stdout || "hc run failed").trim());
-  for (let waited = 0; waited < 3000 && !terminals().some((x) => x.address === address); waited += 50) await sleep(cx, 50);
+  for (let waited = 0; waited < 3000 && !terminals().some((x) => x.address === address); waited += 25) await sleep(cx, 25);
   run("terminal.peek", { terminal: address });
 }
 
@@ -38,7 +54,7 @@ export default class Copy extends View {
     if (this.action === "nvim") {
       cx.spawn(async (cx) => {
         try {
-          await capture(cx, p.terminal, p.cwd);
+          await capture(cx, p.terminal, p.cwd, Boolean(p.colors));
         } catch (error) {
           notify({ title: "Couldn't open the pane in Neovim", body: String(error?.message ?? error), level: "error" });
         }

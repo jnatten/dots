@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Writes a herdr-core terminal's history and screen, colours kept, as lines of
 text with SGR codes (what tmux's capture-pane -e gives): the first paint of a
-watch-only `hc attach`, without its clears, tab stops and cursor moves. A
-full-screen app that `hc read` can scroll gets that longer plain text instead.
+watch-only `hc attach`, without its clears, tab stops and cursor moves.
 
 usage: capture.py <terminal> <file> [history lines]
 """
@@ -30,6 +29,17 @@ def size(terminal):
         return 50, 200
 
 
+# hc attach asks the terminal it runs in about itself and paints only once it has
+# answers, or after half a second without them.
+REPLIES = {
+    b"\x1b]10;?": b"\x1b]10;rgb:ffff/ffff/ffff\x1b\\",
+    b"\x1b]11;?": b"\x1b]11;rgb:0000/0000/0000\x1b\\",
+    b"\x1b]12;?": b"\x1b]12;rgb:ffff/ffff/ffff\x1b\\",
+    b"\x1b[16t": b"\x1b[6;20;10t",
+    b"\x1b[c": b"\x1b[?62;22c",
+}
+
+
 def first_paint(terminal, history):
     rows, cols = size(terminal)
     pid, fd = pty.fork()
@@ -37,10 +47,11 @@ def first_paint(terminal, history):
         os.execvp("hc", ["hc", "attach", "--observe", "--history", history, terminal])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     data = bytearray()
+    answered = set()
     start = time.time()
-    last = None
-    while time.time() - start < 8:
-        ready, _, _ = select.select([fd], [], [], 0.05)
+    last = start
+    while time.time() - start < 3:
+        ready, _, _ = select.select([fd], [], [], 0.02)
         if ready:
             try:
                 chunk = os.read(fd, 1 << 16)
@@ -50,9 +61,11 @@ def first_paint(terminal, history):
                 break
             data += chunk
             last = time.time()
-        elif last and data.count(CLEAR) >= 2 and time.time() - last > 0.3:
-            break
-        elif last and time.time() - last > 1.5:
+            for query, reply in REPLIES.items():
+                if query not in answered and query in data:
+                    answered.add(query)
+                    os.write(fd, reply)
+        elif time.time() - last > (0.06 if CLEAR in data else 0.6):
             break
     os.kill(pid, signal.SIGTERM)
     return bytes(data)
@@ -84,20 +97,11 @@ def lines(paint):
     return b"\n".join(parts).replace(b"\n", b"\r\n") + b"\x1b[0m\r\n"
 
 
-def stitched(terminal, history):
-    try:
-        read = json.loads(subprocess.run(["hc", "read", terminal, "--lines", history, "--json"], capture_output=True, text=True, timeout=30).stdout)
-    except (ValueError, OSError, subprocess.SubprocessError):
-        return None
-    return read["text"].rstrip().replace("\n", "\r\n").encode() + b"\r\n" if read.get("how") == "stitched" else None
-
-
 def main():
     terminal, path = sys.argv[1], sys.argv[2]
     history = sys.argv[3] if len(sys.argv) > 3 else "100000"
-    text = stitched(terminal, history) or lines(first_paint(terminal, history))
     with open(path, "wb") as f:
-        f.write(text)
+        f.write(lines(first_paint(terminal, history)))
 
 
 if __name__ == "__main__":
