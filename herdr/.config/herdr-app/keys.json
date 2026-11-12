@@ -20,6 +20,7 @@
     "cmd-p": "mod.open:jj-picker",
     "cmd-shift-p": "app.palette",
     "cmd-k": "mod.open:jj-sessions",
+    "cmd-o": "mod.open:jj-open",
     "cmd-shift-a": "jj-sessions.archive",
     "cmd-,": "app.settings",
     "cmd-d": "pane.split:right",
