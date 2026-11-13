@@ -53,6 +53,8 @@
     "ctrl-a \"": "pane.split:down",
     "ctrl-a w": "mod.open:jj-sessions",
     "ctrl-a ctrl-a": "send:\u0001",
+    "ctrl-a ctrl-o": "jj-tabs.rotate-up",
+    "ctrl-a alt-o": "jj-tabs.rotate-down",
     "ctrl-a b": "jj-tabs.pane-tab",
     "ctrl-a shift-b": "jj-tabs.pane-space",
     "ctrl-a alt-1": "jj-tabs.layout-even-horizontal",
