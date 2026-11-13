@@ -77,6 +77,16 @@ async function graphql(fields) {
   return JSON.parse(r.stdout || "null")?.data ?? null;
 }
 
+// A repo's open PRs, yours first, then the most recently updated.
+export async function openPrs(repo) {
+  const [owner, name] = repo.split("/");
+  const data = await graphql(`viewer { login } r: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { ${PR} headRefName author { login } } } }`);
+  if (!data?.r) throw new Error(`Couldn't list ${repo}'s open PRs.`);
+  const at = Date.now();
+  const prs = data.r.pullRequests.nodes.map((n) => ({ ...itemOf(n, at), branch: n.headRefName, author: n.author?.login ?? "", mine: n.author?.login === data.viewer?.login }));
+  return [...prs.filter((p) => p.mine), ...prs.filter((p) => !p.mine)];
+}
+
 // A PR or issue from what someone typed: its URL, owner/repo#12, or #12 in `repo`.
 export async function resolve(text, repo) {
   const s = text.trim();
