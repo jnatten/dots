@@ -1,5 +1,5 @@
-// Workspace spaces: stable colored avatars, worktrees under their checkout,
-// grouped by machine when more than one is known. After a space's name, the repo
+// Workspace spaces: stable colored avatars, in the order they're in, grouped by
+// machine when more than one is known. After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
 // switch, right-click for its menu, drag to reorder.
 // Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
@@ -30,7 +30,6 @@ function place(s, ps) {
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
   return ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
 }
-const rowHeight = ({ tree }) => (tree ? 28 : 30);
 const RAIL_CELL = 32;
 const railCell = (el) => h_flex().flex_none().justify_center().child(el);
 const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
@@ -92,10 +91,6 @@ export default class Spaces extends View {
     this.ready = {}; // machine -> its layout was readable at the last look
     this.at = {}; // space -> its where() at the last look
     this.watching = new Set(); // local repos' git folders
-    // Spaces made while this runs wait (at most a moment) for their git, so a
-    // worktree appears under its repo instead of jumping there.
-    this.shown = new Set(spaces().map((s) => s.id));
-    this.born = {};
     this.pressed = null;
     this.over = null;
     this.machines = [];
@@ -123,13 +118,11 @@ export default class Spaces extends View {
   checkNew(cx) {
     const now = Date.now();
     const sp = spaces();
-    for (const s of sp) if (!this.shown.has(s.id)) this.born[s.id] ??= now;
     const ps = panes();
     const due = this.due(now, sp, ps);
     if (due.size) this.refreshGit(due, cx);
     this.claudeDue(cx);
     this.githubDue(now, sp, ps, cx);
-    if (sp.some((s) => !this.shown.has(s.id)) || this.orderingDue(now)) cx.notify();
   }
 
   // Claude sessions to read for PR links: new ones, and those whose turn just ended.
@@ -403,49 +396,9 @@ export default class Spaces extends View {
     openOverlay({ mod: "jj-menu", kind: "popup", width: 200, height: 260, props: { tab: "space", target: { id: w.id } } });
   }
 
-  orderingDue(now) {
-    return this.ordering && now - this.ordering.at >= 1000
-      && this.ordering.machines.every(name => machines().some(m => m.name === name && m.layout === "ready"));
-  }
-
-  // Spaces in order, each worktree space moved under its main checkout's.
   ordered() {
     const sp = spaces(), ps = panes();
-    const ready = (w) => this.shown.has(w.id) || where(w, ps) in this.git || Date.now() - (this.born[w.id] ??= Date.now()) > 1500;
-    for (const w of sp) if (!this.shown.has(w.id) && ready(w)) this.shown.add(w.id);
-    const list = sp.map((w, i) => ({ w, i, g: this.git[where(w, ps)] ?? null }));
-    const mains = new Set(list.filter((r) => r.g && !r.g.linked).map((r) => r.g.repo));
-    const nested = (r) => r.g?.linked && mains.has(r.g.repo);
-    const out = [];
-    const placed = new Set(); // repos whose worktrees are listed (under the first of its spaces)
-    for (const r of list) {
-      if (nested(r)) continue;
-      out.push({ ...r, tree: null });
-      if (!r.g || r.g.linked || placed.has(r.g.repo)) continue;
-      placed.add(r.g.repo);
-      const kids = list.filter((k) => nested(k) && k.g.repo === r.g.repo);
-      kids.forEach((k, n) => out.push({ ...k, tree: n === kids.length - 1 ? "└─" : "├─" }));
-    }
-    // Simulate the batch so later indexes include earlier moves. An attempted
-    // write can lose a sync conflict: allow the echo to settle before retrying.
-    const order = sp.map(w => w.id);
-    const target = out.map(r => r.w.id);
-    const key = JSON.stringify([order, target, machines()]);
-    if (order.every((id, i) => id === target[i])) {
-      this.ordering = null;
-    } else if (this.ordering?.key !== key || this.orderingDue(Date.now())) {
-      const moved = new Set();
-      this.ordering = { key, at: Date.now(), machines: [] };
-      for (let i = 0; i < out.length; i++) {
-        const from = order.indexOf(out[i].w.id);
-        if (from === i) continue;
-        run("space.move", { id: out[i].w.id, index: i + 1 });
-        moved.add(out[i].w.machine ?? null);
-        order.splice(i, 0, order.splice(from, 1)[0]);
-      }
-      this.ordering.machines = [...moved];
-    }
-    return out.filter(r => this.shown.has(r.w.id));
+    return sp.map((w, i) => ({ w, i, g: this.git[where(w, ps)] ?? null }));
   }
 
   // Archived Claude sessions in a workspace, leaving out those in workspaces nested inside it.
@@ -464,8 +417,7 @@ export default class Spaces extends View {
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
     const loading = m => {
       const layout = machines().find(k => k.name === m)?.layout;
-      return layout === "loading" || (!layout && this.machines.some(k => k.name === m && k.state === "connected"))
-        || spaces().some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
+      return layout === "loading" || (!layout && this.machines.some(k => k.name === m && k.state === "connected"));
     };
     const loadingRow = m => h_flex().id(`machine-loading-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).items_center().when(collapsed, el => el.justify_center()).text_size(12).text_color(t.dim).child(collapsed ? "…" : "Loading…");
     if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : rows.map(draw);
@@ -528,11 +480,11 @@ export default class Spaces extends View {
   // Only what's unusual, after the name: "herdr \u00b7 spike \u21912 \u21931". The repo or
   // branch goes when the name already says it (a worktree is named after its branch),
   // and master/main go: nearly every space is on one.
-  gitTail(g, tree, name, t) {
+  gitTail(g, name, t) {
     const raw = g.branch ?? "detached";
     const same = (a) => a.toLowerCase() === name.toLowerCase();
     const branch = same(raw) || raw === "master" || raw === "main" ? "" : raw;
-    const repo = tree || same(g.name) ? "" : g.name;
+    const repo = same(g.name) ? "" : g.name;
     const where = [repo, branch].filter(Boolean).join(" \u00b7 ");
     return h_flex()
       .flex_1()
@@ -547,7 +499,7 @@ export default class Spaces extends View {
       .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
   }
 
-  row({ w, i, g, tree }, t) {
+  row({ w, i, g }, t) {
     const on = w.active;
     const fromIndex = this.pressed === null ? -1 : spaces().findIndex(s => s.id === this.pressed);
     const colors = shared("space.colors") ?? {};
@@ -557,7 +509,7 @@ export default class Spaces extends View {
       .relative()
       .id(`space-${w.id}`)
       .px(8)
-      .h(rowHeight({ tree }))
+      .h(30)
       .flex_none()
       .justify_center()
       .rounded(8)
@@ -597,13 +549,12 @@ export default class Spaces extends View {
         h_flex()
           .gap(9)
           .items_center()
-          .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
-          .when(!tree, el => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?")))
+          .child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?"))
           .child(div().flex_shrink(1).min_w(48).max_w(150).truncate().text_color(t.foreground).child(w.name))
-          .child(g ? this.gitTail(g, tree, w.name, t) : div().flex_1())
+          .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
           .when(this.links?.get(w.id)?.length > 0, (el) => el.child(badges(this.links.get(w.id), this.items, t, `gh-${w.id}`, 3)))
           .when(Boolean(g?.top), (el) => {
-            const count = this.archivedIn(g.top, tree ? [] : Object.values(this.git).filter((k) => k?.linked && k.repo === g.repo).map((k) => k.top));
+            const count = this.archivedIn(g.top, g.linked ? [] : Object.values(this.git).filter((k) => k?.linked && k.repo === g.repo).map((k) => k.top));
             return count > 0 ? el.child(this.archiveBadge(count, t)) : el;
           }),
       );
