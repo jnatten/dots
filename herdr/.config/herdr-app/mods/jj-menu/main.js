@@ -1,7 +1,7 @@
 // Context menus (Herdr's items). Opened as a popup with
 // props { tab: "pane" | "tab" | "space" | "global", target }.
 // ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
-// a command "worktree", "jj-workspace", "jj-sessions", "jj-panes" or "jj-copy" opens that mod instead.
+// a command "worktree", "jj-workspace", "jj-sessions", "jj-panes", "jj-copy" or "jj-spaces" (its link dialog) opens that mod instead.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -91,6 +91,7 @@ function items(p, git) {
               ...(git ? [["New worktree", "worktree", { space: tg.id, action: "new" }], ["Open worktree", "worktree", { space: tg.id, action: "open" }]] : []),
               ...(git === "linked" ? [["Remove worktree", "worktree", { space: tg.id, action: "remove" }]] : []),
             ]),
+        ["Link PR or issue\u2026", "jj-spaces", { link: tg.id }],
         ...(agents().some((a) => a.space === tg.id && claude(a)) ? [["Archive sessions & close", "jj-sessions", { action: "archive", space: tg.id }]] : []),
         ["Close", "space.close", { id: tg.id }],
       ];
@@ -107,6 +108,7 @@ function items(p, git) {
 }
 
 function menuIcon(command) {
+  if (command === "jj-spaces") return "mods/jj-spaces/git-pull-request.svg";
   const name = command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
   return `mods/workspace-chrome/${name}.svg`;
 }
@@ -140,6 +142,7 @@ export default class Menu extends View {
     if (!it) return;
     closeOverlay(props()?.overlay);
     if (it[1] === "worktree" || it[1] === "jj-workspace") openOverlay({ mod: it[1], kind: "dialog", ...(it[2].action === "open" ? { width: 560, height: 480 } : { width: 440, height: 260 }), props: it[2] });
+    else if (it[1] === "jj-spaces") openOverlay({ mod: "jj-spaces", kind: "dialog", width: 460, height: 340, props: it[2] });
     else if (it[1] === "jj-sessions") openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: it[2] });
     else if (it[1] === "jj-copy" && it[2].action === "copy") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: it[2] });
     else if (it[1] === "jj-copy") openOverlay({ mod: "jj-copy", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: it[2] });

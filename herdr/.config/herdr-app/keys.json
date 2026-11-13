@@ -59,6 +59,7 @@
     "ctrl-a v": "jj-tabs.copy-mode",
     "ctrl-a e": "jj-tabs.capture",
     "ctrl-a shift-e": "jj-tabs.capture-colors",
+    "ctrl-a g": "jj-spaces.link",
     "cmd-/": "app.help",
     "cmd-shift-/": "app.help",
     "cmd-b": "layout.toggle:sidebar",
