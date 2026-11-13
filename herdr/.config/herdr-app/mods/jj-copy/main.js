@@ -1,10 +1,12 @@
 // A terminal pane's screen and history, with the keyboard. Opened as an overlay
-// with props { action, terminal }: "copy" (a vim-style copy mode) or "nvim" (opens
-// the text in Neovim as a peek over the tab, then closes; { colors } keeps colours).
+// with props { action, terminal }: "copy" (a vim-style copy mode), "nvim" (opens
+// the text in Neovim as a peek over the tab, then closes; { colors } keeps colours)
+// or "fingers" ({ pane, cwd }: hints on the screen's hashes, paths, URLs...,
+// drawn by fingers.py in a terminal shown in the pane for now).
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { props, theme, settings, terminals, run, exec, hc, appHome, notify, closeOverlay } from "herdr";
+import { props, theme, settings, terminals, run, exec, hc, appHome, home, notify, closeOverlay, shared, setShared, readTextFile } from "herdr";
 import * as vim from "./vim.js";
 
 const HISTORY = "100000";
@@ -47,10 +49,109 @@ async function capture(cx, terminal, cwd, colors) {
   run("terminal.peek", { terminal: address });
 }
 
+const RUNNING = "jj-copy.fingers";
+let python = null;
+const python3 = async () => (python ??= (await exec("sh", ["-lc", "command -v python3"])).stdout.trim() || "python3");
+const githubRepo = (remote) => (remote ?? "").trim().match(/github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/)?.slice(1).join("/") ?? null;
+const short = (text) => (text.length > 80 ? `${text.slice(0, 79)}…` : text);
+
+// Where Ctrl+hint goes: { target } to `open`, or { why } it can't.
+async function openable({ text, kind }, cwd, on) {
+  if (kind === "url") {
+    const ssh = text.match(/^(?:git@|ssh:\/\/(?:[^@/]+@)?)([^:/]+)[:/](.+?)(?:\.git)?$/);
+    return { target: ssh ? `https://${ssh[1]}/${ssh[2]}` : text.replace(/^git:\/\//, "https://") };
+  }
+  if (["sha", "jj", "github"].includes(kind)) {
+    const remote = cwd ? await exec("git", ["remote", "get-url", "origin"], { cwd, on }).catch(() => null) : null;
+    const repo = remote?.code === 0 ? githubRepo(remote.stdout) : null;
+    if (!repo) return { why: "this folder has no GitHub remote" };
+    if (kind === "github") return { target: `https://github.com/${repo}/issues/${text.slice(1)}` };
+    let sha = text;
+    if (kind === "jj") {
+      const r = await exec("jj", ["--ignore-working-copy", "log", "-r", text, "--no-graph", "-T", "commit_id"], { cwd, on }).catch(() => null);
+      if (r?.code !== 0 || !r.stdout.trim()) return { why: `jj doesn't know ${text} here` };
+      sha = r.stdout.trim();
+    }
+    return { target: `https://github.com/${repo}/commit/${sha}` };
+  }
+  if (on) return { why: `it's a path on ${on}` };
+  let path = text.replace(/(:\d+){1,2}$/, "").replace(/^~(?=\/|$)/, home());
+  if (!path.startsWith("/")) path = `${cwd || home()}/${path}`;
+  if ((await exec("test", ["-e", path]).catch(() => null))?.code !== 0) return { why: `${path} doesn't exist` };
+  return { target: path };
+}
+
+// Hint mode on a pane: the helper reads its screen, is shown in its place until a
+// hint is typed or Esc, then the pane gets its own terminal back. Pressed again
+// while one runs, it ends that one.
+async function fingers(cx, { terminal, pane, cwd }) {
+  const running = shared(RUNNING);
+  if (running && terminals().some((x) => x.address === running && x.state === "live")) {
+    run("terminal.kill", { terminal: running });
+    return;
+  }
+  const dir = await exec("sh", ["-c", 'd=$(mktemp -d "${TMPDIR:-/tmp}/herdr-fingers.XXXXXX") && hc read "$1" --json >"$d/screen.json" && printf %s "$d"', "sh", terminal]);
+  const tmp = (dir.stdout ?? "").trim();
+  if (dir.code !== 0 || !tmp) throw new Error((dir.stderr || "couldn't read the pane").trim());
+  try {
+    const size = JSON.parse((await hc(["get", terminal, "--json"])).stdout);
+    const every = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
+    const chosen = shared("jj-copy.hints") ?? {};
+    const ids = every.filter((p) => chosen[p.id] ?? p.on).map((p) => p.id);
+    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await python3(), "-I", `${appHome()}/mods/jj-copy/fingers.py`, `${tmp}/screen.json`, `${tmp}/result.json`, JSON.stringify(ids), String(size.cols), String(size.rows)]);
+    let address = null;
+    try {
+      address = r.code === 0 ? JSON.parse(r.stdout).address : null;
+    } catch {}
+    if (!address) throw new Error((r.stderr || r.stdout || "hc run failed").trim());
+    setShared(RUNNING, address);
+    const live = () => terminals().some((x) => x.address === address && x.state === "live");
+    for (let waited = 0; waited < 3000 && !live(); waited += 25) await sleep(cx, 25);
+    if (live()) run("terminal.show", { terminal: address, pane });
+    for (let waited = 0; waited < 600000 && live(); waited += 50) await sleep(cx, 50);
+    if (live()) run("terminal.kill", { terminal: address });
+    run("terminal.show", { pane });
+    if (shared(RUNNING) === address) setShared(RUNNING, null);
+    const result = JSON.parse((await readTextFile(`${tmp}/result.json`).catch(() => null)) ?? "null");
+    if (!result) return;
+    if (result.none) return notify({ title: "Nothing to hint", body: "No hashes, paths or links on the screen." });
+    const on = terminal.includes("/") ? terminal.split("/")[0] : null;
+    if (result.action === "open") {
+      const o = await openable(result, cwd, on);
+      if (o.target) {
+        await exec("open", [o.target]);
+        return;
+      }
+      cx.write_to_clipboard(result.text);
+      return notify({ title: "Copied instead", body: `Can't open ${short(result.text)}: ${o.why}.`, level: "warning" });
+    }
+    cx.write_to_clipboard(result.text);
+    if (result.action === "paste") {
+      run("pane.focus", { pane });
+      run("terminal.paste");
+      return;
+    }
+    notify({ title: "Copied", body: short(result.text) });
+  } finally {
+    exec("rm", ["-rf", tmp]).catch(() => null);
+  }
+}
+
 export default class Copy extends View {
   init(_props, cx) {
     const p = props() ?? {};
     this.action = p.action ?? "copy";
+    if (this.action === "fingers") {
+      cx.spawn(async (cx) => {
+        try {
+          await fingers(cx, p);
+        } catch (error) {
+          notify({ title: "Hint mode failed", body: String(error?.message ?? error), level: "error" });
+        }
+        closeOverlay(p.overlay);
+      });
+      return;
+    }
     if (this.action === "nvim") {
       cx.spawn(async (cx) => {
         try {

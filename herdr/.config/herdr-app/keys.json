@@ -61,6 +61,7 @@
     "ctrl-a alt-4": "jj-tabs.layout-main-vertical",
     "ctrl-a alt-5": "jj-tabs.layout-tiled",
     "ctrl-a v": "jj-tabs.copy-mode",
+    "ctrl-a f": "jj-tabs.fingers",
     "ctrl-a e": "jj-tabs.capture",
     "ctrl-a shift-e": "jj-tabs.capture-colors",
     "ctrl-a g": "jj-spaces.link",

@@ -1,0 +1,100 @@
+[
+  {
+    "id": "url",
+    "label": "URLs",
+    "example": "https://github.com/NDLANO/ndla/pull/386",
+    "on": true,
+    "trim": ".,;:!?'\"`",
+    "regex": "((?:https?|git|ssh|ftp|file)://[^\\s<>\\\"'`]+|git@[\\w.-]+:[\\w./~-]+)"
+  },
+  {
+    "id": "uuid",
+    "label": "UUIDs",
+    "example": "f1b43afb-773c-4da2-9ae5-fef1aa6945ce",
+    "on": true,
+    "regex": "\\b([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\\b"
+  },
+  {
+    "id": "diff",
+    "label": "Paths in diffs",
+    "example": "+++ b/src/main.js",
+    "on": true,
+    "regex": "^(?:\\+\\+\\+|---) [ab]/(\\S+)"
+  },
+  {
+    "id": "status",
+    "label": "Files in git status and jj st",
+    "example": "modified: keys.json",
+    "on": true,
+    "regex": "^\\s*(?:(?:modified|deleted|new file|renamed|both modified):\\s+(\\S+)|[MADRC?]{1,2} (\\S+)\\s*$)"
+  },
+  {
+    "id": "path",
+    "label": "File paths",
+    "example": "~/dev/dots/keys.json:12",
+    "on": true,
+    "trim": ".,;:!?'\"`",
+    "regex": "((?:[.\\w\\-@~]+)?(?:/[.\\w\\-@\\[\\]]+)+(?::\\d+){0,2})"
+  },
+  {
+    "id": "file",
+    "label": "File names",
+    "example": "main.js",
+    "on": true,
+    "trim": ".,;:!?'\"`",
+    "regex": "(?i)(?<![\\w/.-])([\\w-][\\w.-]*\\.(?:js|jsx|ts|tsx|mjs|cjs|json|jsonc|md|mdx|py|rs|go|rb|java|kt|kts|scala|sc|sbt|sh|bash|zsh|fish|lua|vim|toml|yaml|yml|xml|html|css|scss|sql|txt|log|lock|conf|cfg|ini|env|svg|png|jpg|jpeg|gif|pdf|swift|c|h|cpp|hpp|cs|php|ex|exs|tf|nix|graphql|proto|csv|diff|patch))\\b"
+  },
+  {
+    "id": "email",
+    "label": "Email addresses",
+    "example": "name@example.com",
+    "on": false,
+    "regex": "\\b([\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+)\\b"
+  },
+  {
+    "id": "sha",
+    "label": "Git hashes",
+    "example": "5f0a3c7d",
+    "on": true,
+    "require": [
+      "\\d",
+      "[a-f]"
+    ],
+    "regex": "\\b([0-9a-f]{7,40})\\b"
+  },
+  {
+    "id": "jj",
+    "label": "jj change ids",
+    "example": "msspxpuz",
+    "on": true,
+    "regex": "\\b([k-z]{8,32})\\b"
+  },
+  {
+    "id": "github",
+    "label": "PR and issue numbers",
+    "example": "#386",
+    "on": true,
+    "regex": "(?<![\\w&#])(#\\d+)\\b"
+  },
+  {
+    "id": "ip",
+    "label": "IP addresses",
+    "example": "192.168.0.1:8080",
+    "on": true,
+    "regex": "\\b(\\d{1,3}(?:\\.\\d{1,3}){3}(?::\\d+)?)\\b"
+  },
+  {
+    "id": "hex",
+    "label": "Hex numbers",
+    "example": "0x00FF",
+    "on": true,
+    "regex": "\\b(0x[0-9a-fA-F]+)\\b"
+  },
+  {
+    "id": "number",
+    "label": "Numbers (4 digits or more)",
+    "example": "1337",
+    "on": true,
+    "regex": "\\b(\\d{4,})\\b"
+  }
+]
