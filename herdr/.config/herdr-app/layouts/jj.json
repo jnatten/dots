@@ -163,5 +163,6 @@
     -100,
     -100
   ],
-  "terminal_menu": "jj-menu"
+  "terminal_menu": "jj-menu",
+  "toast": "jj-toast"
 }
