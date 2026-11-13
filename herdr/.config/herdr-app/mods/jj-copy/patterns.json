@@ -42,7 +42,8 @@
     "example": "main.js",
     "on": true,
     "trim": ".,;:!?'\"`",
-    "regex": "(?i)(?<![\\w/.-])([\\w-][\\w.-]*\\.(?:js|jsx|ts|tsx|mjs|cjs|json|jsonc|md|mdx|py|rs|go|rb|java|kt|kts|scala|sc|sbt|sh|bash|zsh|fish|lua|vim|toml|yaml|yml|xml|html|css|scss|sql|txt|log|lock|conf|cfg|ini|env|svg|png|jpg|jpeg|gif|pdf|swift|c|h|cpp|hpp|cs|php|ex|exs|tf|nix|graphql|proto|csv|diff|patch))\\b"
+    "regex": "(?<![\\w/.-])([\\w-][\\w.-]*\\.(?:js|jsx|ts|tsx|mjs|cjs|json|jsonc|md|mdx|py|rs|go|rb|java|kt|kts|scala|sc|sbt|sh|bash|zsh|fish|lua|vim|toml|yaml|yml|xml|html|css|scss|sql|txt|log|lock|conf|cfg|ini|env|svg|png|jpg|jpeg|gif|pdf|swift|c|h|cpp|hpp|cs|php|ex|exs|tf|nix|graphql|proto|csv|diff|patch))\\b",
+    "flags": "i"
   },
   {
     "id": "email",
