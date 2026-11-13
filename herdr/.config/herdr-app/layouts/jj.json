@@ -50,19 +50,6 @@
           ]
         },
         {
-          "id": "sidebar-footer",
-          "type": "block",
-          "content": {
-            "mod": "workspace-chrome",
-            "props": {
-              "footer": true
-            }
-          },
-          "size": {
-            "px": 69
-          }
-        },
-        {
           "id": "limits",
           "type": "block",
           "content": {
