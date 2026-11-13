@@ -1,9 +1,21 @@
-// Claude Code plan limits as pies in the status bar, from the file the Claude
-// status line writes (claude/.claude/hooks/statusline.sh in dots).
+// Claude Code plan limits as pies at the bottom of the sidebar, from the file the
+// Claude status line writes (claude/.claude/hooks/statusline.sh in dots).
 
 import { View, div, PathBuilder } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { theme, home, readTextFile, watchFolder } from "herdr";
+import { theme, home, readTextFile, watchFolder, layout } from "herdr";
+
+function find(node, id) {
+  if (node?.id === id) return node;
+  for (const child of node?.children ?? []) {
+    const found = find(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+// The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
+const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
 const DIR = () => `${home()}/.cache/herdr-claude`;
 const WINDOWS = [
@@ -67,12 +79,13 @@ export default class Limits extends View {
     const t = theme();
     const now = Date.now() / 1000;
     const shown = WINDOWS.map(([key, short, long]) => ({ key, short, long, w: this.limits?.[key] })).filter((x) => x.w);
+    const collapsed = narrow();
     return h_flex()
       .size_full()
-      .px(14)
-      .gap(14)
+      .px(collapsed ? 0 : 16)
+      .gap(collapsed ? 8 : 14)
       .items_center()
-      .justify_end()
+      .when(collapsed, (el) => el.justify_center())
       .bg(t.chrome)
       .border_t(1)
       .border_color(t.border)
@@ -89,7 +102,7 @@ export default class Limits extends View {
             .items_center()
             .tooltip(stale ? `${long}: reset since Claude last reported` : `${long}: ${pct}% used, resets in ${until(w.resets_at)}`)
             .child(pie(pct / 100, 13, fill, t.dim))
-            .child(div().text_color(pct >= 75 ? fill : t.muted).child(`${short} ${pct}%`));
+            .when(!collapsed, (el) => el.child(div().text_color(pct >= 75 ? fill : t.muted).child(`${short} ${pct}%`)));
         }),
       );
   }
