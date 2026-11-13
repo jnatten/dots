@@ -1,5 +1,6 @@
 // Claude Code plan limits as pies at the bottom of the sidebar, from the file the
-// Claude status line writes (claude/.claude/hooks/statusline.sh in dots).
+// Claude status line writes (claude/.claude/hooks/statusline.sh in dots), then
+// the Spacing and Settings buttons.
 
 import { View, div, svg, PathBuilder } from "gpui-kit";
 import { h_flex } from "gpui-base";
@@ -80,6 +81,11 @@ export default class Limits extends View {
     const now = Date.now() / 1000;
     const shown = WINDOWS.map(([key, short, long]) => ({ key, short, long, w: this.limits?.[key] })).filter((x) => x.w);
     const collapsed = narrow();
+    const button = (id, icon, tip, action) => div().id(id).flex_none().p(3).rounded(5).text_color(t.dim)
+      .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip(tip)
+      .on_click(action)
+      .child(svg(icon).size(13));
+    const settings = button("settings", "mods/workspace-chrome/settings.svg", "Settings", () => run("app.settings"));
     return h_flex()
       .size_full()
       .px(collapsed ? 0 : 16)
@@ -105,9 +111,9 @@ export default class Limits extends View {
             .when(!collapsed, (el) => el.child(div().text_color(pct >= 75 ? fill : t.muted).child(`${short} ${pct}%`)));
         }),
       )
-      .when(!collapsed, (el) => el.child(div().flex_1()).child(div().id("spacing").flex_none().p(3).rounded(5).text_color(t.dim)
-        .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip("Spacing")
-        .on_click(() => run("mod.open", { name: "jj-spacing" }))
-        .child(svg("mods/jj-spacing/sliders.svg").size(13))));
+      .when(!collapsed, (el) => el.child(div().flex_1()).child(h_flex().flex_none().gap(2)
+        .child(button("spacing", "mods/jj-spacing/sliders.svg", "Spacing", () => run("mod.open", { name: "jj-spacing" })))
+        .child(settings)))
+      .when(collapsed, (el) => el.child(settings));
   }
 }
