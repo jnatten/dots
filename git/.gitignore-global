@@ -27,3 +27,5 @@ out-*/
 
 /src/messages/convertTheFilesNeverCommitNeverDie.ts
 http-requests/
+
+**/.claude/settings.local.json
