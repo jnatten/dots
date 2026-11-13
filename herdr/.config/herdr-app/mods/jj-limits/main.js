@@ -1,9 +1,9 @@
 // Claude Code plan limits as pies at the bottom of the sidebar, from the file the
 // Claude status line writes (claude/.claude/hooks/statusline.sh in dots).
 
-import { View, div, PathBuilder } from "gpui-kit";
+import { View, div, svg, PathBuilder } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { theme, home, readTextFile, watchFolder, layout } from "herdr";
+import { theme, home, readTextFile, watchFolder, layout, run } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -104,6 +104,10 @@ export default class Limits extends View {
             .child(pie(pct / 100, 13, fill, t.dim))
             .when(!collapsed, (el) => el.child(div().text_color(pct >= 75 ? fill : t.muted).child(`${short} ${pct}%`)));
         }),
-      );
+      )
+      .when(!collapsed, (el) => el.child(div().flex_1()).child(div().id("spacing").flex_none().p(3).rounded(5).text_color(t.dim)
+        .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip("Spacing")
+        .on_click(() => run("mod.open", { name: "jj-spacing" }))
+        .child(svg("mods/jj-spacing/sliders.svg").size(13))));
   }
 }
