@@ -65,13 +65,13 @@ $shell """
 command = """test -z "$TMUX" && echo T"""
 format = '(\[[$symbol$output]($style)\])'
 shell = "sh"
-when = true
+when = 'test -z "$HC_TERMINAL_ID"'
 style = "bold red"
 
 [custom.tmuxsessions]
 command = """tmux list-sessions | wc -l"""
 format = '\[[$symbol($output)]($style)\]'
-when = true
+when = 'test -z "$HC_TERMINAL_ID"'
 shell = "sh"
 style = "bold green"
 
