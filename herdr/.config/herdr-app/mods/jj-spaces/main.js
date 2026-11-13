@@ -2,10 +2,15 @@
 // grouped by machine when more than one is known. After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
 // switch, right-click for its menu, drag to reorder.
+// Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
+// those its Claude sessions opened. This copy asks GitHub for all of them and
+// shares what it learns as shared("github") for the agents list and the link dialog.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { FINAL, badges, branchName, fetchGitHub, githubRepo, scanAgent } from "./github.js";
+import { linkInit, linkRender } from "./links.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -51,6 +56,13 @@ async function bookmarkOf(cwd, on) {
 // for this often, in repos the list shows, while the window is in front.
 const FALLBACK = 60000;
 
+// GitHub is asked again this often while the window is in front: open PRs and
+// issues and branches' PRs, then merged and closed ones; after a failure, not before.
+const GH_OPEN = 2 * 60000;
+const GH_FINAL = 30 * 60000;
+const GH_RETRY = 10 * 60000;
+const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
+
 // What a stored color name looks like on an avatar (the same in every mod
 // that draws space avatars): one strong color per hue, light and dark alike.
 const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
@@ -64,9 +76,15 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
+// The link dialog for a space.
+function openLinks(id) {
+  if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 460, height: 340, props: { link: id } });
+}
+
 export default class Spaces extends View {
   init(_props, cx) {
-    this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked }, null: not a repo
+    if (props()?.link) return linkInit(this, cx);
+    this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked, gh: "owner/repo" }, null: not a repo
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
     this.pending = new Set(); // where()s to look at next
@@ -84,19 +102,136 @@ export default class Spaces extends View {
     this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
     for (const state of Object.values(this.reconnecting)) state.busy = false;
     this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
+    const gh = shared("github") ?? {};
+    this.items = gh.items ?? {}; // url -> { kind, url, repo, number, title, state, at }
+    this.agentLinks = gh.agents ?? {}; // terminal -> PR urls its Claude session recorded
+    this.branchPrs = {}; // "owner/repo\0branch" -> { url, at }
+    this.published = JSON.stringify(gh);
+    this.claude = {}; // terminal -> { sid, working } at the last look
+    this.scanQueue = new Set();
+    this.stale = new Set(); // urls to ask GitHub about again now
+    this.ghRetry = 0;
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
+    cx.spawn(async () => {
+      for (;;) if ((await nextCommand()) === "link") openLinks(focused()?.space ?? spaces().find((s) => s.active)?.id);
+    });
   }
 
   checkNew(cx) {
     const now = Date.now();
     const sp = spaces();
     for (const s of sp) if (!this.shown.has(s.id)) this.born[s.id] ??= now;
-    const due = this.due(now, sp, panes());
+    const ps = panes();
+    const due = this.due(now, sp, ps);
     if (due.size) this.refreshGit(due, cx);
+    this.claudeDue(cx);
+    this.githubDue(now, sp, ps, cx);
     if (sp.some((s) => !this.shown.has(s.id)) || this.orderingDue(now)) cx.notify();
+  }
+
+  // Claude sessions to read for PR links: new ones, and those whose turn just ended.
+  claudeDue(cx) {
+    const seen = {};
+    for (const t of terminals()) {
+      const sid = t.state === "live" && t.labels?.["claude.session"];
+      if (!sid) continue;
+      const working = t.status === "working";
+      const was = this.claude[t.address];
+      seen[t.address] = { sid, working };
+      if (!was || was.sid !== sid || (was.working && !working)) this.scanQueue.add(t.address);
+    }
+    this.claude = seen;
+    const gone = Object.keys(this.agentLinks).filter((address) => !seen[address]);
+    for (const address of gone) delete this.agentLinks[address];
+    if (gone.length) cx.notify();
+    if (!this.scanQueue.size || this.scanning) return;
+    this.scanning = true;
+    cx.spawn(async (cx) => {
+      while (this.scanQueue.size) {
+        const [address] = this.scanQueue;
+        this.scanQueue.delete(address);
+        const c = this.claude[address];
+        if (!c) continue;
+        try {
+          const urls = await scanAgent(c.sid, machineOf(address));
+          if (urls.length) this.agentLinks[address] = urls;
+          else delete this.agentLinks[address];
+          for (const url of urls) this.stale.add(url);
+        } catch {}
+      }
+      this.scanning = false;
+      cx.notify();
+    });
+  }
+
+  // The GitHub repo and branch a space's PR would be on: "owner/repo\0branch".
+  branchKey(s, ps) {
+    const g = this.git[where(s, ps)];
+    const branch = g?.gh && branchName(g.branch);
+    return branch ? `${g.gh}\0${branch}` : null;
+  }
+
+  githubDue(now, sp, ps, cx) {
+    if (this.fetching || now < this.ghRetry) return;
+    const active = window().active;
+    const old = (at, final) => active && now - (at ?? 0) > (final ? GH_FINAL : GH_OPEN);
+    const urls = [...new Set([...Object.values(shared("github.links") ?? {}).flat(), ...Object.values(this.agentLinks).flat()])]
+      .filter((u) => !this.items[u] || this.stale.has(u) || old(this.items[u].at, FINAL.has(this.items[u].state)));
+    const keys = [...new Set(sp.map((s) => this.branchKey(s, ps)).filter(Boolean))].filter((k) => !this.branchPrs[k] || old(this.branchPrs[k].at, false));
+    if (!urls.length && !keys.length) return;
+    this.fetching = true;
+    for (const u of urls) this.stale.delete(u);
+    cx.spawn(async (cx) => {
+      try {
+        const r = await fetchGitHub(urls, keys.map((key) => { const [repo, branch] = key.split("\0"); return { key, repo, branch }; }));
+        Object.assign(this.items, r.items);
+        for (const [k, url] of Object.entries(r.branches)) this.branchPrs[k] = { url, at: Date.now() };
+        if (!r.ok) this.ghRetry = Date.now() + GH_RETRY;
+      } catch {
+        this.ghRetry = Date.now() + GH_RETRY;
+      }
+      this.fetching = false;
+      cx.notify();
+    });
+  }
+
+  // What the other mods read: every linked item's state, agents' PRs and spaces'
+  // branch PRs. Written only when it changed; links and hidden ones of gone spaces
+  // are dropped once their machine's layout is in.
+  publish(sp, ps) {
+    const ids = new Set(sp.map((s) => s.id));
+    const ready = new Set(machines().filter((m) => m.layout === "ready").map((m) => m.name ?? null));
+    const prune = (key) => {
+      const all = shared(key) ?? {};
+      const kept = Object.fromEntries(Object.entries(all).filter(([id, urls]) => urls?.length && (ids.has(id) || !ready.has(machineOf(id)))));
+      if (Object.keys(kept).length !== Object.keys(all).length) setShared(key, kept);
+      return kept;
+    };
+    const kept = prune("github.links");
+    const hidden = prune("github.hidden");
+    const branches = {};
+    for (const s of sp) {
+      const k = this.branchKey(s, ps);
+      if (k && this.branchPrs[k]?.url) branches[s.id] = this.branchPrs[k].url;
+    }
+    const used = new Set([...Object.values(kept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches)]);
+    for (const u of Object.keys(this.items)) if (!used.has(u)) delete this.items[u];
+    const gh = { items: this.items, agents: this.agentLinks, branches };
+    const text = JSON.stringify(gh);
+    if (text !== this.published) {
+      this.published = text;
+      setShared("github", gh);
+    }
+    // Each space's links: by hand, its branch's PR, its agents', less those hidden.
+    const as = agents();
+    this.links = new Map(sp.map((s) => {
+      const off = new Set(hidden[s.id] ?? []);
+      const auto = [branches[s.id], ...as.filter((a) => a.space === s.id).flatMap((a) => this.agentLinks[a.address] ?? [])].filter((u) => u && !off.has(u));
+      return [s.id, [...new Set([...(kept[s.id] ?? []), ...auto])]];
+    }));
   }
 
   // Places whose git could have changed: new ones (a new space, a cd), where a
@@ -231,14 +366,15 @@ export default class Spaces extends View {
       }
       // The repo's own .git folder names it; a worktree's top differs from it.
       const top = r.stdout.replace(/\n$/, ""), repo = common.stdout.replace(/\n$/, "");
-      const [branch, counts] = await Promise.all([
+      const [branch, counts, origin] = await Promise.all([
         exec("git", ["symbolic-ref", "-q", "HEAD"], { cwd, on }),
         exec("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd, on }),
+        exec("git", ["remote", "get-url", "origin"], { cwd, on }),
       ]);
       const name = repo.endsWith("/.git") ? base(repo.slice(0, -5)) : base(repo).replace(/\.git$/, "");
       const [ahead, behind] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
       const bookmark = branch.code === 0 ? null : await bookmarkOf(cwd, on);
-      const info = { name, top, branch: bookmark ?? (branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)"), ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git` };
+      const info = { name, top, branch: bookmark ?? (branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)"), ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git`, gh: origin.code === 0 ? githubRepo(origin.stdout) : null };
       this.git[key] = info;
       if (!on) this.watch(repo, cx);
     } catch {
@@ -463,8 +599,9 @@ export default class Spaces extends View {
           .items_center()
           .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
           .when(!tree, el => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?")))
-          .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(w.name))
+          .child(div().flex_shrink(1).min_w(48).max_w(150).truncate().text_color(t.foreground).child(w.name))
           .child(g ? this.gitTail(g, tree, w.name, t) : div().flex_1())
+          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(badges(this.links.get(w.id), this.items, t, `gh-${w.id}`, 3)))
           .when(Boolean(g?.top), (el) => {
             const count = this.archivedIn(g.top, tree ? [] : Object.values(this.git).filter((k) => k?.linked && k.repo === g.repo).map((k) => k.top));
             return count > 0 ? el.child(this.archiveBadge(count, t)) : el;
@@ -489,6 +626,7 @@ export default class Spaces extends View {
   }
 
   render() {
+    if (props()?.link) return linkRender(this);
     const t = theme();
     const collapsed = narrow();
     const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
@@ -503,6 +641,7 @@ export default class Spaces extends View {
       changed = true;
     }
     if (changed) setShared("space.colors", kept);
+    this.publish(sp, panes());
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
       .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())

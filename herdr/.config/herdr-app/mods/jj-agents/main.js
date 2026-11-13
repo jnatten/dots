@@ -2,7 +2,7 @@
 
 import { View, div, image, svg, PathBuilder } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, hc, home, readTextFile } from "herdr";
+import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, hc, home, readTextFile, settings } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -134,6 +134,48 @@ function duration(ms) {
 function icon(p, size, color) {
   if (!p?.icon) return null;
   return p.tint ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
+}
+
+// The PRs an agent's Claude session opened, as jj-spaces finds them (shared("github")),
+// drawn as jj-spaces/github.js draws them: GitHub's colors, [light, dark].
+const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"];
+const GH = {
+  open: { icon: "mods/jj-spaces/git-pull-request.svg", color: GREEN, label: "Open" },
+  draft: { icon: "mods/jj-spaces/git-pull-request-draft.svg", color: GRAY, label: "Draft" },
+  queued: { icon: "mods/jj-spaces/git-pull-request.svg", color: ["#9a6700", "#d29922"], label: "Merge queued" },
+  merged: { icon: "mods/jj-spaces/git-merge.svg", color: PURPLE, label: "Merged" },
+  closed: { icon: "mods/jj-spaces/git-pull-request-closed.svg", color: ["#cf222e", "#f85149"], label: "Closed" },
+};
+
+function prBadges(urls, items, t, id, max) {
+  const dark = Boolean(settings()?.dark);
+  const badge = (url) => {
+    const it = items[url];
+    const s = GH[it?.state];
+    const number = it?.number ?? url.match(/\/(\d+)\/?$/)?.[1] ?? "?";
+    return h_flex()
+      .id(`${id}-${url}`)
+      .flex_none()
+      .gap(2)
+      .items_center()
+      .text_size(11)
+      .text_color(s ? s.color[dark ? 1 : 0] : t.dim)
+      .cursor_pointer()
+      .tooltip([`${it?.repo ?? ""}#${number}`, s?.label, it?.title].filter(Boolean).join(" · "))
+      .on_click((_e, cx) => {
+        cx.stop_propagation();
+        cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
+      })
+      .child(div().flex_none().child(svg(s?.icon ?? GH.open.icon).size(11)))
+      .child(String(number));
+  };
+  const rest = urls.length - max;
+  return h_flex()
+    .flex_none()
+    .gap(6)
+    .items_center()
+    .children(urls.slice(0, max).map(badge))
+    .when(rest > 0, (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(`+${rest}`)));
 }
 
 export default class Agents extends View {
@@ -362,6 +404,7 @@ export default class Agents extends View {
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
     const termLabels = new Map(all.map((x) => [x.address, x.labels ?? {}]));
+    const gh = shared("github") ?? {};
     this.migratePins(all);
     const shown = focused()?.agent;
     const now = Date.now();
@@ -456,6 +499,8 @@ export default class Agents extends View {
       const mine = termLabels.get(a.address) ?? {};
       const context = mine["claude.context"] !== undefined && mine["claude.context"] !== "" && !Number.isNaN(Number(mine["claude.context"])) ? Number(mine["claude.context"]) : null;
       const size = Number(mine["claude.context_size"]) || 0;
+      const off = shared("github.hidden")?.[a.space] ?? [];
+      const prs = (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
       const isPinned = a.pinned;
       const pin = div()
         .id(`pin-${a.address}`)
@@ -507,6 +552,7 @@ export default class Agents extends View {
         .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
         .when(subs.length > 0, el => el.child(fold(a, subs)))
         .when(this.hovered === a.address, el => el.child(pin))
+        .when(prs.length > 0, el => el.child(prBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, 2)))
         .when(context !== null, el => el.child(div().id(`ctx-${a.address}`).flex_none()
           .on_hover((on, cx) => {
             if (!on) return;
