@@ -11,6 +11,17 @@ function find(node, id) {
   return null;
 }
 
+// tmux's rotate-window: each pane of the focused tab moves one place up (the
+// first to the end) or down (the last to the start), as a run of swaps.
+function rotate(up) {
+  const tab = focused()?.tab;
+  const order = panes().filter((p) => p.tab === tab);
+  if (order.length < 2 || order.some((p) => p.zoomed)) return;
+  const ids = order.map((p) => p.pane);
+  const moving = up ? ids[0] : ids.at(-1);
+  for (const target of up ? ids.slice(1) : ids.slice(0, -1).reverse()) run("pane.swap", { pane: moving, target });
+}
+
 export default class Tabs extends View {
   init(_props, cx) {
     this.pressed = null;
@@ -23,7 +34,8 @@ export default class Tabs extends View {
         const command = await nextCommand();
         const terminal = focused()?.terminal;
         if (!terminal) continue;
-        if (command === "pane-space") openOverlay({ mod: "jj-panes", kind: "dialog", width: 420, height: 360, props: { action: "space", terminal } });
+        if (command === "rotate-up" || command === "rotate-down") rotate(command === "rotate-up");
+        else if (command === "pane-space") openOverlay({ mod: "jj-panes", kind: "dialog", width: 420, height: 360, props: { action: "space", terminal } });
         else if (command === "pane-tab") openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "tab", terminal } });
         else if (command.startsWith("layout-")) openOverlay({ mod: "jj-panes", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "layout", layout: command.slice(7), terminal } });
         else if (command === "copy-mode") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: { action: "copy", terminal } });
