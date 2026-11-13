@@ -1,5 +1,5 @@
-// Spacing dialog: the gap between panes (and around them) and the terminals'
-// padding, written into the shown layout with layout.set as they change.
+// Spacing dialog: the gap between panes (and around them), the terminals' padding
+// and the panes' title bars, written into the shown layout with layout.set as they change.
 // ↑/↓ pick a row, ←/→ or the buttons change it. Its Hints tab picks what hint
 // mode (ctrl-a f, jj-copy/patterns.json) highlights, kept as shared("jj-copy.hints").
 
@@ -14,6 +14,8 @@ const ROWS = [
   { key: "padY", label: "Terminal padding, top and bottom", max: 32 },
 ];
 const STEP = 2;
+const BARS = [["always", "Shown"], ["hover", "On hover"], ["none", "Hidden"]];
+const HEADER = { content: { mod: "pane" }, height: 26, position: "top" };
 const HINTS = "jj-copy.hints";
 const TABS = [["spacing", "Spacing"], ["hints", "Hints"]];
 
@@ -34,11 +36,17 @@ const areaOf = (root) => find(root, (n) => (n.children ?? []).some((c) => c.cont
 function current() {
   const root = layout();
   const [padX, padY] = root?.terminal_padding ?? [DEFAULT.padX, DEFAULT.padY];
-  return { gap: frameOf(root)?.gap ?? DEFAULT.gap, padX, padY };
+  const header = frameOf(root)?.header;
+  return { gap: frameOf(root)?.gap ?? DEFAULT.gap, padX, padY, bars: !header ? "none" : header.reveal === "hover" ? "hover" : "always" };
 }
 
-function apply(values) {
+function edit(change) {
   const root = JSON.parse(JSON.stringify(layout()));
+  change(root);
+  run("layout.set", { layout: root });
+}
+
+function spacing(root, values) {
   const frame = frameOf(root);
   const area = areaOf(root);
   if (frame) {
@@ -50,7 +58,22 @@ function apply(values) {
     area.gap = values.gap;
   }
   root.terminal_padding = [values.padX, values.padY];
-  run("layout.set", { layout: root });
+}
+
+// A hidden header is kept in localStorage, so showing it again brings back its mod and size.
+function bars(root, mode) {
+  const frame = frameOf(root);
+  if (!frame) return;
+  if (mode === "none") {
+    if (frame.header) localStorage.setItem("header", JSON.stringify(frame.header));
+    delete frame.header;
+    return;
+  }
+  let kept = null;
+  try {
+    kept = JSON.parse(localStorage.getItem("header") ?? "null");
+  } catch {}
+  frame.header = { ...(frame.header ?? kept ?? HEADER), reveal: mode };
 }
 
 const isOn = (p) => shared(HINTS)?.[p.id] ?? p.on;
@@ -82,7 +105,12 @@ export default class Spacing extends View {
     const row = ROWS.find((r) => r.key === key);
     const values = current();
     const next = Math.max(0, Math.min(row.max, values[key] + delta));
-    if (next !== values[key]) apply({ ...values, [key]: next });
+    if (next !== values[key]) edit((root) => spacing(root, { ...values, [key]: next }));
+  }
+
+  cycle(delta) {
+    const i = BARS.findIndex(([mode]) => mode === current().bars);
+    edit((root) => bars(root, BARS[(i + delta + BARS.length) % BARS.length][0]));
   }
 
   show(tab) {
@@ -102,11 +130,12 @@ export default class Spacing extends View {
       else return false;
       return true;
     }
-    const key = ROWS[this.at].key;
-    if (up) this.at = (this.at + ROWS.length - 1) % ROWS.length;
-    else if (down) this.at = (this.at + 1) % ROWS.length;
-    else if (e.key === "left" || e.key === "h" || e.key === "-") this.change(key, -STEP);
-    else if (e.key === "right" || e.key === "l" || e.key === "+" || e.key === "=") this.change(key, STEP);
+    const n = ROWS.length + 1;
+    const step = e.key === "left" || e.key === "h" || e.key === "-" ? -1 : e.key === "right" || e.key === "l" || e.key === "+" || e.key === "=" ? 1 : 0;
+    if (up) this.at = (this.at + n - 1) % n;
+    else if (down) this.at = (this.at + 1) % n;
+    else if (step && this.at === ROWS.length) this.cycle(step);
+    else if (step) this.change(ROWS[this.at].key, step * STEP);
     else return false;
     return true;
   }
@@ -131,11 +160,29 @@ export default class Spacing extends View {
       .child(button(`less-${r.key}`, "minus", () => this.change(r.key, -STEP)))
       .child(div().w(44).flex_none().text_center().text_color(t.foreground).child(`${values[r.key]} px`))
       .child(button(`more-${r.key}`, "plus", () => this.change(r.key, STEP)));
-    const changed = ROWS.some((r) => values[r.key] !== DEFAULT[r.key]);
+    const option = ([mode, label]) => div().id(`bars-${mode}`).px(8).py(3).rounded(5).cursor_pointer()
+      .text_color(values.bars === mode ? t.foreground : t.muted)
+      .when(values.bars === mode, (el) => el.bg(t.hover))
+      .when(values.bars !== mode, (el) => el.hover((s) => s.text_color(t.foreground)))
+      .on_click((_e, cx) => { this.at = ROWS.length; edit((root) => bars(root, mode)); cx.notify(); })
+      .child(label);
+    const titleBars = h_flex()
+      .id("row-bars")
+      .h(34)
+      .px(8)
+      .gap(6)
+      .flex_none()
+      .items_center()
+      .rounded(7)
+      .when(this.at === ROWS.length, (el) => el.bg(t.selected))
+      .on_click((_e, cx) => { this.at = ROWS.length; cx.notify(); })
+      .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child("Pane title bars"))
+      .child(h_flex().flex_none().gap(2).text_size(12).children(BARS.map(option)));
+    const changed = ROWS.some((r) => values[r.key] !== DEFAULT[r.key]) || values.bars !== "always";
     return {
-      body: v_flex().flex_1().min_h(0).gap(4).children(ROWS.map(row)),
-      reset: changed ? () => apply(DEFAULT) : null,
-      resetLabel: `Reset to ${DEFAULT.gap} / ${DEFAULT.padX} / ${DEFAULT.padY}`,
+      body: v_flex().flex_1().min_h(0).gap(4).children(ROWS.map(row)).child(titleBars),
+      reset: changed ? () => edit((root) => (spacing(root, DEFAULT), bars(root, "always"))) : null,
+      resetLabel: "Reset to defaults",
       hint: "↑↓ choose · ←→ change · tab hints · esc close",
     };
   }
