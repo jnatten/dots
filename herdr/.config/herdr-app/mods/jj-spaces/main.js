@@ -78,7 +78,7 @@ export function tone(t, status) {
 
 // The link dialog for a space.
 function openLinks(id) {
-  if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 460, height: 340, props: { link: id } });
+  if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: id } });
 }
 
 export default class Spaces extends View {
