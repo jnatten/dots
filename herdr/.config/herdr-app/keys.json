@@ -64,6 +64,7 @@
     "ctrl-a e": "jj-tabs.capture",
     "ctrl-a shift-e": "jj-tabs.capture-colors",
     "ctrl-a g": "jj-spaces.link",
+    "ctrl-a k": "mod.open:jj-scroll",
     "cmd-/": "app.help",
     "cmd-shift-/": "app.help",
     "cmd-b": "layout.toggle:sidebar",
