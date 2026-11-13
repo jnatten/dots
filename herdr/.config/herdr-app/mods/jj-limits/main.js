@@ -112,7 +112,7 @@ export default class Limits extends View {
         }),
       )
       .when(!collapsed, (el) => el.child(div().flex_1()).child(h_flex().flex_none().gap(2)
-        .child(button("spacing", "mods/jj-spacing/sliders.svg", "Spacing", () => run("mod.open", { name: "jj-spacing" })))
+        .child(button("spacing", "mods/jj-spacing/sliders.svg", "Spacing and hints", () => run("mod.open", { name: "jj-spacing" })))
         .child(settings)))
       .when(collapsed, (el) => el.child(settings));
   }
