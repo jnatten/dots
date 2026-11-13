@@ -123,8 +123,8 @@
                     "width": 1,
                     "color": "accent"
                   },
-                  "radius": 8,
-                  "gap": 6,
+                  "radius": 0,
+                  "gap": 0,
                   "lone": true
                 }
               }
@@ -163,8 +163,8 @@
               "hidden": true
             }
           ],
-          "padding": 6,
-          "gap": 6
+          "padding": 0,
+          "gap": 0
         }
       ],
       "resizable": false
@@ -172,8 +172,8 @@
   ],
   "background": "canvas",
   "terminal_padding": [
-    14,
-    12
+    0,
+    0
   ],
   "divider": {
     "width": 1,
