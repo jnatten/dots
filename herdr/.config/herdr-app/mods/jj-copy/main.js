@@ -2,7 +2,7 @@
 // with props { action, terminal }: "copy" (a vim-style copy mode), "nvim" (opens
 // the text in Neovim as a peek over the tab, then closes; { colors } keeps colours)
 // or "fingers" ({ pane, cwd }: hints on the screen's hashes, paths, URLs...,
-// drawn by fingers.py in a terminal shown in the pane for now).
+// drawn by fingers.mjs in a terminal shown in the pane for now).
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
@@ -12,12 +12,14 @@ import * as vim from "./vim.js";
 const HISTORY = "100000";
 const sleep = (cx, ms) => new Promise((resolve) => cx.timer.after(ms, () => resolve()));
 
-// Neovim, found once through the login shell's PATH.
+// Neovim and Node, found once through the login shell's PATH.
 let nvim = null;
 const neovim = async () => (nvim ??= (await exec("sh", ["-lc", "command -v nvim"])).stdout.trim() || "nvim");
+let node = null;
+const nodejs = async () => (node ??= (await exec("sh", ["-lc", "command -v node"])).stdout.trim() || "node");
 
 // The temp file each way of reading the pane writes, and how Neovim shows it. Plain
-// is `hc read`'s text, read-only. Coloured is capture.py's output through
+// is `hc read`'s text, read-only. Coloured is capture.mjs's output through
 // `:terminal cat`, as tmux's capture-and-edit did, ending at the last line of output.
 const WAYS = {
   plain: {
@@ -25,7 +27,7 @@ const WAYS = {
     show: '"$2" -R -n "+normal G" "+call search(\'\\S\', \'bcW\')" "$1"; rm -f "$1"',
   },
   colors: {
-    write: 'python3 -I "$2" "$1" "$f" "$3"',
+    write: '"$4" "$2" "$1" "$f" "$3"',
     show: '"$2" -n -c "autocmd TermClose * ++once execute \'normal! G\' | call search(\'^\\[Process exited\', \'bW\') | call search(\'\\S\', \'bW\') | normal! 0" -c "terminal cat $1"; rm -f "$1"',
   },
 };
@@ -34,8 +36,8 @@ const WAYS = {
 // the tab. The peek closes when Neovim quits, and the temp file goes with it.
 async function capture(cx, terminal, cwd, colors) {
   const way = WAYS[colors ? "colors" : "plain"];
-  const helper = `${appHome()}/mods/jj-copy/capture.py`;
-  const file = await exec("sh", ["-c", `f=$(mktemp "\${TMPDIR:-/tmp}/herdr-capture.XXXXXX") && ${way.write} && printf %s "$f"`, "sh", terminal, helper, HISTORY], { timeout: 60000 });
+  const helper = `${appHome()}/mods/jj-copy/capture.mjs`;
+  const file = await exec("sh", ["-c", `f=$(mktemp "\${TMPDIR:-/tmp}/herdr-capture.XXXXXX") && ${way.write} && printf %s "$f"`, "sh", terminal, helper, HISTORY, await nodejs()], { timeout: 60000 });
   const path = (file.stdout ?? "").trim();
   if (file.code !== 0 || !path) throw new Error((file.stderr || "couldn't read the pane").trim());
   const here = cwd && (await exec("test", ["-d", cwd])).code === 0 ? ["--cwd", cwd] : [];
@@ -50,8 +52,6 @@ async function capture(cx, terminal, cwd, colors) {
 }
 
 const RUNNING = "jj-copy.fingers";
-let python = null;
-const python3 = async () => (python ??= (await exec("sh", ["-lc", "command -v python3"])).stdout.trim() || "python3");
 const githubRepo = (remote) => (remote ?? "").trim().match(/github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/)?.slice(1).join("/") ?? null;
 const short = (text) => (text.length > 80 ? `${text.slice(0, 79)}…` : text);
 
@@ -98,7 +98,7 @@ async function fingers(cx, { terminal, pane, cwd }) {
     const every = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
     const chosen = shared("jj-copy.hints") ?? {};
     const ids = every.filter((p) => chosen[p.id] ?? p.on).map((p) => p.id);
-    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await python3(), "-I", `${appHome()}/mods/jj-copy/fingers.py`, `${tmp}/screen.json`, `${tmp}/result.json`, JSON.stringify(ids), String(size.cols), String(size.rows)]);
+    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await nodejs(), `${appHome()}/mods/jj-copy/fingers.mjs`, `${tmp}/screen.json`, `${tmp}/result.json`, JSON.stringify(ids), String(size.cols), String(size.rows)]);
     let address = null;
     try {
       address = r.code === 0 ? JSON.parse(r.stdout).address : null;

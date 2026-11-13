@@ -76,8 +76,11 @@ async function live() {
   return found.filter(Boolean);
 }
 
+let node = null;
+const nodejs = async () => (node ??= (await exec("sh", ["-lc", "command -v node"])).stdout.trim() || "node");
+
 async function history() {
-  const r = await exec("python3", ["-I", `${appHome()}/mods/jj-sessions/scan.py`], { timeout: 60000 });
+  const r = await exec(await nodejs(), [`${appHome()}/mods/jj-sessions/scan.mjs`], { timeout: 60000 });
   return r.code === 0 ? JSON.parse(r.stdout) : [];
 }
 
