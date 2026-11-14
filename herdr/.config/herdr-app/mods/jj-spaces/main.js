@@ -3,13 +3,16 @@
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
 // switch, right-click for its menu, drag to reorder.
 // Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
-// those its Claude sessions opened. This copy asks GitHub for all of them and
-// shares what it learns as shared("github") for the agents list and the link dialog.
+// those its Claude sessions opened, each with the issues or PRs it's linked to
+// and the Trello cards in their descriptions. This copy asks GitHub and Trello
+// about all of them and shares what it learns as shared("github") for the agents
+// list, the link dialog and the spacing dialog's Links tab.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
-import { FINAL, badges, branchName, fetchGitHub, githubRepo, scanAgent } from "./github.js";
+import { FINAL, badges, branchName, expand, fetchGitHub, githubRepo, isCard, scanAgent } from "./github.js";
+import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
 import { linkInit, linkRender } from "./links.js";
 
 function find(node, id) {
@@ -106,6 +109,11 @@ export default class Spaces extends View {
     this.scanQueue = new Set();
     this.stale = new Set(); // urls to ask GitHub about again now
     this.ghRetry = 0;
+    this.cards = new Set(); // Trello card urls shown somewhere
+    this.trelloRetry = 0;
+    this.trelloBlocked = null; // refsOf() and connect when 1Password said no
+    this.connected = shared("jj-links.connect") ?? 0;
+    this.trello = { state: "idle", error: null, cards: 0 }; // for the Links tab
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
@@ -123,6 +131,7 @@ export default class Spaces extends View {
     if (due.size) this.refreshGit(due, cx);
     this.claudeDue(cx);
     this.githubDue(now, sp, ps, cx);
+    this.trelloDue(now, cx);
   }
 
   // Claude sessions to read for PR links: new ones, and those whose turn just ended.
@@ -172,7 +181,7 @@ export default class Spaces extends View {
     const active = window().active;
     const old = (at, final) => active && now - (at ?? 0) > (final ? GH_FINAL : GH_OPEN);
     const urls = [...new Set([...Object.values(shared("github.links") ?? {}).flat(), ...Object.values(this.agentLinks).flat()])]
-      .filter((u) => !this.items[u] || this.stale.has(u) || old(this.items[u].at, FINAL.has(this.items[u].state)));
+      .filter((u) => !isCard(u) && (!this.items[u]?.links || this.stale.has(u) || old(this.items[u].at, FINAL.has(this.items[u].state))));
     const keys = [...new Set(sp.map((s) => this.branchKey(s, ps)).filter(Boolean))].filter((k) => !this.branchPrs[k] || old(this.branchPrs[k].at, false));
     if (!urls.length && !keys.length) return;
     this.fetching = true;
@@ -180,7 +189,7 @@ export default class Spaces extends View {
     cx.spawn(async (cx) => {
       try {
         const r = await fetchGitHub(urls, keys.map((key) => { const [repo, branch] = key.split("\0"); return { key, repo, branch }; }));
-        Object.assign(this.items, r.items);
+        for (const [url, it] of Object.entries(r.items)) this.items[url] = { links: this.items[url]?.links, ...it };
         for (const [k, url] of Object.entries(r.branches)) this.branchPrs[k] = { url, at: Date.now() };
         if (!r.ok) this.ghRetry = Date.now() + GH_RETRY;
       } catch {
@@ -189,6 +198,46 @@ export default class Spaces extends View {
       this.fetching = false;
       cx.notify();
     });
+  }
+
+  // The Trello cards shown that are new or due, while Trello linking is on. After
+  // 1Password said no, only once the Links tab's Connect is pressed (or the refs
+  // change), which also asks about every card again.
+  trelloDue(now, cx) {
+    const cfg = linkSettings(shared("jj-links"));
+    if (!cfg.trello) return this.status({ state: "off", error: null, cards: 0 }, cx);
+    if (this.trello.state === "off") this.status({ state: "idle", error: null, cards: 0 }, cx);
+    if (this.carding) return;
+    const pressed = shared("jj-links.connect") ?? 0;
+    const connect = pressed !== this.connected;
+    const ask = JSON.stringify([refsOf(cfg), pressed]);
+    if (!connect && (this.trelloBlocked === ask || now < this.trelloRetry)) return;
+    const active = window().active;
+    const old = (it) => !it || (active && now - (it.at ?? 0) > (FINAL.has(it.state) ? GH_FINAL : GH_OPEN));
+    const urls = [...this.cards].filter((u) => connect || old(this.items[u]));
+    if (!urls.length && !connect) return;
+    this.connected = pressed;
+    this.carding = true;
+    this.trello = { ...this.trello, state: "busy" };
+    cx.spawn(async (cx) => {
+      try {
+        Object.assign(this.items, await fetchCards(urls, cfg));
+        this.trelloBlocked = null;
+        this.trello = { state: "ok", error: null, cards: [...this.cards].filter((u) => this.items[u]?.state?.startsWith("trello-")).length };
+      } catch (e) {
+        if (e instanceof OpError) this.trelloBlocked = ask;
+        else this.trelloRetry = Date.now() + GH_RETRY;
+        this.trello = { state: "error", error: String(e?.message ?? e), cards: 0 };
+      }
+      this.carding = false;
+      cx.notify();
+    });
+  }
+
+  status(trello, cx) {
+    if (this.trello.state === trello.state) return;
+    this.trello = trello;
+    cx.notify();
   }
 
   // What the other mods read: every linked item's state, agents' PRs and spaces'
@@ -210,21 +259,34 @@ export default class Spaces extends View {
       const k = this.branchKey(s, ps);
       if (k && this.branchPrs[k]?.url) branches[s.id] = this.branchPrs[k].url;
     }
-    const used = new Set([...Object.values(kept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches)]);
+    // Kept whatever the Links tab says, so turning something back on shows it at once.
+    const direct = [...Object.values(kept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches)];
+    const used = new Set(expand([...new Set(direct)], this.items).map((e) => e.url));
     for (const u of Object.keys(this.items)) if (!used.has(u)) delete this.items[u];
-    const gh = { items: this.items, agents: this.agentLinks, branches };
+    // Each space's links: by hand, its branch's PR, its agents', less those hidden,
+    // then what they bring along; agents' the same, for the agents list.
+    const cfg = linkSettings(shared("jj-links"));
+    const shownOf = (own, auto, off) => {
+      const mine = [...new Set([...own, ...auto.filter((u) => u && !off.has(u))])];
+      return expand(mine, this.items, cfg).map((e) => e.url).filter((u) => mine.includes(u) || !off.has(u));
+    };
+    const as = agents();
+    this.links = new Map(sp.map((s) => {
+      const auto = [branches[s.id], ...as.filter((a) => a.space === s.id).flatMap((a) => this.agentLinks[a.address] ?? [])];
+      return [s.id, shownOf(kept[s.id] ?? [], auto, new Set(hidden[s.id] ?? []))];
+    }));
+    const shownAgents = {};
+    for (const a of as) {
+      const urls = shownOf([], this.agentLinks[a.address] ?? [], new Set(hidden[a.space] ?? []));
+      if (urls.length) shownAgents[a.address] = urls;
+    }
+    this.cards = new Set([...this.links.values(), ...Object.values(shownAgents)].flat().filter(isCard));
+    const gh = { items: this.items, agents: this.agentLinks, branches, shown: { agents: shownAgents }, trello: this.trello };
     const text = JSON.stringify(gh);
     if (text !== this.published) {
       this.published = text;
       setShared("github", gh);
     }
-    // Each space's links: by hand, its branch's PR, its agents', less those hidden.
-    const as = agents();
-    this.links = new Map(sp.map((s) => {
-      const off = new Set(hidden[s.id] ?? []);
-      const auto = [branches[s.id], ...as.filter((a) => a.space === s.id).flatMap((a) => this.agentLinks[a.address] ?? [])].filter((u) => u && !off.has(u));
-      return [s.id, [...new Set([...(kept[s.id] ?? []), ...auto])]];
-    }));
   }
 
   // Places whose git could have changed: new ones (a new space, a cd), where a

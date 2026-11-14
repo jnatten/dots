@@ -2,9 +2,12 @@
 // and the panes' title bars, written into the shown layout with layout.set as they change.
 // ↑/↓ pick a row, ←/→ or the buttons change it. Its Hints tab picks what hint
 // mode (ctrl-a f, jj-copy/patterns.json) highlights, kept as shared("jj-copy.hints").
+// Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
+// an issue's PRs, Trello cards) and where 1Password keeps the Trello key and token,
+// kept as shared("jj-links"); Connect asks 1Password again (shared("jj-links.connect")).
 
 import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { layout, run, theme, props, closeOverlay, appHome, readTextFile, shared, setShared } from "herdr";
 
 const DEFAULT = { gap: 6, padX: 14, padY: 12 };
@@ -17,7 +20,27 @@ const STEP = 2;
 const BARS = [["always", "Shown"], ["hover", "On hover"], ["none", "Hidden"]];
 const HEADER = { content: { mod: "pane" }, height: 26, position: "top" };
 const HINTS = "jj-copy.hints";
-const TABS = [["spacing", "Spacing"], ["hints", "Hints"]];
+const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"]];
+
+// jj-spaces/trello.js's DEFAULTS.
+const LINKS = "jj-links";
+const LINK_DEFAULTS = { related: true, trello: true, account: "my.1password.com", key: "op://Private/Trello/key", token: "op://Private/Trello/token" };
+const SWITCHES = [
+  { key: "related", label: "Linked issues and PRs", about: "a PR's issues, an issue's PRs" },
+  { key: "trello", label: "Trello cards", about: "from their descriptions" },
+];
+const FIELDS = [
+  { key: "account", label: "1Password account" },
+  { key: "key", label: "Trello API key" },
+  { key: "token", label: "Trello token" },
+];
+const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
+
+// Only what differs from the defaults is kept.
+function setLink(key, value) {
+  const { [key]: _, ...rest } = shared(LINKS) ?? {};
+  setShared(LINKS, value === LINK_DEFAULTS[key] || value === "" ? rest : { ...rest, [key]: value });
+}
 
 function find(node, test) {
   if (!node) return null;
@@ -87,10 +110,22 @@ export default class Spacing extends View {
   init(_props, cx) {
     this.at = 0;
     this.hint = 0;
-    this.tab = localStorage.getItem("tab") === "hints" ? "hints" : "spacing";
+    this.link = 0;
+    this.tab = TABS.find(([id]) => id === localStorage.getItem("tab"))?.[0] ?? "spacing";
     this.patterns = null;
     this.handle = cx.focus_handle();
     this.handle.focus();
+    // Saved on ↵ or leaving the field: each save may have the sidebar ask 1Password.
+    this.editing = null;
+    this.fields = {};
+    for (const f of FIELDS) {
+      const input = InputState.new({ placeholder: LINK_DEFAULTS[f.key], value: linkValue(f.key) });
+      const save = () => { const v = input.value().trim(); if (v !== linkValue(f.key)) setLink(f.key, v); };
+      input.on("focus", (_e, cx) => { this.editing = f.key; cx.notify(); });
+      input.on("blur", (_e, cx) => { this.editing = null; save(); cx.notify(); });
+      input.on("submit", (_e, cx) => { save(); this.handle.focus(); cx.notify(); });
+      this.fields[f.key] = input;
+    }
     cx.spawn(async (cx) => {
       try {
         this.patterns = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
@@ -119,9 +154,18 @@ export default class Spacing extends View {
   }
 
   key(e) {
-    if (e.key === "tab") return this.show(this.tab === "hints" ? "spacing" : "hints"), true;
+    if (this.editing) return false;
+    if (e.key === "tab") return this.show(TABS[(TABS.findIndex(([id]) => id === this.tab) + 1) % TABS.length][0]), true;
     const up = e.key === "up" || e.key === "k";
     const down = e.key === "down" || e.key === "j";
+    if (this.tab === "links") {
+      const n = SWITCHES.length;
+      if (up) this.link = (this.link + n - 1) % n;
+      else if (down) this.link = (this.link + 1) % n;
+      else if (e.key === "space" || e.key === "enter") setLink(SWITCHES[this.link].key, !linkValue(SWITCHES[this.link].key));
+      else return false;
+      return true;
+    }
     if (this.tab === "hints") {
       const n = this.patterns?.length ?? 0;
       if (up && n) this.hint = (this.hint + n - 1) % n;
@@ -214,13 +258,71 @@ export default class Spacing extends View {
         .when(this.patterns?.length === 0, (el) => el.child(div().p(8).text_color(t.dim).child("Couldn't read jj-copy/patterns.json."))),
       reset: Object.keys(shared(HINTS) ?? {}).length ? () => setShared(HINTS, {}) : null,
       resetLabel: "Reset to defaults",
-      hint: "↑↓ choose · space toggle · tab spacing · esc close",
+      hint: "↑↓ choose · space toggle · tab links · esc close",
+    };
+  }
+
+  links(t) {
+    const trello = shared("github")?.trello;
+    const on = (key) => Boolean(linkValue(key));
+    const row = (sw, i) => h_flex()
+      .id(`link-${sw.key}`)
+      .h(30)
+      .px(8)
+      .gap(10)
+      .flex_none()
+      .items_center()
+      .rounded(7)
+      .cursor_pointer()
+      .when(i === this.link, (el) => el.bg(t.selected))
+      .when(i !== this.link, (el) => el.hover((s) => s.bg(t.hover)))
+      .on_click((_e, cx) => { this.link = i; setLink(sw.key, !on(sw.key)); cx.notify(); })
+      .child(div().size(14).flex_none().flex().items_center().justify_center().rounded(4).border_1()
+        .border_color(on(sw.key) ? t.accent : t.input).when(on(sw.key), (el) => el.bg(t.accent).text_color(t.accent_foreground))
+        .when(on(sw.key), (el) => el.child(svg("mods/workspace-chrome/check.svg").size(10))))
+      .child(div().flex_none().text_color(on(sw.key) ? t.foreground : t.muted).child(sw.label))
+      .child(div().flex_1().min_w(0).truncate().text_right().text_size(11.5).text_color(t.dim).child(sw.about));
+    const field = (f) => h_flex()
+      .h(34)
+      .px(8)
+      .gap(10)
+      .flex_none()
+      .items_center()
+      .child(div().w(120).flex_none().text_color(t.muted).child(f.label))
+      .child(Input.new(this.fields[f.key]).flex_1().min_w(0).h(28).px(8).items_center().rounded(6).border(1)
+        .border_color(this.editing === f.key ? t.accent : t.input).bg(t.background).text_color(t.foreground));
+    const cards = trello?.cards ?? 0;
+    const status = {
+      off: "Trello cards are off.",
+      idle: "1Password is asked the first time a card shows.",
+      busy: "Asking 1Password and Trello…",
+      ok: `Connected · ${cards} card${cards === 1 ? "" : "s"}`,
+      error: trello?.error,
+    }[on("trello") ? (trello?.state ?? "idle") : "off"];
+    const connect = div().id("connect").flex_none().px(8).py(3).rounded(5).bg(t.raised).text_color(t.foreground)
+      .cursor_pointer().hover((s) => s.bg(t.hover))
+      .on_click((_e, cx) => { setShared("jj-links.connect", Date.now()); cx.notify(); })
+      .child(trello?.state === "ok" ? "Refresh" : "Connect");
+    return {
+      body: v_flex().flex_1().min_h(0).gap(4)
+        .children(SWITCHES.map(row))
+        .child(div().px(8).pt(10).pb(2).flex_none().text_size(11).text_color(t.dim).child("Where 1Password keeps Trello's key and token"))
+        .children(FIELDS.map(field))
+        .child(h_flex().px(8).pt(6).gap(8).flex_none().items_center()
+          .child(div().flex_1().min_w(0).text_size(11.5).text_color(trello?.state === "error" && on("trello") ? t.blocked : t.dim).child(status ?? ""))
+          .when(on("trello") && trello?.state !== "busy", (el) => el.child(connect))),
+      reset: Object.keys(shared(LINKS) ?? {}).length ? () => {
+        setShared(LINKS, {});
+        for (const f of FIELDS) this.fields[f.key].set_value(LINK_DEFAULTS[f.key]);
+      } : null,
+      resetLabel: "Reset to defaults",
+      hint: this.editing ? "↵ save · esc close" : "↑↓ choose · space toggle · tab spacing · esc close",
     };
   }
 
   render() {
     const t = theme();
-    const view = this.tab === "hints" ? this.hints(t) : this.spacing(t);
+    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.spacing(t);
     const tab = ([id, label]) => div().id(`tab-${id}`).px(10).py(4).rounded(6).cursor_pointer()
       .text_color(this.tab === id ? t.foreground : t.muted)
       .when(this.tab === id, (el) => el.bg(t.selected))

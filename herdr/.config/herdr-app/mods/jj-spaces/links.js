@@ -1,14 +1,16 @@
-// The link dialog: a space's GitHub PRs and issues, those linked by hand beside
-// its branch's PR and its Claude sessions', then its repo's open PRs to link.
-// Typing filters both (a number picks that one; a URL or owner/repo#12 is looked
-// up). ^D (or the row's button) unlinks one linked by hand, and hides the others
-// from the space and its agents (shared("github.hidden")) until ^D shows them
-// again. A jj-spaces overlay with props { link: spaceId }.
+// The link dialog: a space's GitHub PRs and issues and Trello cards, those linked
+// by hand beside its branch's PR and its Claude sessions', then what those bring
+// along (a PR's issues, an issue's PRs, their Trello cards: "via #12"), then its
+// repo's open PRs to link. Typing filters both (a number picks that one; a URL or
+// owner/repo#12 is looked up). ^D (or the row's button) unlinks one linked by hand,
+// and hides the others from the space and its agents (shared("github.hidden"))
+// until ^D shows them again. A jj-spaces overlay with props { link: spaceId }.
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
 import { props, closeOverlay, theme, spaces, panes, agents, exec, shared, setShared } from "herdr";
-import { badges, githubRepo, openPrs, resolve } from "./github.js";
+import { badges, expand, githubRepo, openPrs, resolve } from "./github.js";
+import { linkSettings } from "./trello.js";
 
 const spaceOf = () => spaces().find((s) => s.id === props()?.link);
 const open = (url, cx) => cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
@@ -24,7 +26,7 @@ export function linkInit(view, cx) {
   view.childOf = [];
   view.scroll = ScrollHandle.new();
   view.handle = cx.focus_handle();
-  view.input = InputState.new({ placeholder: "Filter open PRs, or paste a URL, owner/repo#12 or #12" });
+  view.input = InputState.new({ placeholder: "Filter open PRs, or paste a PR, issue or Trello URL, owner/repo#12 or #12" });
   view.input.on("change", (_e, cx) => { view.error = ""; view.at = 0; cx.notify(); });
   view.input.on("submit", (_e, cx) => enter(view, cx));
   view.input.focus();
@@ -87,6 +89,9 @@ function drop(id, r) {
   setShared(key, { ...all, [id]: r.own || r.hidden ? mine.filter((u) => u !== r.url) : [...mine, r.url] });
 }
 
+const REFERENCE = /github\.com\/|trello\.com\/c\/|^[\w.-]+\/[\w.-]+#\d+$/;
+const via = (it) => (it?.kind === "trello" ? "a card" : `#${it?.number ?? "?"}`);
+
 // What's typed: nothing (everything), a number (that one), a reference elsewhere
 // (nothing here: ↵ looks it up), or words every one of which must appear.
 function filter(text) {
@@ -94,7 +99,7 @@ function filter(text) {
   const n = s.match(/^#?(\d+)$/);
   if (!s) return () => true;
   if (n) return (it) => it?.number === Number(n[1]);
-  if (/github\.com\/|^[\w.-]+\/[\w.-]+#\d+$/.test(s)) return () => false;
+  if (REFERENCE.test(s)) return () => false;
   const words = s.split(/\s+/);
   return (it, url) => words.every((w) => `#${it?.number ?? ""} ${it?.title ?? ""} ${it?.branch ?? ""} ${it?.author ?? ""} ${url}`.toLowerCase().includes(w));
 }
@@ -118,6 +123,8 @@ export function linkRender(view) {
   for (const url of shared("github.links")?.[id] ?? []) push(url, "linked", true);
   push(gh.branches?.[id], "branch");
   for (const a of agents().filter((a) => a.space === id)) for (const url of gh.agents?.[a.address] ?? []) push(url, `Claude · ${a.tab_name || a.title || a.address}`);
+  const shown = linked.filter((r) => !r.hidden).map((r) => r.url);
+  for (const e of expand(shown, items, linkSettings(shared("jj-links")))) if (e.via) push(e.url, `via ${via(items[e.via])}`);
   const mine = linked.filter((r) => wanted(items[r.url], r.url));
   const candidates = (view.open ?? []).filter((p) => !seen.has(p.url));
   const others = candidates.filter((p) => wanted(p, p.url)).map((p) => ({ url: p.url, pr: p }));
@@ -141,7 +148,7 @@ export function linkRender(view) {
     .when(r.hidden, (el) => el.opacity(0.5))
     .on_click((_e, cx) => open(r.url, cx))
     .child(div().w(52).flex_none().child(badges([r.url], items, t, `link-badge-${r.url}`, 1)))
-    .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(items[r.url]?.title || r.url.replace(/^https:\/\/github\.com\//, "")))
+    .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(items[r.url]?.title || r.url.replace(/^https:\/\/(github\.com\/)?/, "")))
     .child(div().flex_none().max_w(160).truncate().text_size(11).text_color(t.dim).child(r.hidden ? `hidden · ${r.from}` : r.from))
     .child(div().id(`drop-${r.url}`).flex_none().p(2).rounded(4).text_color(t.dim)
       .hover((el) => el.bg(t.selected).text_color(t.foreground))
@@ -167,8 +174,8 @@ export function linkRender(view) {
   for (const r of others) { view.childOf[n] = children.length; children.push(openRow(r, n++)); }
   const empty = !view.rows.length && view.open !== undefined;
   const why = !text
-    ? "Nothing linked yet. Its branch's PR and PRs its Claude sessions open show up here too."
-    : /github\.com\/|^[\w.-]+\/[\w.-]+#\d+$/.test(text) ? "↵ looks it up on GitHub."
+    ? "Nothing linked yet. Its branch's PR and PRs its Claude sessions open show up here too, with their issues and Trello cards."
+    : REFERENCE.test(text) ? "↵ looks it up."
     : /^#?\d+$/.test(text) ? `${text.replace(/^#?/, "#")} isn't here: ↵ looks it up on GitHub.`
     : "Nothing matches.";
 
@@ -199,7 +206,7 @@ export function linkRender(view) {
     .gap(10)
     .bg(t.popover)
     .text_size(13)
-    .child(div().flex_none().truncate().font_semibold().text_color(t.foreground).child(`GitHub links${s ? ` of ${s.name}` : ""}`))
+    .child(div().flex_none().truncate().font_semibold().text_color(t.foreground).child(`Links${s ? ` of ${s.name}` : ""}`))
     .child(Input.new(view.input).h(32).px(10).flex_none().items_center().rounded(6).border(1).border_color(t.accent).bg(t.background).text_color(t.foreground))
     .when(Boolean(view.error), (el) => el.child(div().flex_none().text_color(t.blocked).child(view.error)))
     .child(v_flex().id("link-list").flex_1().min_h(0).overflow_y_scrollbar().track_scroll(view.scroll)

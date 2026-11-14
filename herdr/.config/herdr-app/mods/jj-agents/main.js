@@ -136,22 +136,31 @@ function icon(p, size, color) {
   return p.tint ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
-// The PRs an agent's Claude session opened, as jj-spaces finds them (shared("github")),
-// drawn as jj-spaces/github.js draws them: GitHub's colors, [light, dark].
-const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"];
+// The PRs an agent's Claude session opened, with their issues and Trello cards, as
+// jj-spaces finds them (shared("github")), drawn as jj-spaces/github.js draws them:
+// GitHub's colors, [light, dark], and Trello's blue.
+const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"], BLUE = ["#0c66e4", "#579dff"];
 const GH = {
   open: { icon: "mods/jj-spaces/git-pull-request.svg", color: GREEN, label: "Open" },
   draft: { icon: "mods/jj-spaces/git-pull-request-draft.svg", color: GRAY, label: "Draft" },
   queued: { icon: "mods/jj-spaces/git-pull-request.svg", color: ["#9a6700", "#d29922"], label: "Merge queued" },
   merged: { icon: "mods/jj-spaces/git-merge.svg", color: PURPLE, label: "Merged" },
   closed: { icon: "mods/jj-spaces/git-pull-request-closed.svg", color: ["#cf222e", "#f85149"], label: "Closed" },
+  "issue-open": { icon: "mods/jj-spaces/circle-dot.svg", color: GREEN, label: "Open" },
+  "issue-done": { icon: "mods/workspace-chrome/circle-check.svg", color: PURPLE, label: "Closed" },
+  "issue-skip": { icon: "mods/jj-spaces/circle-slash.svg", color: GRAY, label: "Not planned" },
+  "trello-open": { icon: "mods/jj-spaces/trello.svg", color: BLUE, label: "" },
+  "trello-done": { icon: "mods/jj-spaces/trello.svg", color: PURPLE, label: "Done" },
+  "trello-archived": { icon: "mods/jj-spaces/trello.svg", color: GRAY, label: "Archived" },
 };
+const isCard = (url) => /trello\.com\/c\//.test(url);
 
 function prBadges(urls, items, t, id, max) {
   const dark = Boolean(settings()?.dark);
   const badge = (url) => {
     const it = items[url];
     const s = GH[it?.state];
+    const card = it?.kind === "trello" || isCard(url);
     const number = it?.number ?? url.match(/\/(\d+)\/?$/)?.[1] ?? "?";
     return h_flex()
       .id(`${id}-${url}`)
@@ -161,12 +170,12 @@ function prBadges(urls, items, t, id, max) {
       .text_size(11)
       .text_color(s ? s.color[dark ? 1 : 0] : t.dim)
       .cursor_pointer()
-      .tooltip([`${it?.repo ?? ""}#${number}`, s?.label, it?.title].filter(Boolean).join(" · "))
+      .tooltip((card ? [it?.repo || "Trello card", it?.list, s?.label, it?.title] : [`${it?.repo ?? ""}#${number}`, s?.label, it?.title]).filter(Boolean).join(" · "))
       .on_click((_e, cx) => {
         cx.stop_propagation();
         cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
       })
-      .child(div().flex_none().child(svg(s?.icon ?? GH.open.icon).size(11)))
+      .child(div().flex_none().child(svg(s?.icon ?? (card ? GH["trello-open"].icon : GH.open.icon)).size(11)))
       .child(String(number));
   };
   const rest = urls.length - max;
@@ -500,7 +509,7 @@ export default class Agents extends View {
       const context = mine["claude.context"] !== undefined && mine["claude.context"] !== "" && !Number.isNaN(Number(mine["claude.context"])) ? Number(mine["claude.context"]) : null;
       const size = Number(mine["claude.context_size"]) || 0;
       const off = shared("github.hidden")?.[a.space] ?? [];
-      const prs = (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
+      const prs = gh.shown ? (gh.shown.agents?.[a.address] ?? []) : (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
       const isPinned = a.pinned;
       const pin = div()
         .id(`pin-${a.address}`)
