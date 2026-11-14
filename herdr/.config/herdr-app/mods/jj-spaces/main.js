@@ -6,8 +6,9 @@
 // those its Claude sessions opened, each with the issues or PRs it's linked to
 // and the Trello cards in their descriptions. This copy asks GitHub and Trello
 // about all of them and shares what it learns as shared("github") for the agents
-// list, the link dialog and the spacing dialog's Links tab. Those linked by hand
-// live on the space's machine (docs.js), copied into shared("github.links").
+// list, the link dialog and the spacing dialog's Links tab. Those linked by hand, to
+// the space or to one of its agents, live on its machine (docs.js), copied into
+// shared("github.links") and shared("github.agent-links").
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -80,9 +81,9 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
-// The link dialog for a space.
-function openLinks(id) {
-  if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: id } });
+// The link dialog for a space, or for one of its agents.
+function openLinks(id, agent) {
+  if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: id, ...(agent && { agent }) } });
 }
 
 export default class Spaces extends View {
@@ -123,7 +124,13 @@ export default class Spaces extends View {
     // Refresh only when the refs could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
     cx.spawn(async () => {
-      for (;;) if ((await nextCommand()) === "link") openLinks(focused()?.space ?? spaces().find((s) => s.active)?.id);
+      for (;;) {
+        // "link": the focused agent's, else the space's; "link-space": the space's.
+        const command = await nextCommand();
+        if (command !== "link" && command !== "link-space") continue;
+        const space = focused()?.space ?? spaces().find((s) => s.active)?.id;
+        openLinks(space, command === "link" ? agents().find((a) => a.focused && a.space === space)?.address : null);
+      }
     });
   }
 
@@ -139,10 +146,11 @@ export default class Spaces extends View {
     this.linksDue(now, cx);
   }
 
-  // Hand-made links from each machine's core into shared("github.links") and
-  // shared("github.hidden"), where the rows, the agents list and the dialog read them.
-  // A space missing at two syncs in a row on a machine whose layout is in loses its
-  // links there; the first time per machine, what this screen kept itself is moved in.
+  // Hand-made links from each machine's core into shared("github.links"),
+  // shared("github.hidden") and shared("github.agent-links"), where the rows, the agents
+  // list and the dialog read them. A space or agent missing at two syncs in a row on a
+  // machine whose layout is in loses its links there; the first time per machine, what
+  // this screen kept itself is moved in.
   linksDue(now, cx) {
     if (this.syncing || now - this.linksAt < (window().active ? 10000 : 60000)) return;
     this.syncing = true;
@@ -151,7 +159,7 @@ export default class Spaces extends View {
     cx.spawn(async (cx) => {
       const known = machines();
       const names = new Set(known.map((m) => m.name ?? null));
-      const cache = { "github.links": {}, "github.hidden": {} };
+      const cache = { "github.links": {}, "github.hidden": {}, "github.agent-links": {} };
       for (const [key, into] of Object.entries(cache))
         for (const [id, urls] of Object.entries(shared(key) ?? {})) if (urls?.length && names.has(machineOf(id))) into[id] = urls;
       const moved = new Set(shared("github.links.moved") ?? []);
@@ -159,7 +167,11 @@ export default class Spaces extends View {
       for (const m of known.filter((m) => m.layout === "ready")) {
         const on = m.name ?? null;
         const mine = (id) => machineOf(id) === on;
-        const here = new Set(spaces().filter((s) => (s.machine ?? null) === on).map((s) => split(s.id)[1]));
+        const full = (bare) => (on ? `${on}/${bare}` : bare);
+        const live = {
+          spaces: new Set(spaces().filter((s) => (s.machine ?? null) === on).map((s) => split(s.id)[1])),
+          agents: new Set(terminals().filter((t) => t.state === "live" && mine(t.address)).map((t) => split(t.address)[1])),
+        };
         const move = !moved.has(on ?? "");
         try {
           const doc = await updateLinks(on, (doc) => {
@@ -167,24 +179,26 @@ export default class Spaces extends View {
               const ids = new Set([...Object.keys(cache["github.links"]), ...Object.keys(cache["github.hidden"])].filter(mine));
               for (const id of ids) {
                 const bare = split(id)[1];
-                const join = (key, field) => [...new Set([...(doc[bare]?.[field] ?? []), ...(cache[key][id] ?? [])])];
-                doc[bare] = { links: join("github.links", "links"), hidden: join("github.hidden", "hidden") };
+                const join = (key, field) => [...new Set([...(doc.spaces[bare]?.[field] ?? []), ...(cache[key][id] ?? [])])];
+                doc.spaces[bare] = { links: join("github.links", "links"), hidden: join("github.hidden", "hidden") };
               }
             }
-            for (const bare of Object.keys(doc)) {
-              if (here.has(bare)) continue;
-              const k = `${on ?? ""}\0${bare}`;
-              if (this.missing.has(k)) delete doc[bare];
-              else missing.add(k);
+            for (const kind of ["spaces", "agents"]) {
+              for (const bare of Object.keys(doc[kind])) {
+                if (live[kind].has(bare)) continue;
+                const k = `${kind}\0${on ?? ""}\0${bare}`;
+                if (this.missing.has(k)) delete doc[kind][bare];
+                else missing.add(k);
+              }
             }
             return doc;
           });
           for (const into of Object.values(cache)) for (const id of Object.keys(into)) if (mine(id)) delete into[id];
-          for (const [bare, e] of Object.entries(doc)) {
-            const id = on ? `${on}/${bare}` : bare;
-            if (e.links?.length) cache["github.links"][id] = e.links;
-            if (e.hidden?.length) cache["github.hidden"][id] = e.hidden;
+          for (const [bare, e] of Object.entries(doc.spaces)) {
+            if (e.links?.length) cache["github.links"][full(bare)] = e.links;
+            if (e.hidden?.length) cache["github.hidden"][full(bare)] = e.hidden;
           }
+          for (const [bare, e] of Object.entries(doc.agents)) if (e.links?.length) cache["github.agent-links"][full(bare)] = e.links;
           moved.add(on ?? "");
         } catch {}
       }
@@ -244,7 +258,7 @@ export default class Spaces extends View {
     if (this.fetching || now < this.ghRetry) return;
     const active = window().active;
     const old = (at, final) => active && now - (at ?? 0) > (final ? GH_FINAL : GH_OPEN);
-    const urls = [...new Set([...Object.values(shared("github.links") ?? {}).flat(), ...Object.values(this.agentLinks).flat()])]
+    const urls = [...new Set([...Object.values(shared("github.links") ?? {}).flat(), ...Object.values(shared("github.agent-links") ?? {}).flat(), ...Object.values(this.agentLinks).flat()])]
       .filter((u) => !isCard(u) && (!this.items[u]?.links || this.stale.has(u) || old(this.items[u].at, FINAL.has(this.items[u].state))));
     const keys = [...new Set(sp.map((s) => this.branchKey(s, ps)).filter(Boolean))].filter((k) => !this.branchPrs[k] || old(this.branchPrs[k].at, false));
     if (!urls.length && !keys.length) return;
@@ -309,17 +323,19 @@ export default class Spaces extends View {
   publish(sp, ps) {
     const kept = shared("github.links") ?? {};
     const hidden = shared("github.hidden") ?? {};
+    const agentKept = shared("github.agent-links") ?? {};
     const branches = {};
     for (const s of sp) {
       const k = this.branchKey(s, ps);
       if (k && this.branchPrs[k]?.url) branches[s.id] = this.branchPrs[k].url;
     }
     // Kept whatever the Links tab says, so turning something back on shows it at once.
-    const direct = [...Object.values(kept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches)];
+    const direct = [...Object.values(kept).flat(), ...Object.values(agentKept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches)];
     const used = new Set(expand([...new Set(direct)], this.items).map((e) => e.url));
     for (const u of Object.keys(this.items)) if (!used.has(u)) delete this.items[u];
-    // Each space's links: by hand, its branch's PR, its agents', less those hidden,
-    // then what they bring along; agents' the same, for the agents list.
+    // Each space's links: by hand on it and on its agents, then its branch's PR and its
+    // Claude sessions', less those hidden, then what they bring along; agents' the same,
+    // for the agents list.
     const cfg = linkSettings(shared("jj-links"));
     const shownOf = (own, auto, off) => {
       const mine = [...new Set([...own, ...auto.filter((u) => u && !off.has(u))])];
@@ -327,12 +343,14 @@ export default class Spaces extends View {
     };
     const as = agents();
     this.links = new Map(sp.map((s) => {
-      const auto = [branches[s.id], ...as.filter((a) => a.space === s.id).flatMap((a) => this.agentLinks[a.address] ?? [])];
-      return [s.id, shownOf(kept[s.id] ?? [], auto, new Set(hidden[s.id] ?? []))];
+      const mates = as.filter((a) => a.space === s.id);
+      const own = [...(kept[s.id] ?? []), ...mates.flatMap((a) => agentKept[a.address] ?? [])];
+      const auto = [branches[s.id], ...mates.flatMap((a) => this.agentLinks[a.address] ?? [])];
+      return [s.id, shownOf(own, auto, new Set(hidden[s.id] ?? []))];
     }));
     const shownAgents = {};
     for (const a of as) {
-      const urls = shownOf([], this.agentLinks[a.address] ?? [], new Set(hidden[a.space] ?? []));
+      const urls = shownOf(agentKept[a.address] ?? [], this.agentLinks[a.address] ?? [], new Set(hidden[a.space] ?? []));
       if (urls.length) shownAgents[a.address] = urls;
     }
     this.cards = new Set([...this.links.values(), ...Object.values(shownAgents)].flat().filter(isCard));

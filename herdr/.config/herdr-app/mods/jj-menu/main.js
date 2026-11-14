@@ -69,6 +69,7 @@ function items(p, git) {
             ]
           : []),
         ...(inTab && agents().some((a) => a.address === tg.terminal && claude(a)) ? [["Archive session", "jj-sessions", { action: "archive", terminals: [tg.terminal] }]] : []),
+        ...agents().filter((a) => a.address === tg.terminal).map((a) => ["Link PR or issue\u2026", "jj-spaces", { link: a.space, agent: a.address }]),
         ...(inTab ? [["Close pane", "pane.close", { pane: tg.pane }]] : []),
       ];
     }

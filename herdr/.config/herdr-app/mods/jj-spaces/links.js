@@ -1,11 +1,12 @@
-// The link dialog: a space's GitHub PRs and issues and Trello cards, those linked
-// by hand beside its branch's PR and its Claude sessions', then what those bring
-// along (a PR's issues, an issue's PRs, their Trello cards: "via #12"), then its
-// repo's open PRs to link. Typing filters both (a number picks that one; a URL or
-// owner/repo#12 is looked up). ^D (or the row's button) unlinks one linked by hand,
-// and hides the others from the space and its agents until ^D shows them again.
-// Both are kept on the space's machine (docs.js), so every screen shows the same.
-// A jj-spaces overlay with props { link: spaceId }.
+// The link dialog of a space, or of one of its agents: its GitHub PRs and issues and
+// Trello cards, those linked by hand (a space's include its agents') beside its
+// branch's PR and its Claude sessions', then what those bring along (a PR's issues,
+// an issue's PRs, their Trello cards: "via #12"), then its repo's open PRs to link.
+// Typing filters both (a number picks that one; a URL or owner/repo#12 is looked up).
+// ^D (or the row's button) unlinks one linked by hand, and hides the others from the
+// space and its agents until ^D shows them again. Both are kept on the space's
+// machine (docs.js), so every screen shows the same.
+// A jj-spaces overlay with props { link: spaceId, agent?: terminalAddress }.
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -15,6 +16,9 @@ import { linkSettings } from "./trello.js";
 import { editLinks, linksOf, split } from "./docs.js";
 
 const spaceOf = () => spaces().find((s) => s.id === props()?.link);
+const agentOf = () => agents().find((a) => a.address === props()?.agent);
+const nameOf = (a) => a.tab_name || a.title || a.address;
+const targetOf = () => (props()?.agent ? { agent: props().agent } : { space: props()?.link });
 const open = (url, cx) => cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
 
 export function linkInit(view, cx) {
@@ -35,11 +39,13 @@ export function linkInit(view, cx) {
   const s = spaceOf();
   if (!s) return;
   // The latest from its machine, once the sidebar has moved this screen's own links there.
-  const [on, bare] = split(s.id);
+  const [on] = split(s.id);
   if ((shared("github.links.moved") ?? []).includes(on ?? "")) {
     cx.spawn(async (cx) => {
       try {
-        cache(s.id, (await linksOf(on)).value[bare]);
+        const { value } = await linksOf(on);
+        cache({ space: s.id }, value.spaces[split(s.id)[1]]);
+        for (const a of agents().filter((a) => a.space === s.id)) cache({ agent: a.address }, value.agents[split(a.address)[1]]);
       } catch {}
       cx.notify();
     });
@@ -61,9 +67,14 @@ export function linkInit(view, cx) {
   });
 }
 
-// A space's { links, hidden } into this screen's copy of them.
-function cache(id, entry) {
-  for (const [key, list] of [["github.links", entry?.links ?? []], ["github.hidden", entry?.hidden ?? []]]) {
+// Where this screen keeps a space's or an agent's copy: { key: list } by its id.
+const keysOf = (target) => (target.agent ? { links: "github.agent-links" } : { links: "github.links", hidden: "github.hidden" });
+
+// A space's { links, hidden } or an agent's { links } into this screen's copy of them.
+function cache(target, entry) {
+  const id = target.agent ?? target.space;
+  for (const [field, key] of Object.entries(keysOf(target))) {
+    const list = entry?.[field] ?? [];
     const { [id]: _, ...rest } = shared(key) ?? {};
     const next = list.length ? { ...rest, [id]: list } : rest;
     if (JSON.stringify(next) !== JSON.stringify(shared(key) ?? {})) setShared(key, next);
@@ -71,11 +82,13 @@ function cache(id, entry) {
 }
 
 // Shows a change at once, then makes it on the space's machine.
-function save(view, id, change, cx) {
-  cache(id, change({ links: shared("github.links")?.[id] ?? [], hidden: shared("github.hidden")?.[id] ?? [] }));
+function save(view, target, change, cx) {
+  const id = target.agent ?? target.space;
+  cache(target, change({ links: shared(keysOf(target).links)?.[id] ?? [], hidden: shared("github.hidden")?.[id] ?? [] }));
   cx.spawn(async (cx) => {
     try {
-      cache(id, (await editLinks(id, change))[split(id)[1]]);
+      const doc = await editLinks(target, change);
+      cache(target, doc[target.agent ? "agents" : "spaces"][split(id)[1]]);
     } catch (e) {
       view.error = `Couldn't save it on ${split(id)[0] ?? "this computer"}: ${e?.message ?? e}`;
     }
@@ -87,10 +100,9 @@ const add = (list, url) => (list.includes(url) ? list : [...list, url]);
 const without = (list, url) => list.filter((u) => u !== url);
 
 function link(view, it, cx) {
-  const id = props()?.link;
-  if (!id) return;
+  if (!props()?.link) return;
   view.resolved[it.url] = it;
-  save(view, id, (e) => ({ ...e, links: add(e.links, it.url) }), cx);
+  save(view, targetOf(), (e) => ({ ...e, links: add(e.links, it.url) }), cx);
   view.input.set_value("");
 }
 
@@ -115,11 +127,12 @@ function enter(view, cx) {
   });
 }
 
-// Unlinks a row linked by hand; hides or shows again one from the branch or Claude.
+// Unlinks a row from the space or agent it was linked to by hand; hides or shows
+// again one from the branch or Claude, in the space.
 function drop(view, id, r, cx) {
   if (!r || r.pr) return;
-  if (r.own) save(view, id, (e) => ({ ...e, links: without(e.links, r.url) }), cx);
-  else save(view, id, (e) => ({ ...e, hidden: r.hidden ? without(e.hidden, r.url) : add(e.hidden, r.url) }), cx);
+  if (r.owner) save(view, r.owner, (e) => ({ ...e, links: without(e.links, r.url) }), cx);
+  else save(view, { space: id }, (e) => ({ ...e, hidden: r.hidden ? without(e.hidden, r.url) : add(e.hidden, r.url) }), cx);
 }
 
 const REFERENCE = /github\.com\/|trello\.com\/c\/|^[\w.-]+\/[\w.-]+#\d+$/;
@@ -141,6 +154,7 @@ export function linkRender(view) {
   const t = theme();
   const s = spaceOf();
   const id = props()?.link;
+  const agent = props()?.agent ? agentOf() ?? { address: props().agent } : null;
   const gh = shared("github") ?? {};
   const items = { ...view.resolved, ...(gh.items ?? {}) };
   const hidden = new Set(shared("github.hidden")?.[id] ?? []);
@@ -148,14 +162,22 @@ export function linkRender(view) {
   const wanted = filter(text);
   const linked = [];
   const seen = new Set();
-  const push = (url, from, own) => {
+  const push = (url, from, owner) => {
     if (!url || seen.has(url)) return;
     seen.add(url);
-    linked.push({ url, from, own, hidden: !own && hidden.has(url) });
+    linked.push({ url, from, owner, hidden: !owner && hidden.has(url) });
   };
-  for (const url of shared("github.links")?.[id] ?? []) push(url, "linked", true);
-  push(gh.branches?.[id], "branch");
-  for (const a of agents().filter((a) => a.space === id)) for (const url of gh.agents?.[a.address] ?? []) push(url, `Claude · ${a.tab_name || a.title || a.address}`);
+  const handLinks = (a) => shared("github.agent-links")?.[a.address] ?? [];
+  if (agent) {
+    for (const url of handLinks(agent)) push(url, "linked", { agent: agent.address });
+    for (const url of gh.agents?.[agent.address] ?? []) push(url, "Claude session");
+  } else {
+    const mates = agents().filter((a) => a.space === id);
+    for (const url of shared("github.links")?.[id] ?? []) push(url, "linked", { space: id });
+    for (const a of mates) for (const url of handLinks(a)) push(url, nameOf(a), { agent: a.address });
+    push(gh.branches?.[id], "branch");
+    for (const a of mates) for (const url of gh.agents?.[a.address] ?? []) push(url, `Claude · ${nameOf(a)}`);
+  }
   const shown = linked.filter((r) => !r.hidden).map((r) => r.url);
   for (const e of expand(shown, items, linkSettings(shared("jj-links")))) if (e.via) push(e.url, `via ${via(items[e.via])}`);
   const mine = linked.filter((r) => wanted(items[r.url], r.url));
@@ -164,7 +186,7 @@ export function linkRender(view) {
   view.rows = [...mine, ...others];
   view.at = Math.min(view.at, Math.max(0, view.rows.length - 1));
   const selected = view.rows[view.at];
-  const verb = (r) => (r.own ? "unlink" : r.hidden ? "show" : "hide");
+  const verb = (r) => (r.owner ? "unlink" : r.hidden ? "show" : "hide");
 
   const base = (r, i) => h_flex()
     .id(`${r.pr ? "open" : "link"}-${r.url}`)
@@ -185,7 +207,7 @@ export function linkRender(view) {
     .child(div().flex_none().max_w(160).truncate().text_size(11).text_color(t.dim).child(r.hidden ? `hidden · ${r.from}` : r.from))
     .child(div().id(`drop-${r.url}`).flex_none().p(2).rounded(4).text_color(t.dim)
       .hover((el) => el.bg(t.selected).text_color(t.foreground))
-      .tooltip(r.own ? "Unlink" : r.hidden ? "Show in the sidebar" : "Hide from the sidebar")
+      .tooltip(r.owner ? "Unlink" : r.hidden ? "Show in the sidebar" : "Hide from the sidebar")
       .on_click((_e, cx) => { cx.stop_propagation(); drop(view, id, r, cx); })
       .child(svg(`mods/workspace-chrome/${r.hidden ? "plus" : "x"}.svg`).size(12)));
   const openRow = (r, i) => base(r, i)
@@ -207,7 +229,9 @@ export function linkRender(view) {
   for (const r of others) { view.childOf[n] = children.length; children.push(openRow(r, n++)); }
   const empty = !view.rows.length && view.open !== undefined;
   const why = !text
-    ? "Nothing linked yet. Its branch's PR and PRs its Claude sessions open show up here too, with their issues and Trello cards."
+    ? agent
+      ? "Nothing linked to this agent yet. PRs its Claude session opens show up here too, with their issues and Trello cards."
+      : "Nothing linked yet. Its branch's PR and PRs its Claude sessions open show up here too, with their issues and Trello cards."
     : REFERENCE.test(text) ? "↵ looks it up."
     : /^#?\d+$/.test(text) ? `${text.replace(/^#?/, "#")} isn't here: ↵ looks it up on GitHub.`
     : "Nothing matches.";
@@ -239,7 +263,8 @@ export function linkRender(view) {
     .gap(10)
     .bg(t.popover)
     .text_size(13)
-    .child(div().flex_none().truncate().font_semibold().text_color(t.foreground).child(`Links${s ? ` of ${s.name}` : ""}`))
+    .child(div().flex_none().truncate().font_semibold().text_color(t.foreground)
+      .child(agent ? `Links of ${agent.pane ? nameOf(agent) : "the agent"}${s ? ` in ${s.name}` : ""}` : `Links${s ? ` of ${s.name}` : ""}`))
     .child(Input.new(view.input).h(32).px(10).flex_none().items_center().rounded(6).border(1).border_color(t.accent).bg(t.background).text_color(t.foreground))
     .when(Boolean(view.error), (el) => el.child(div().flex_none().text_color(t.blocked).child(view.error)))
     .child(v_flex().id("link-list").flex_1().min_h(0).overflow_y_scrollbar().track_scroll(view.scroll)
