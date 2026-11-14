@@ -1,7 +1,8 @@
-// Hand-made links, kept on the machine each space lives on: herdr-core's `jj-links`
-// document there, { "<space id>": { links: [url], hidden: [url] } } with that machine's
-// bare ids, so every screen showing a space sees and edits the same ones. Asked through
-// `hc connect`; doc.set only writes over the version it was given.
+// Hand-made links, kept on the machine each space and agent lives on: herdr-core's
+// `jj-links` document there, { spaces: { "<space id>": { links, hidden } },
+// agents: { "<terminal address>": { links } } } with that machine's bare ids, so every
+// screen sees and edits the same ones. Asked through `hc connect`; doc.set only writes
+// over the version it was given.
 
 import { exec } from "herdr";
 
@@ -13,7 +14,8 @@ let edits = 0;
 // doesn't put back what it changed.
 export const edited = () => edits;
 
-// [machine or null, the id there] of a space id as this screen names it ("macwg/sp…").
+// [machine or null, the id there] of a space id or terminal address as this screen
+// names it ("macwg/sp…", "macwg/t7").
 export const split = (id) => {
   const at = id.indexOf("/");
   return at === -1 ? [null, id] : [id.slice(0, at), id.slice(at + 1)];
@@ -34,9 +36,18 @@ async function call(method, params, on) {
   return reply.result;
 }
 
+// The first documents were only spaces' entries, at the top.
+const shaped = (stored) => {
+  const { spaces = {}, agents = {}, ...old } = stored ?? {};
+  return { spaces: { ...old, ...spaces }, agents };
+};
+
+// The core keeps keys sorted: compared without their order.
+const canon = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
+
 export async function linksOf(on) {
   const r = await call("doc.get", { name: NAME }, on);
-  return { value: r.value ?? {}, version: r.version };
+  return { value: shaped(r.value), version: r.version, stored: r.value ?? null };
 }
 
 // Writes `update(doc)` (a fresh copy to change) over the machine's document, reading it
@@ -44,9 +55,9 @@ export async function linksOf(on) {
 export async function updateLinks(on, update) {
   let failed;
   for (let i = 0; i < 3; i++) {
-    const { value, version } = await linksOf(on);
+    const { value, version, stored } = await linksOf(on);
     const next = update(JSON.parse(JSON.stringify(value)));
-    if (JSON.stringify(next) === JSON.stringify(value)) return value;
+    if (canon(next) === canon(stored ?? value)) return next;
     try {
       await call("doc.set", { name: NAME, value: next, version }, on);
       return next;
@@ -57,15 +68,18 @@ export async function updateLinks(on, update) {
   throw failed;
 }
 
-// One space's { links, hidden } through `change`; a space with neither is left out.
-export async function editLinks(id, change) {
-  const [on, bare] = split(id);
+// A space's { links, hidden } ({ space: id }) or an agent's { links } ({ agent: address })
+// through `change`; one with nothing left is left out.
+export async function editLinks(target, change) {
+  const kind = target.agent ? "agents" : "spaces";
+  const [on, bare] = split(target.agent ?? target.space);
   edits++;
   try {
     return await updateLinks(on, (doc) => {
-      const entry = change({ links: doc[bare]?.links ?? [], hidden: doc[bare]?.hidden ?? [] });
-      if (entry.links.length || entry.hidden.length) doc[bare] = entry;
-      else delete doc[bare];
+      const was = doc[kind][bare];
+      const entry = change({ links: was?.links ?? [], hidden: was?.hidden ?? [] });
+      if (!entry.links.length && !entry.hidden?.length) delete doc[kind][bare];
+      else doc[kind][bare] = kind === "agents" ? { links: entry.links } : { links: entry.links, hidden: entry.hidden ?? [] };
       return doc;
     });
   } finally {

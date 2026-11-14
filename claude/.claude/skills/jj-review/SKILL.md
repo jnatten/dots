@@ -15,7 +15,7 @@ If the user names a revision or revset, review that instead of `trunk()..@`. If 
 - `jj diff -r 'trunk()..@' --stat`, then `jj diff -r 'trunk()..@' --git`.
 - Read every changed file in full, not just the hunks.
 - Find the consumers of each changed export, type, config key, env var, route or schema, and read the call sites.
-- If the change is a GitHub PR, link it to this Herdr space with `node ~/.claude/skills/jj-review/herdr-link.mjs <pr url>`. It does nothing outside Herdr. The PR is the one the user named, else the open PR of a bookmark on the stack: `gh pr view <name> --json url,state` for each name from `jj log -r 'trunk()..@' --no-graph -T 'local_bookmarks.map(|b| b.name()).join("\n") ++ "\n"'`. No PR: skip it.
+- If the change is a GitHub PR, link it to this agent in Herdr with `node ~/.claude/skills/jj-review/herdr-link.mjs <pr url>`. It does nothing outside Herdr. The PR is the one the user named, else the open PR of a bookmark on the stack: `gh pr view <name> --json url,state` for each name from `jj log -r 'trunk()..@' --no-graph -T 'local_bookmarks.map(|b| b.name()).join("\n") ++ "\n"'`. No PR: skip it.
 
 ## 2. Run the checks
 
