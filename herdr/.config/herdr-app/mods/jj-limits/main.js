@@ -1,10 +1,12 @@
 // Claude Code plan limits as pies at the bottom of the sidebar, from the file the
 // Claude status line writes (claude/.claude/hooks/statusline.sh in dots), then
-// the Spacing and Settings buttons.
+// the Spacing and Settings buttons. It also keeps the spacing dialog's settings in
+// jj-settings.json (settings.js).
 
 import { View, div, svg, PathBuilder } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { theme, home, readTextFile, watchFolder, layout, run } from "herdr";
+import { syncSettings } from "./settings.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -52,6 +54,7 @@ const until = (s) => {
 export default class Limits extends View {
   init(_props, cx) {
     this.limits = null;
+    syncSettings(cx);
     this.read(cx);
     cx.timer.every(60000, (cx) => this.read(cx));
     cx.spawn(async (cx) => {

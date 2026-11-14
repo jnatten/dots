@@ -13,7 +13,8 @@ home folder, `~/.config/herdr-app`:
 
 `~/.config/herdr-app` is Herdr's own folder. Only the files in the dots package
 `~/dev/dots/herdr/.config/herdr-app` are this setup's: the `jj` layout, `keys.json`,
-`settings.json`, this file and the `mods/jj-*` mods. They're linked into Herdr's folder with
+`settings.json`, `jj-settings.json` (the spacing dialog's hints and links, which
+`jj-limits` keeps in sync with `shared()`), this file and the `mods/jj-*` mods. They're linked into Herdr's folder with
 `stow herdr --target ~` from `~/dev/dots`, so edit them in dots and run stow after
 adding a file. Everything else in `~/.config/herdr-app` is Herdr's: clone shipped
 mods and layouts (`mod.clone`, `layout.clone`) rather than editing them.

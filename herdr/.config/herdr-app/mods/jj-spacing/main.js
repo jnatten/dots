@@ -5,6 +5,7 @@
 // Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
 // an issue's PRs, Trello cards) and where 1Password keeps the Trello key and token,
 // kept as shared("jj-links"); Connect asks 1Password again (shared("jj-links.connect")).
+// What isn't in the layout is saved in jj-settings.json by jj-limits.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
@@ -83,20 +84,16 @@ function spacing(root, values) {
   root.terminal_padding = [values.padX, values.padY];
 }
 
-// A hidden header is kept in localStorage, so showing it again brings back its mod and size.
+// A hidden header is kept as shared("jj-spacing.header"), so showing it again brings back its mod and size.
 function bars(root, mode) {
   const frame = frameOf(root);
   if (!frame) return;
   if (mode === "none") {
-    if (frame.header) localStorage.setItem("header", JSON.stringify(frame.header));
+    if (frame.header) setShared("jj-spacing.header", frame.header);
     delete frame.header;
     return;
   }
-  let kept = null;
-  try {
-    kept = JSON.parse(localStorage.getItem("header") ?? "null");
-  } catch {}
-  frame.header = { ...(frame.header ?? kept ?? HEADER), reveal: mode };
+  frame.header = { ...(frame.header ?? shared("jj-spacing.header") ?? HEADER), reveal: mode };
 }
 
 const isOn = (p) => shared(HINTS)?.[p.id] ?? p.on;

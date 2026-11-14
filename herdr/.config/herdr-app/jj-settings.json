@@ -1,0 +1,17 @@
+{
+  "jj-copy.hints": {
+    "email": true
+  },
+  "jj-links": {
+    "key": "op://Private/herdr-trello/username",
+    "token": "op://Private/herdr-trello/password"
+  },
+  "jj-spacing.header": {
+    "content": {
+      "mod": "pane"
+    },
+    "reveal": "hover",
+    "height": 26,
+    "position": "top"
+  }
+}
