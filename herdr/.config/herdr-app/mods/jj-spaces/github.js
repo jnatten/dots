@@ -188,39 +188,55 @@ export async function fetchGitHub(urls, branches) {
   return out;
 }
 
-// Small state-colored icons with their numbers; a click opens the link.
-export function badges(urls, items, t, id, max) {
-  const dark = Boolean(settings()?.dark);
-  const badge = (url) => {
-    const it = items[url] ?? unknown(url, 0);
-    const s = GH[it.state];
-    const color = s ? s.color[dark ? 1 : 0] : t.dim;
-    const icon = s?.icon ?? (it.kind === "issue" ? GH["issue-open"].icon : it.kind === "trello" ? GH["trello-open"].icon : GH.open.icon);
-    const tip = tipOf(it, s);
-    return h_flex()
-      .id(`${id}-${url}`)
-      .flex_none()
-      .gap(2)
-      .items_center()
-      .text_size(11)
-      .text_color(color)
-      .cursor_pointer()
-      .tooltip(tip)
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-      .on_click((_e, cx) => {
-        cx.stop_propagation();
-        cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
-      })
-      .child(div().flex_none().child(svg(icon).size(11)))
-      .child(String(it.number ?? "?"));
-  };
-  const rest = urls.slice(max);
+const open = (url, cx) => cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
+const iconOf = (it, s) => s?.icon ?? (it.kind === "issue" ? GH["issue-open"].icon : it.kind === "trello" ? GH["trello-open"].icon : GH.open.icon);
+const colorOf = (s, t) => (s ? s.color[settings()?.dark ? 1 : 0] : t.dim);
+
+// A state-colored icon with its number, for the link dialog; a click opens the link.
+export function badge(url, items, t, id) {
+  const it = items[url] ?? unknown(url, 0);
+  const s = GH[it.state];
+  return h_flex()
+    .id(id)
+    .flex_none()
+    .gap(2)
+    .items_center()
+    .text_size(11)
+    .text_color(colorOf(s, t))
+    .cursor_pointer()
+    .tooltip(tipOf(it, s))
+    .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+    .on_click((_e, cx) => { cx.stop_propagation(); open(url, cx); })
+    .child(div().flex_none().child(svg(iconOf(it, s)).size(11)))
+    .child(String(it.number ?? "?"));
+}
+
+// One icon per kind (PR, issue, Trello card), in the state of the one most worth a
+// look (open before done, known before unknown), with how many when more than one.
+// A click opens the link, or calls `many` (the link dialog) when there are several.
+export function kinds(urls, items, t, id, many) {
+  const rank = (u) => (!GH[items[u]?.state] ? 2 : FINAL.has(items[u].state) ? 1 : 0);
+  const groups = ["pr", "issue", "trello"].map((kind) => urls.filter((u) => (items[u] ?? unknown(u, 0)).kind === kind)).filter((g) => g.length);
   return h_flex()
     .flex_none()
     .gap(6)
     .items_center()
-    .children(urls.slice(0, max).map(badge))
-    .when(rest.length > 0, (el) => el.child(div().id(`${id}-more`).flex_none().text_size(11).text_color(t.dim)
-      .tooltip(rest.map((u) => (items[u] ? tipOf(items[u], GH[items[u].state]) : u)).join("\n"))
-      .child(`+${rest.length}`)));
+    .children(groups.map((g) => {
+      const lead = g.reduce((a, b) => (rank(b) < rank(a) ? b : a));
+      const it = items[lead] ?? unknown(lead, 0);
+      const s = GH[it.state];
+      return h_flex()
+        .id(`${id}-${it.kind}`)
+        .flex_none()
+        .gap(2)
+        .items_center()
+        .text_size(11)
+        .text_color(colorOf(s, t))
+        .cursor_pointer()
+        .tooltip(g.map((u) => { const x = items[u] ?? unknown(u, 0); return tipOf(x, GH[x.state]); }).join("\n"))
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click((_e, cx) => { cx.stop_propagation(); g.length > 1 ? many() : open(lead, cx); })
+        .child(div().flex_none().child(svg(iconOf(it, s)).size(11)))
+        .when(g.length > 1, (el) => el.child(String(g.length)));
+    }));
 }

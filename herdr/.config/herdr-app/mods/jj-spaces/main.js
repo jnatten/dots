@@ -11,7 +11,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
-import { FINAL, badges, branchName, expand, fetchGitHub, githubRepo, isCard, scanAgent } from "./github.js";
+import { FINAL, branchName, expand, fetchGitHub, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
 import { linkInit, linkRender } from "./links.js";
 
@@ -614,7 +614,7 @@ export default class Spaces extends View {
           .child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?"))
           .child(div().flex_shrink(1).min_w(48).max_w(150).truncate().text_color(t.foreground).child(w.name))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
-          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(badges(this.links.get(w.id), this.items, t, `gh-${w.id}`, 3)))
+          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id))))
           .when(Boolean(g?.top), (el) => {
             const count = this.archivedIn(g.top, g.linked ? [] : Object.values(this.git).filter((k) => k?.linked && k.repo === g.repo).map((k) => k.top));
             return count > 0 ? el.child(this.archiveBadge(count, t)) : el;
