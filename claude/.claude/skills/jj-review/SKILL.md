@@ -5,7 +5,7 @@ description: Review the jj change stack trunk()..@ and report regressions, risks
 
 # jj review
 
-Review only. Do not commit, push or edit files. No `jj` commands that change the repo (new, edit, describe, squash, rebase, abandon), no `--fix`, no formatter writes, no snapshot updates. Clearing caches in step 2 is the only allowed file change.
+Review only. Do not commit, push or edit files. No `jj` commands that change the repo (new, edit, describe, squash, rebase, abandon), no `--fix`, no formatter writes, no snapshot updates. Clearing caches in step 2 is the only allowed file change. Linking the PR in Herdr (step 1) changes no files and is allowed.
 
 If the user names a revision or revset, review that instead of `trunk()..@`. If `trunk()` resolves to the root commit, ask what to compare against.
 
@@ -15,6 +15,7 @@ If the user names a revision or revset, review that instead of `trunk()..@`. If 
 - `jj diff -r 'trunk()..@' --stat`, then `jj diff -r 'trunk()..@' --git`.
 - Read every changed file in full, not just the hunks.
 - Find the consumers of each changed export, type, config key, env var, route or schema, and read the call sites.
+- If the change is a GitHub PR, link it to this Herdr space with `node ~/.claude/skills/jj-review/herdr-link.mjs <pr url>`. It does nothing outside Herdr. The PR is the one the user named, else the open PR of a bookmark on the stack: `gh pr view <name> --json url,state` for each name from `jj log -r 'trunk()..@' --no-graph -T 'local_bookmarks.map(|b| b.name()).join("\n") ++ "\n"'`. No PR: skip it.
 
 ## 2. Run the checks
 
