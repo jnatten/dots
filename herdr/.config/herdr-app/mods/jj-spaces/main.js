@@ -6,13 +6,15 @@
 // those its Claude sessions opened, each with the issues or PRs it's linked to
 // and the Trello cards in their descriptions. This copy asks GitHub and Trello
 // about all of them and shares what it learns as shared("github") for the agents
-// list, the link dialog and the spacing dialog's Links tab.
+// list, the link dialog and the spacing dialog's Links tab. Those linked by hand
+// live on the space's machine (docs.js), copied into shared("github.links").
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
 import { FINAL, branchName, expand, fetchGitHub, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
+import { edited, split, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
 
 function find(node, id) {
@@ -109,6 +111,8 @@ export default class Spaces extends View {
     this.scanQueue = new Set();
     this.stale = new Set(); // urls to ask GitHub about again now
     this.ghRetry = 0;
+    this.linksAt = 0;
+    this.missing = new Set(); // "machine\0space" with links whose space wasn't there at the last sync
     this.cards = new Set(); // Trello card urls shown somewhere
     this.trelloRetry = 0;
     this.trelloBlocked = null; // refsOf() and connect when 1Password said no
@@ -132,6 +136,66 @@ export default class Spaces extends View {
     this.claudeDue(cx);
     this.githubDue(now, sp, ps, cx);
     this.trelloDue(now, cx);
+    this.linksDue(now, cx);
+  }
+
+  // Hand-made links from each machine's core into shared("github.links") and
+  // shared("github.hidden"), where the rows, the agents list and the dialog read them.
+  // A space missing at two syncs in a row on a machine whose layout is in loses its
+  // links there; the first time per machine, what this screen kept itself is moved in.
+  linksDue(now, cx) {
+    if (this.syncing || now - this.linksAt < (window().active ? 10000 : 60000)) return;
+    this.syncing = true;
+    this.linksAt = now;
+    const before = edited();
+    cx.spawn(async (cx) => {
+      const known = machines();
+      const names = new Set(known.map((m) => m.name ?? null));
+      const cache = { "github.links": {}, "github.hidden": {} };
+      for (const [key, into] of Object.entries(cache))
+        for (const [id, urls] of Object.entries(shared(key) ?? {})) if (urls?.length && names.has(machineOf(id))) into[id] = urls;
+      const moved = new Set(shared("github.links.moved") ?? []);
+      const missing = new Set();
+      for (const m of known.filter((m) => m.layout === "ready")) {
+        const on = m.name ?? null;
+        const mine = (id) => machineOf(id) === on;
+        const here = new Set(spaces().filter((s) => (s.machine ?? null) === on).map((s) => split(s.id)[1]));
+        const move = !moved.has(on ?? "");
+        try {
+          const doc = await updateLinks(on, (doc) => {
+            if (move) {
+              const ids = new Set([...Object.keys(cache["github.links"]), ...Object.keys(cache["github.hidden"])].filter(mine));
+              for (const id of ids) {
+                const bare = split(id)[1];
+                const join = (key, field) => [...new Set([...(doc[bare]?.[field] ?? []), ...(cache[key][id] ?? [])])];
+                doc[bare] = { links: join("github.links", "links"), hidden: join("github.hidden", "hidden") };
+              }
+            }
+            for (const bare of Object.keys(doc)) {
+              if (here.has(bare)) continue;
+              const k = `${on ?? ""}\0${bare}`;
+              if (this.missing.has(k)) delete doc[bare];
+              else missing.add(k);
+            }
+            return doc;
+          });
+          for (const into of Object.values(cache)) for (const id of Object.keys(into)) if (mine(id)) delete into[id];
+          for (const [bare, e] of Object.entries(doc)) {
+            const id = on ? `${on}/${bare}` : bare;
+            if (e.links?.length) cache["github.links"][id] = e.links;
+            if (e.hidden?.length) cache["github.hidden"][id] = e.hidden;
+          }
+          moved.add(on ?? "");
+        } catch {}
+      }
+      this.missing = missing;
+      if (edited() === before) {
+        for (const [key, value] of Object.entries(cache)) if (JSON.stringify(value) !== JSON.stringify(shared(key) ?? {})) setShared(key, value);
+        if (moved.size !== (shared("github.links.moved") ?? []).length) setShared("github.links.moved", [...moved]);
+      } else this.linksAt = 0;
+      this.syncing = false;
+      cx.notify();
+    });
   }
 
   // Claude sessions to read for PR links: new ones, and those whose turn just ended.
@@ -241,19 +305,10 @@ export default class Spaces extends View {
   }
 
   // What the other mods read: every linked item's state, agents' PRs and spaces'
-  // branch PRs. Written only when it changed; links and hidden ones of gone spaces
-  // are dropped once their machine's layout is in.
+  // branch PRs. Written only when it changed.
   publish(sp, ps) {
-    const ids = new Set(sp.map((s) => s.id));
-    const ready = new Set(machines().filter((m) => m.layout === "ready").map((m) => m.name ?? null));
-    const prune = (key) => {
-      const all = shared(key) ?? {};
-      const kept = Object.fromEntries(Object.entries(all).filter(([id, urls]) => urls?.length && (ids.has(id) || !ready.has(machineOf(id)))));
-      if (Object.keys(kept).length !== Object.keys(all).length) setShared(key, kept);
-      return kept;
-    };
-    const kept = prune("github.links");
-    const hidden = prune("github.hidden");
+    const kept = shared("github.links") ?? {};
+    const hidden = shared("github.hidden") ?? {};
     const branches = {};
     for (const s of sp) {
       const k = this.branchKey(s, ps);
