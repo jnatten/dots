@@ -597,7 +597,7 @@ export default class Spaces extends View {
       .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
       .when(!collapsed, (el) => el.child(div().flex_1().child("Waiting")))
       .child(div().flex_none().text_color(!open && top ? t[top] : t.dim).child(String(waiting.length)));
-    return [collapsed ? railCell(head) : head, ...(open ? waiting.map(draw) : [])];
+    return [collapsed ? railCell(head) : head, ...(open ? waiting.map((r) => (collapsed ? draw(r) : this.row(r, t, true))) : [])];
   }
 
   // The rows, under a header per machine once one isn't this computer.
@@ -688,7 +688,8 @@ export default class Spaces extends View {
       .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
   }
 
-  row({ w, i, g }, t) {
+  // `where`: a server icon names another machine's space (the Waiting section has no machine headers).
+  row({ w, i, g }, t, where = false) {
     const on = w.active;
     const fromIndex = this.pressed === null ? -1 : spaces().findIndex(s => s.id === this.pressed);
     const colors = shared("space.colors") ?? {};
@@ -740,6 +741,8 @@ export default class Spaces extends View {
           .items_center()
           .child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?"))
           .child(div().flex_shrink(1).min_w(48).max_w(150).truncate().text_color(t.foreground).child(w.name))
+          .when(where && Boolean(w.machine), (el) => el.child(div().id(`space-machine-${w.id}`).flex_none().text_color(t.dim).tooltip(w.machine)
+            .child(svg("mods/workspace-chrome/server.svg").size(11))))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
           .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id))))
           .when(Boolean(g?.top), (el) => {
