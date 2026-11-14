@@ -3,14 +3,16 @@
 // along (a PR's issues, an issue's PRs, their Trello cards: "via #12"), then its
 // repo's open PRs to link. Typing filters both (a number picks that one; a URL or
 // owner/repo#12 is looked up). ^D (or the row's button) unlinks one linked by hand,
-// and hides the others from the space and its agents (shared("github.hidden"))
-// until ^D shows them again. A jj-spaces overlay with props { link: spaceId }.
+// and hides the others from the space and its agents until ^D shows them again.
+// Both are kept on the space's machine (docs.js), so every screen shows the same.
+// A jj-spaces overlay with props { link: spaceId }.
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
 import { props, closeOverlay, theme, spaces, panes, agents, exec, shared, setShared } from "herdr";
 import { badge, expand, githubRepo, openPrs, resolve } from "./github.js";
 import { linkSettings } from "./trello.js";
+import { editLinks, linksOf, split } from "./docs.js";
 
 const spaceOf = () => spaces().find((s) => s.id === props()?.link);
 const open = (url, cx) => cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
@@ -32,6 +34,16 @@ export function linkInit(view, cx) {
   view.input.focus();
   const s = spaceOf();
   if (!s) return;
+  // The latest from its machine, once the sidebar has moved this screen's own links there.
+  const [on, bare] = split(s.id);
+  if ((shared("github.links.moved") ?? []).includes(on ?? "")) {
+    cx.spawn(async (cx) => {
+      try {
+        cache(s.id, (await linksOf(on)).value[bare]);
+      } catch {}
+      cx.notify();
+    });
+  }
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
   const folder = panes().find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
   cx.spawn(async (cx) => {
@@ -49,20 +61,43 @@ export function linkInit(view, cx) {
   });
 }
 
-function link(view, it) {
+// A space's { links, hidden } into this screen's copy of them.
+function cache(id, entry) {
+  for (const [key, list] of [["github.links", entry?.links ?? []], ["github.hidden", entry?.hidden ?? []]]) {
+    const { [id]: _, ...rest } = shared(key) ?? {};
+    const next = list.length ? { ...rest, [id]: list } : rest;
+    if (JSON.stringify(next) !== JSON.stringify(shared(key) ?? {})) setShared(key, next);
+  }
+}
+
+// Shows a change at once, then makes it on the space's machine.
+function save(view, id, change, cx) {
+  cache(id, change({ links: shared("github.links")?.[id] ?? [], hidden: shared("github.hidden")?.[id] ?? [] }));
+  cx.spawn(async (cx) => {
+    try {
+      cache(id, (await editLinks(id, change))[split(id)[1]]);
+    } catch (e) {
+      view.error = `Couldn't save it on ${split(id)[0] ?? "this computer"}: ${e?.message ?? e}`;
+    }
+    cx.notify();
+  });
+}
+
+const add = (list, url) => (list.includes(url) ? list : [...list, url]);
+const without = (list, url) => list.filter((u) => u !== url);
+
+function link(view, it, cx) {
   const id = props()?.link;
   if (!id) return;
   view.resolved[it.url] = it;
-  const links = shared("github.links") ?? {};
-  const mine = links[id] ?? [];
-  if (!mine.includes(it.url)) setShared("github.links", { ...links, [id]: [...mine, it.url] });
+  save(view, id, (e) => ({ ...e, links: add(e.links, it.url) }), cx);
   view.input.set_value("");
 }
 
 // ↵: links the chosen open PR, opens the chosen linked one, or looks up what's typed.
 function enter(view, cx) {
   const sel = view.rows[view.at];
-  if (sel?.pr) return link(view, sel.pr);
+  if (sel?.pr) return link(view, sel.pr, cx);
   if (sel) return open(sel.url, cx);
   const text = view.input.value();
   if (view.busy || !text.trim()) return;
@@ -71,7 +106,7 @@ function enter(view, cx) {
   cx.notify();
   cx.spawn(async (cx) => {
     try {
-      link(view, await resolve(text, view.repo));
+      link(view, await resolve(text, view.repo), cx);
     } catch (e) {
       view.error = String(e?.message ?? e);
     }
@@ -81,12 +116,10 @@ function enter(view, cx) {
 }
 
 // Unlinks a row linked by hand; hides or shows again one from the branch or Claude.
-function drop(id, r) {
+function drop(view, id, r, cx) {
   if (!r || r.pr) return;
-  const key = r.own ? "github.links" : "github.hidden";
-  const all = shared(key) ?? {};
-  const mine = all[id] ?? [];
-  setShared(key, { ...all, [id]: r.own || r.hidden ? mine.filter((u) => u !== r.url) : [...mine, r.url] });
+  if (r.own) save(view, id, (e) => ({ ...e, links: without(e.links, r.url) }), cx);
+  else save(view, id, (e) => ({ ...e, hidden: r.hidden ? without(e.hidden, r.url) : add(e.hidden, r.url) }), cx);
 }
 
 const REFERENCE = /github\.com\/|trello\.com\/c\/|^[\w.-]+\/[\w.-]+#\d+$/;
@@ -153,10 +186,10 @@ export function linkRender(view) {
     .child(div().id(`drop-${r.url}`).flex_none().p(2).rounded(4).text_color(t.dim)
       .hover((el) => el.bg(t.selected).text_color(t.foreground))
       .tooltip(r.own ? "Unlink" : r.hidden ? "Show in the sidebar" : "Hide from the sidebar")
-      .on_click((_e, cx) => { cx.stop_propagation(); drop(id, r); })
+      .on_click((_e, cx) => { cx.stop_propagation(); drop(view, id, r, cx); })
       .child(svg(`mods/workspace-chrome/${r.hidden ? "plus" : "x"}.svg`).size(12)));
   const openRow = (r, i) => base(r, i)
-    .on_click((_e, cx) => { link(view, r.pr); cx.notify(); })
+    .on_click((_e, cx) => { link(view, r.pr, cx); cx.notify(); })
     .child(div().w(52).flex_none().child(badge(r.url, { [r.url]: r.pr }, t, `open-badge-${r.url}`)))
     .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(r.pr.title))
     .child(div().flex_none().max_w(200).truncate().text_size(11).text_color(t.dim).child(r.pr.mine ? r.pr.branch : `${r.pr.author} · ${r.pr.branch}`));
@@ -195,7 +228,7 @@ export function linkRender(view) {
       if (e.key === "escape") return closeOverlay(props().overlay);
       if ((e.key === "down" || (ctrl && (e.key === "j" || e.key === "n"))) && count) view.at = (view.at + 1) % count;
       else if ((e.key === "up" || (ctrl && (e.key === "k" || e.key === "p"))) && count) view.at = (view.at + count - 1) % count;
-      else if (ctrl && e.key === "d") drop(id, selected);
+      else if (ctrl && e.key === "d") drop(view, id, selected, cx);
       else return;
       view.scroll.scroll_to_item(view.childOf[view.at] ?? 0);
       cx.stop_propagation();

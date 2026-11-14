@@ -19,6 +19,10 @@ home folder, `~/.config/herdr-app`:
 adding a file. Everything else in `~/.config/herdr-app` is Herdr's: clone shipped
 mods and layouts (`mod.clone`, `layout.clone`) rather than editing them.
 
+Links added by hand in the link dialog (ctrl-a g) aren't in any file: they live in
+the `jj-links` herdr-core document on the machine each space is on
+(`mods/jj-spaces/docs.js`), so every screen sees the same ones.
+
 ## Working on mods
 
 - **Check:** `herdr-app check ~/.config/herdr-app/mods/<mod>` after every change.
