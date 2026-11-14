@@ -1,17 +1,27 @@
 // GitHub PRs and issues for the sidebar: the ones Claude Code recorded in a
 // session (its transcript's "pr-link" lines, as Claude desktop reads them), the
 // PR of a branch, and the state of each, asked of GitHub with one GraphQL query.
+// Each comes with what it's linked to: a PR's issues, an issue's PRs, and the
+// Trello cards in their descriptions (trello.js asks Trello about those).
 
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { exec, settings } from "herdr";
 
 const PR = "__typename url number title state isDraft isInMergeQueue repository { nameWithOwner }";
-const ISSUE = "url number title state stateReason repository { nameWithOwner }";
-const NODE = `__typename ... on PullRequest { ${PR} } ... on Issue { ${ISSUE} }`;
+const ISSUE = "__typename url number title state stateReason repository { nameWithOwner }";
+const PR_LINKED = `${PR} body closingIssuesReferences(first: 10) { nodes { ${ISSUE} body } }`;
+const ISSUE_LINKED = `${ISSUE} body closedByPullRequestsReferences(first: 10, includeClosedPrs: true) { nodes { ${PR} body } }`;
+const NODE = `__typename ... on PullRequest { ${PR_LINKED} } ... on Issue { ${ISSUE_LINKED} }`;
 
-// GitHub's own colors, [light, dark]; merge-queued is the attention yellow.
-const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"];
+const CARD = /https?:\/\/(?:www\.)?trello\.com\/c\/([A-Za-z0-9]{8})/;
+export const cardUrl = (text) => { const m = (text ?? "").match(CARD); return m ? `https://trello.com/c/${m[1]}` : null; };
+export const isCard = (url) => CARD.test(url ?? "");
+const cardsIn = (body) => [...new Set([...(body ?? "").matchAll(new RegExp(CARD, "g"))].map((m) => `https://trello.com/c/${m[1]}`))];
+const linkedOf = (n) => (n.closingIssuesReferences ?? n.closedByPullRequestsReferences)?.nodes ?? [];
+
+// GitHub's own colors, [light, dark]; merge-queued is the attention yellow. Trello cards in its blue.
+const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"], BLUE = ["#0c66e4", "#579dff"];
 export const GH = {
   open: { icon: "mods/jj-spaces/git-pull-request.svg", color: GREEN, label: "Open" },
   draft: { icon: "mods/jj-spaces/git-pull-request-draft.svg", color: GRAY, label: "Draft" },
@@ -21,8 +31,11 @@ export const GH = {
   "issue-open": { icon: "mods/jj-spaces/circle-dot.svg", color: GREEN, label: "Open" },
   "issue-done": { icon: "mods/workspace-chrome/circle-check.svg", color: PURPLE, label: "Closed" },
   "issue-skip": { icon: "mods/jj-spaces/circle-slash.svg", color: GRAY, label: "Not planned" },
+  "trello-open": { icon: "mods/jj-spaces/trello.svg", color: BLUE, label: "" },
+  "trello-done": { icon: "mods/jj-spaces/trello.svg", color: PURPLE, label: "Done" },
+  "trello-archived": { icon: "mods/jj-spaces/trello.svg", color: GRAY, label: "Archived" },
 };
-export const FINAL = new Set(["merged", "closed", "issue-done", "issue-skip"]);
+export const FINAL = new Set(["merged", "closed", "issue-done", "issue-skip", "trello-done", "trello-archived"]);
 
 export function stateOf(n) {
   if (n.__typename === "Issue") return n.state === "OPEN" ? "issue-open" : n.stateReason === "NOT_PLANNED" ? "issue-skip" : "issue-done";
@@ -34,13 +47,52 @@ export function stateOf(n) {
 const parseUrl = (url) => url.match(/github\.com\/([^/]+\/[^/]+)\/(pull|issues)\/(\d+)/);
 
 export function itemOf(n, at) {
-  return { kind: n.__typename === "Issue" ? "issue" : "pr", url: n.url, repo: n.repository?.nameWithOwner ?? "", number: n.number, title: n.title ?? "", state: stateOf(n), at };
+  return { kind: n.__typename === "Issue" ? "issue" : "pr", url: n.url, repo: n.repository?.nameWithOwner ?? "", number: n.number, title: n.title ?? "", state: stateOf(n), at, links: linkedOf(n).map((l) => l.url), trello: cardsIn(n.body) };
 }
 
-// What a URL GitHub couldn't answer for shows: its number, dimmed.
-function unknown(url, at) {
+// A node and those it's linked to, into `items`. Those come without `links` of their
+// own (one hop), so they don't replace one asked about directly.
+function collect(n, at, items) {
+  items[n.url] = itemOf(n, at);
+  for (const l of linkedOf(n)) {
+    if (items[l.url]?.links) continue;
+    const { links: _, ...it } = itemOf(l, at);
+    items[l.url] = it;
+  }
+}
+
+// What a URL nobody could answer for shows: its number, dimmed.
+export function unknown(url, at) {
+  if (isCard(url)) return { kind: "trello", url, repo: "", list: "", number: null, title: "", state: "unknown", at };
   const m = parseUrl(url);
-  return { kind: m?.[2] === "issues" ? "issue" : "pr", url, repo: m?.[1] ?? "", number: Number(m?.[3]) || null, title: "", state: "unknown", at };
+  return { kind: m?.[2] === "issues" ? "issue" : "pr", url, repo: m?.[1] ?? "", number: Number(m?.[3]) || null, title: "", state: "unknown", at, links: [], trello: [] };
+}
+
+export function tipOf(it, s) {
+  if (it.kind === "trello") return [it.repo || "Trello card", it.list, s?.label, it.title].filter(Boolean).join(" · ");
+  return [`${it.repo}#${it.number ?? "?"}`, s?.label, it.title].filter(Boolean).join(" · ");
+}
+
+// `urls`, then what they bring along: a PR's issues and an issue's PRs (`related`),
+// and the Trello cards in any of their descriptions (`trello`). One hop only.
+// [{ url, via }], via: the URL it came with, null for those in `urls`.
+export function expand(urls, items, { related = true, trello = true } = {}) {
+  const out = [];
+  const seen = new Set();
+  const add = (url, via) => {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push({ url, via });
+  };
+  for (const url of urls) add(url, null);
+  for (const url of urls) {
+    const near = related ? (items[url]?.links ?? []) : [];
+    for (const l of near) add(l, url);
+    if (!trello) continue;
+    for (const c of items[url]?.trello ?? []) add(c, url);
+    for (const l of near) for (const c of items[l]?.trello ?? []) add(c, l);
+  }
+  return out;
 }
 
 // "owner/name" of a GitHub remote URL, or null.
@@ -88,11 +140,14 @@ export async function openPrs(repo) {
 }
 
 // A PR or issue from what someone typed: its URL, owner/repo#12, or #12 in `repo`.
+// A Trello card's URL comes back as it is: the sidebar asks Trello about it.
 export async function resolve(text, repo) {
   const s = text.trim();
+  const card = cardUrl(s);
+  if (card) return unknown(card, Date.now());
   const m = s.match(/github\.com\/([^/\s]+)\/([^/\s]+)\/(?:pull|issues)\/(\d+)/) ?? s.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
   const short = s.match(/^#?(\d+)$/);
-  if (!m && !(short && repo)) throw new Error(short ? "This space isn't in a GitHub repo: paste a URL or owner/repo#12." : "Paste a PR or issue URL, owner/repo#12 or #12.");
+  if (!m && !(short && repo)) throw new Error(short ? "This space isn't in a GitHub repo: paste a URL or owner/repo#12." : "Paste a PR, issue or Trello card URL, owner/repo#12 or #12.");
   const [owner, name, number] = m ? m.slice(1) : [...repo.split("/"), short[1]];
   const data = await graphql(`r: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { issueOrPullRequest(number: ${Number(number)}) { ${NODE} } }`);
   const n = data?.r?.issueOrPullRequest;
@@ -108,17 +163,17 @@ export async function fetchGitHub(urls, branches) {
   const parts = [
     ...urls.map((url) => ({
       q: `resource(url: ${JSON.stringify(url)}) { ${NODE} }`,
-      done: (d) => (out.items[url] = d?.number ? itemOf(d, at) : unknown(url, at)),
+      done: (d) => (d?.number ? collect(d, at, out.items) : (out.items[url] = unknown(url, at))),
     })),
     ...branches.map(({ key, repo, branch }) => {
       const [owner, name] = repo.split("/");
       return {
-        q: `repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { pullRequests(headRefName: ${JSON.stringify(branch)}, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { ${PR} } } }`,
+        q: `repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { pullRequests(headRefName: ${JSON.stringify(branch)}, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { ${PR_LINKED} } } }`,
         done: (d) => {
           const nodes = d?.pullRequests?.nodes ?? [];
           const pr = nodes.find((n) => n.state === "OPEN") ?? nodes[0];
           out.branches[key] = pr?.url ?? null;
-          if (pr) out.items[pr.url] = itemOf(pr, at);
+          if (pr) collect(pr, at, out.items);
         },
       };
     }),
@@ -140,8 +195,8 @@ export function badges(urls, items, t, id, max) {
     const it = items[url] ?? unknown(url, 0);
     const s = GH[it.state];
     const color = s ? s.color[dark ? 1 : 0] : t.dim;
-    const icon = s?.icon ?? (it.kind === "issue" ? GH["issue-open"].icon : GH.open.icon);
-    const tip = [`${it.repo}#${it.number ?? "?"}`, s?.label, it.title].filter(Boolean).join(" · ");
+    const icon = s?.icon ?? (it.kind === "issue" ? GH["issue-open"].icon : it.kind === "trello" ? GH["trello-open"].icon : GH.open.icon);
+    const tip = tipOf(it, s);
     return h_flex()
       .id(`${id}-${url}`)
       .flex_none()
@@ -166,6 +221,6 @@ export function badges(urls, items, t, id, max) {
     .items_center()
     .children(urls.slice(0, max).map(badge))
     .when(rest.length > 0, (el) => el.child(div().id(`${id}-more`).flex_none().text_size(11).text_color(t.dim)
-      .tooltip(rest.map((u) => { const it = items[u]; return it ? `${it.repo}#${it.number} ${it.title}`.trim() : u; }).join("\n"))
+      .tooltip(rest.map((u) => (items[u] ? tipOf(items[u], GH[items[u].state]) : u)).join("\n"))
       .child(`+${rest.length}`)));
 }
