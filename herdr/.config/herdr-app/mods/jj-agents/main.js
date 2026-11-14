@@ -61,6 +61,9 @@ const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[
 const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
 
+// An agent's right-click menu (jj-menu): pin, link. A popup is as tall as its items.
+const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 200, height: 120, props: { tab: "agent", target: { terminal: a.address } } });
+
 function duration(ms) {
   const m = Math.floor(ms / 60000);
   if (m < 1) return "<1m";
@@ -367,6 +370,7 @@ export default class Agents extends View {
           .gap(4)
           .hover((s) => s.bg(t.hover))
           .on_click(() => run("pane.focus", { pane: a.pane }))
+          .on_mouse_down("right", () => menu(a))
           .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(t.muted).child(String(i + 1)))
           .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true)));
       }
@@ -375,23 +379,6 @@ export default class Agents extends View {
       const off = shared("github.hidden")?.[a.space] ?? [];
       const prs = gh.shown ? (gh.shown.agents?.[a.address] ?? []) : (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
       const isPinned = a.pinned;
-      const pin = div()
-        .id(`pin-${a.address}`)
-        .flex_none()
-        .p(2)
-        .rounded(4)
-        .text_color(t.dim)
-        .cursor_pointer()
-        .hover((s) => s.bg(t.hover).text_color(t.foreground))
-        .tooltip(isPinned ? "Unpin" : "Pin to the top")
-        .on_click((_e, cx) => {
-          cx.stop_propagation();
-          run("terminal.pin", { terminal: a.address, pinned: !isPinned });
-          // The row moves away from under the pointer, and no hover-out comes.
-          this.hovered = null;
-          cx.notify();
-        })
-        .child(svg(`mods/workspace-chrome/${isPinned ? "pin-off" : "pin"}.svg`).size(13));
       // Under a space header the space goes without saying; an automatic tab number says nothing.
       // Without a space header above (priority, pinned) the row names its space.
       const full = byPriority || isPinned;
@@ -407,12 +394,8 @@ export default class Agents extends View {
         .when(a.focused, (el) => el.bg(t.selected))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
-        .on_hover((on, cx) => {
-          if (on) this.hovered = a.address;
-          else if (this.hovered === a.address) this.hovered = null;
-          cx.notify();
-        })
         .on_click(() => run("pane.focus", { pane: a.pane }))
+        .on_mouse_down("right", () => menu(a))
         .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
           .when(subs.length > 0, el => el.on_click((_e, cx) => {
             cx.stop_propagation();
@@ -424,9 +407,8 @@ export default class Agents extends View {
           .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
         .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
         .when(subs.length > 0, el => el.child(fold(a, subs)))
-        .when(this.hovered === a.address, el => el.child(pin))
         .when(prs.length > 0, el => el.child(kindBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, a.space)))
-        .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
+        .when(Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
         .child(this.status(t, a, byPriority && !isPinned));
       return line;
     };

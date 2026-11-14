@@ -1,5 +1,5 @@
 // Context menus (Herdr's items). Opened as a popup with
-// props { tab: "pane" | "tab" | "space" | "global", target }.
+// props { tab: "pane" | "agent" | "tab" | "space" | "global", target }.
 // ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
 // a command "worktree", "jj-workspace", "jj-sessions", "jj-panes", "jj-copy" or "jj-spaces" (its link dialog) opens that mod instead.
 
@@ -73,6 +73,15 @@ function items(p, git) {
         ...(inTab ? [["Close pane", "pane.close", { pane: tg.pane }]] : []),
       ];
     }
+    case "agent": {
+      const a = agents().find((x) => x.address === tg.terminal);
+      return a
+        ? [
+            [a.pinned ? "Unpin" : "Pin to the top", "terminal.pin", { terminal: a.address, pinned: !a.pinned }],
+            ["Link PR or issue\u2026", "jj-spaces", { link: a.space, agent: a.address }],
+          ]
+        : [];
+    }
     case "tab":
       return [
         ["Rename", "tab.rename", { id: tg.id }],
@@ -110,7 +119,7 @@ function items(p, git) {
 
 function menuIcon(command) {
   if (command === "jj-spaces") return "mods/jj-spaces/git-pull-request.svg";
-  const name = command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
+  const name = command === "terminal.pin" ? "pin" : command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
   return `mods/workspace-chrome/${name}.svg`;
 }
 
