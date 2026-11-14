@@ -153,38 +153,48 @@ const GH = {
   "trello-done": { icon: "mods/jj-spaces/trello.svg", color: PURPLE, label: "Done" },
   "trello-archived": { icon: "mods/jj-spaces/trello.svg", color: GRAY, label: "Archived" },
 };
-const isCard = (url) => /trello\.com\/c\//.test(url);
+const FINAL = new Set(["merged", "closed", "issue-done", "issue-skip", "trello-done", "trello-archived"]);
+const kindOf = (url, it) => it?.kind ?? (/trello\.com\/c\//.test(url) ? "trello" : /\/issues\/\d+/.test(url) ? "issue" : "pr");
 
-function prBadges(urls, items, t, id, max) {
+function tipOf(url, it) {
+  const s = GH[it?.state];
+  if (kindOf(url, it) === "trello") return [it?.repo || "Trello card", it?.list, s?.label, it?.title].filter(Boolean).join(" · ");
+  const number = it?.number ?? url.match(/\/(\d+)\/?$/)?.[1] ?? "?";
+  return [`${it?.repo ?? ""}#${number}`, s?.label, it?.title].filter(Boolean).join(" · ");
+}
+
+// One icon per kind, in the state of the one most worth a look, with how many when
+// more than one; a click opens the link, or the space's link dialog when there are several.
+function kindBadges(urls, items, t, id, space) {
   const dark = Boolean(settings()?.dark);
-  const badge = (url) => {
-    const it = items[url];
-    const s = GH[it?.state];
-    const card = it?.kind === "trello" || isCard(url);
-    const number = it?.number ?? url.match(/\/(\d+)\/?$/)?.[1] ?? "?";
-    return h_flex()
-      .id(`${id}-${url}`)
-      .flex_none()
-      .gap(2)
-      .items_center()
-      .text_size(11)
-      .text_color(s ? s.color[dark ? 1 : 0] : t.dim)
-      .cursor_pointer()
-      .tooltip((card ? [it?.repo || "Trello card", it?.list, s?.label, it?.title] : [`${it?.repo ?? ""}#${number}`, s?.label, it?.title]).filter(Boolean).join(" · "))
-      .on_click((_e, cx) => {
-        cx.stop_propagation();
-        cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
-      })
-      .child(div().flex_none().child(svg(s?.icon ?? (card ? GH["trello-open"].icon : GH.open.icon)).size(11)))
-      .child(String(number));
-  };
-  const rest = urls.length - max;
+  const rank = (u) => (!GH[items[u]?.state] ? 2 : FINAL.has(items[u].state) ? 1 : 0);
+  const fallback = { pr: GH.open.icon, issue: GH["issue-open"].icon, trello: GH["trello-open"].icon };
+  const groups = ["pr", "issue", "trello"].map((kind) => urls.filter((u) => kindOf(u, items[u]) === kind)).filter((g) => g.length);
   return h_flex()
     .flex_none()
     .gap(6)
     .items_center()
-    .children(urls.slice(0, max).map(badge))
-    .when(rest > 0, (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(`+${rest}`)));
+    .children(groups.map((g) => {
+      const lead = g.reduce((a, b) => (rank(b) < rank(a) ? b : a));
+      const kind = kindOf(lead, items[lead]);
+      const s = GH[items[lead]?.state];
+      return h_flex()
+        .id(`${id}-${kind}`)
+        .flex_none()
+        .gap(2)
+        .items_center()
+        .text_size(11)
+        .text_color(s ? s.color[dark ? 1 : 0] : t.dim)
+        .cursor_pointer()
+        .tooltip(g.map((u) => tipOf(u, items[u])).join("\n"))
+        .on_click((_e, cx) => {
+          cx.stop_propagation();
+          if (g.length > 1) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: space } });
+          else cx.spawn(async () => { await exec("open", [lead]).catch(() => null); });
+        })
+        .child(div().flex_none().child(svg(s?.icon ?? fallback[kind]).size(11)))
+        .when(g.length > 1, (el) => el.child(String(g.length)));
+    }));
 }
 
 export default class Agents extends View {
@@ -561,7 +571,7 @@ export default class Agents extends View {
         .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
         .when(subs.length > 0, el => el.child(fold(a, subs)))
         .when(this.hovered === a.address, el => el.child(pin))
-        .when(prs.length > 0, el => el.child(prBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, 2)))
+        .when(prs.length > 0, el => el.child(kindBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, a.space)))
         .when(context !== null, el => el.child(div().id(`ctx-${a.address}`).flex_none()
           .on_hover((on, cx) => {
             if (!on) return;

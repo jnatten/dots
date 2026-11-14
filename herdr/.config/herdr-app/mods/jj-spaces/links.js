@@ -9,7 +9,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
 import { props, closeOverlay, theme, spaces, panes, agents, exec, shared, setShared } from "herdr";
-import { badges, expand, githubRepo, openPrs, resolve } from "./github.js";
+import { badge, expand, githubRepo, openPrs, resolve } from "./github.js";
 import { linkSettings } from "./trello.js";
 
 const spaceOf = () => spaces().find((s) => s.id === props()?.link);
@@ -147,7 +147,7 @@ export function linkRender(view) {
   const linkedRow = (r, i) => base(r, i)
     .when(r.hidden, (el) => el.opacity(0.5))
     .on_click((_e, cx) => open(r.url, cx))
-    .child(div().w(52).flex_none().child(badges([r.url], items, t, `link-badge-${r.url}`, 1)))
+    .child(div().w(52).flex_none().child(badge(r.url, items, t, `link-badge-${r.url}`)))
     .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(items[r.url]?.title || r.url.replace(/^https:\/\/(github\.com\/)?/, "")))
     .child(div().flex_none().max_w(160).truncate().text_size(11).text_color(t.dim).child(r.hidden ? `hidden · ${r.from}` : r.from))
     .child(div().id(`drop-${r.url}`).flex_none().p(2).rounded(4).text_color(t.dim)
@@ -157,7 +157,7 @@ export function linkRender(view) {
       .child(svg(`mods/workspace-chrome/${r.hidden ? "plus" : "x"}.svg`).size(12)));
   const openRow = (r, i) => base(r, i)
     .on_click((_e, cx) => { link(view, r.pr); cx.notify(); })
-    .child(div().w(52).flex_none().child(badges([r.url], { [r.url]: r.pr }, t, `open-badge-${r.url}`, 1)))
+    .child(div().w(52).flex_none().child(badge(r.url, { [r.url]: r.pr }, t, `open-badge-${r.url}`)))
     .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(r.pr.title))
     .child(div().flex_none().max_w(200).truncate().text_size(11).text_color(t.dim).child(r.pr.mine ? r.pr.branch : `${r.pr.author} · ${r.pr.branch}`));
   const header = (label) => h_flex().h(26).px(8).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(label);
