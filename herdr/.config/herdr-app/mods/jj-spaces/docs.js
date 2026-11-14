@@ -1,8 +1,8 @@
-// Hand-made links, kept on the machine each space and agent lives on: herdr-core's
-// `jj-links` document there, { spaces: { "<space id>": { links, hidden } },
-// agents: { "<terminal address>": { links } } } with that machine's bare ids, so every
-// screen sees and edits the same ones. Asked through `hc connect`; doc.set only writes
-// over the version it was given.
+// Hand-made links and the Waiting mark, kept on the machine each space and agent lives
+// on: herdr-core's `jj-links` document there, { spaces: { "<space id>": { links, hidden,
+// waiting? } }, agents: { "<terminal address>": { links } } } with that machine's bare
+// ids, so every screen sees and edits the same ones. Asked through `hc connect`; doc.set
+// only writes over the version it was given.
 
 import { exec } from "herdr";
 
@@ -68,8 +68,8 @@ export async function updateLinks(on, update) {
   throw failed;
 }
 
-// A space's { links, hidden } ({ space: id }) or an agent's { links } ({ agent: address })
-// through `change`; one with nothing left is left out.
+// A space's { links, hidden, waiting } ({ space: id }) or an agent's { links }
+// ({ agent: address }) through `change`; one with nothing left is left out.
 export async function editLinks(target, change) {
   const kind = target.agent ? "agents" : "spaces";
   const [on, bare] = split(target.agent ?? target.space);
@@ -77,12 +77,15 @@ export async function editLinks(target, change) {
   try {
     return await updateLinks(on, (doc) => {
       const was = doc[kind][bare];
-      const entry = change({ links: was?.links ?? [], hidden: was?.hidden ?? [] });
-      if (!entry.links.length && !entry.hidden?.length) delete doc[kind][bare];
-      else doc[kind][bare] = kind === "agents" ? { links: entry.links } : { links: entry.links, hidden: entry.hidden ?? [] };
+      const entry = change({ links: was?.links ?? [], hidden: was?.hidden ?? [], waiting: Boolean(was?.waiting) });
+      if (!entry.links.length && !entry.hidden?.length && !entry.waiting) delete doc[kind][bare];
+      else if (kind === "agents") doc[kind][bare] = { links: entry.links };
+      else doc[kind][bare] = { links: entry.links, hidden: entry.hidden ?? [], ...(entry.waiting && { waiting: true }) };
       return doc;
     });
   } finally {
     edits++;
   }
 }
+
+export const setWaiting = (id, waiting) => editLinks({ space: id }, (e) => ({ ...e, waiting }));

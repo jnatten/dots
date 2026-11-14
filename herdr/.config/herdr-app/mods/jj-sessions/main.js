@@ -1,6 +1,6 @@
 // Claude Code sessions: the sidebar's Archived block, the session search (as
-// the overlay, mod.open), and the archive confirmation ({ action: "archive",
-// terminals? | space? }).
+// the overlay, mod.open; spaces in Waiting and their sessions in a section of their
+// own), and the archive confirmation ({ action: "archive", terminals? | space? }).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -233,16 +233,25 @@ export default class Sessions extends View {
     }));
     const skip = new Set([...(this.open ?? []), ...archived()].map((s) => s.id));
     const past = (this.history ?? []).filter((s) => !skip.has(s.id) && match(s));
+    // Spaces in Waiting (jj-spaces' shared("spaces.waiting")) and their open sessions
+    // have a section of their own: each space, then its sessions.
+    const parked = new Set(shared("spaces.waiting") ?? []);
+    const open = this.open ?? [];
+    const waiting = all.filter((w) => parked.has(w.id)).flatMap((w) => {
+      const mine = open.filter((s) => s.space === w.id && match(s)).map((s) => ({ ...s, kind: "open" }));
+      return match(w) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
+    });
     return [
-      { name: "Open", kind: "open", list: (this.open ?? []).filter(match), loading: this.open === undefined },
-      { name: "Spaces", kind: "space", list: all.filter(match), loading: false },
+      { name: "Open", kind: "open", list: open.filter((s) => !parked.has(s.space) && match(s)), loading: this.open === undefined },
+      { name: "Spaces", kind: "space", list: all.filter((w) => !parked.has(w.id) && match(w)), loading: false },
+      { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "Archived", kind: "archived", list: archived().filter(match), loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.history === undefined },
     ];
   }
 
   items() {
-    return this.sections().flatMap(({ kind, list }) => list.map((s) => ({ kind, s })));
+    return this.sections().flatMap(({ kind, list }) => list.map((s) => ({ kind: kind === "waiting" ? s.kind : kind, s })));
   }
 
   go(it, cx) {
@@ -423,7 +432,7 @@ export default class Sessions extends View {
 
   renderSearch(t) {
     const sections = this.sections();
-    const items = sections.flatMap(({ kind, list }) => list.map((s) => ({ kind, s })));
+    const items = this.items();
     this.at = Math.min(this.at, Math.max(0, items.length - 1));
     const selected = items[this.at];
     const row = (kind, s, i) => {
@@ -459,7 +468,7 @@ export default class Sessions extends View {
       children.push(h_flex().h(26).px(10).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(loading ? `${name} · loading…` : `${name} · ${total > list.length ? `${list.length} of ${total}` : list.length}`));
       for (const s of list) {
         this.childOf[n] = children.length;
-        children.push(row(kind, s, n++));
+        children.push(row(kind === "waiting" ? s.kind : kind, s, n++));
       }
     }
     const empty = items.length === 0 && !sections.some((s) => s.loading);
