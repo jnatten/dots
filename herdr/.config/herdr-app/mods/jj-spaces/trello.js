@@ -40,8 +40,14 @@ export async function fetchCards(urls, cfg) {
     const short = url.split("/").pop();
     const r = await fetch(`https://api.trello.com/1/cards/${short}?fields=name,closed,dueComplete,idShort&board=true&board_fields=name&list=true&list_fields=name`, { headers });
     if (r.status === 401) {
+      const why = (await r.text()).trim();
+      // A board this token's member can't see: only that card stays unknown.
+      if (/permission/i.test(why)) {
+        items[url] = unknown(url, at);
+        continue;
+      }
       auth = null;
-      throw new OpError("Trello refused the key and token.");
+      throw new OpError(`Trello refused the key and token: ${why || "401"}. The token comes from trello.com/1/authorize with the key, not the app's secret.`);
     }
     if (!r.ok) {
       items[url] = unknown(url, at);
