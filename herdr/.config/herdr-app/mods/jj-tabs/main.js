@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, focused, nextCommand } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, focused, nextCommand } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -22,6 +22,40 @@ function rotate(up) {
   for (const target of up ? ids.slice(1) : ids.slice(0, -1).reverse()) run("pane.swap", { pane: moving, target });
 }
 
+// Space and agent next/prev, as the sidebar lists them: spaces in Waiting
+// (shared("spaces.waiting")) and their agents only while its section is open
+// (shared("waiting.open")); agents in jj-agents' order (shared("agents.order")).
+function spaceOrder() {
+  const parked = new Set(shared("spaces.waiting") ?? []);
+  const ids = spaces().map((s) => s.id);
+  return [...ids.filter((id) => !parked.has(id)), ...(shared("waiting.open") ? ids.filter((id) => parked.has(id)) : [])];
+}
+
+function step(order, current, by) {
+  if (!order.length) return null;
+  const i = order.indexOf(current);
+  return i === -1 ? (by > 0 ? order[0] : order.at(-1)) : order[(i + by + order.length) % order.length];
+}
+
+// Moves a space in or out of Waiting: shown at once, and kept on its machine by jj-spaces.
+function askWaiting(id, waiting) {
+  const now = shared("spaces.waiting") ?? [];
+  setShared("spaces.waiting", waiting ? [...new Set([...now, id])] : now.filter((x) => x !== id));
+  setShared("spaces.waiting.ask", [...(shared("spaces.waiting.ask") ?? []), { id, waiting }]);
+}
+
+function navigate(command) {
+  const by = command.endsWith("-next") ? 1 : -1;
+  const space = focused()?.space ?? spaces().find((s) => s.active)?.id;
+  if (command.startsWith("space-")) {
+    const id = step(spaceOrder(), space, by);
+    if (id) run("space.select", { id });
+  } else {
+    const terminal = step(shared("agents.order") ?? [], focused()?.terminal, by);
+    if (terminal) run("agent.focus", { terminal });
+  }
+}
+
 export default class Tabs extends View {
   init(_props, cx) {
     this.pressed = null;
@@ -32,6 +66,19 @@ export default class Tabs extends View {
     cx.spawn(async () => {
       for (;;) {
         const command = await nextCommand();
+        if (/^(space|agent)-(next|prev)$/.test(command)) {
+          navigate(command);
+          continue;
+        }
+        if (command === "waiting") {
+          setShared("waiting.open", !shared("waiting.open"));
+          continue;
+        }
+        if (command === "wait") {
+          const space = focused()?.space;
+          if (space) askWaiting(space, !(shared("spaces.waiting") ?? []).includes(space));
+          continue;
+        }
         const terminal = focused()?.terminal;
         if (!terminal) continue;
         if (command === "rotate-up" || command === "rotate-down") rotate(command === "rotate-up");

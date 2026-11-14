@@ -1,7 +1,8 @@
 // Workspace spaces: stable colored avatars, in the order they're in, grouped by
 // machine when more than one is known. After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
-// switch, right-click for its menu, drag to reorder.
+// switch, right-click for its menu, drag to reorder. Spaces put in Waiting (kept on
+// their machine, docs.js) go to a section of their own at the bottom, folded at first.
 // Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
 // those its Claude sessions opened, each with the issues or PRs it's linked to
 // and the Trello cards in their descriptions. This copy asks GitHub and Trello
@@ -12,10 +13,10 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
 import { FINAL, branchName, expand, fetchGitHub, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
-import { edited, split, updateLinks } from "./docs.js";
+import { edited, setWaiting, split, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
 
 function find(node, id) {
@@ -144,11 +145,34 @@ export default class Spaces extends View {
     this.githubDue(now, sp, ps, cx);
     this.trelloDue(now, cx);
     this.linksDue(now, cx);
+    this.waitingDue(cx);
   }
 
-  // Hand-made links from each machine's core into shared("github.links"),
-  // shared("github.hidden") and shared("github.agent-links"), where the rows, the agents
-  // list and the dialog read them. A space or agent missing at two syncs in a row on a
+  // Spaces moved in or out of Waiting by the other mods (jj-menu, jj-tabs), which show it
+  // at once in shared("spaces.waiting") and ask here, in shared("spaces.waiting.ask"),
+  // for it to be kept on the space's machine.
+  waitingDue(cx) {
+    const asks = shared("spaces.waiting.ask") ?? [];
+    if (!asks.length || this.asking) return;
+    setShared("spaces.waiting.ask", []);
+    this.asking = true;
+    cx.spawn(async (cx) => {
+      for (const ask of asks) {
+        try {
+          await setWaiting(ask.id, ask.waiting);
+        } catch (e) {
+          notify({ title: "Couldn't move the space", body: String(e?.message ?? e), level: "error" });
+        }
+      }
+      this.asking = false;
+      this.linksAt = 0;
+      cx.notify();
+    });
+  }
+
+  // Hand-made links and Waiting marks from each machine's core into shared("github.links"),
+  // shared("github.hidden"), shared("github.agent-links") and shared("spaces.waiting"),
+  // where the rows, the agents list and the dialog read them. A space or agent missing at two syncs in a row on a
   // machine whose layout is in loses its links there; the first time per machine, what
   // this screen kept itself is moved in.
   linksDue(now, cx) {
@@ -162,6 +186,7 @@ export default class Spaces extends View {
       const cache = { "github.links": {}, "github.hidden": {}, "github.agent-links": {} };
       for (const [key, into] of Object.entries(cache))
         for (const [id, urls] of Object.entries(shared(key) ?? {})) if (urls?.length && names.has(machineOf(id))) into[id] = urls;
+      let waiting = (shared("spaces.waiting") ?? []).filter((id) => names.has(machineOf(id)));
       const moved = new Set(shared("github.links.moved") ?? []);
       const missing = new Set();
       for (const m of known.filter((m) => m.layout === "ready")) {
@@ -199,6 +224,7 @@ export default class Spaces extends View {
             if (e.hidden?.length) cache["github.hidden"][full(bare)] = e.hidden;
           }
           for (const [bare, e] of Object.entries(doc.agents)) if (e.links?.length) cache["github.agent-links"][full(bare)] = e.links;
+          waiting = [...waiting.filter((id) => !mine(id)), ...Object.entries(doc.spaces).filter(([, e]) => e.waiting).map(([bare]) => full(bare))];
           moved.add(on ?? "");
         } catch {}
       }
@@ -206,6 +232,8 @@ export default class Spaces extends View {
       if (edited() === before) {
         for (const [key, value] of Object.entries(cache)) if (JSON.stringify(value) !== JSON.stringify(shared(key) ?? {})) setShared(key, value);
         if (moved.size !== (shared("github.links.moved") ?? []).length) setShared("github.links.moved", [...moved]);
+        const asked = this.asking || (shared("spaces.waiting.ask") ?? []).length > 0;
+        if (!asked && JSON.stringify(waiting) !== JSON.stringify(shared("spaces.waiting") ?? [])) setShared("spaces.waiting", waiting);
       } else this.linksAt = 0;
       this.syncing = false;
       cx.notify();
@@ -545,10 +573,35 @@ export default class Spaces extends View {
     return h_flex().flex_none().gap(3).items_center().text_size(11.5).text_color(t.dim).child(svg("mods/workspace-chrome/archive.svg").size(11)).child(String(count));
   }
 
-  // The rows, under a header per machine once one isn't this computer.
+  // The rows, but those in Waiting, then the Waiting section.
   grouped(t, collapsed) {
-    const rows = this.ordered();
+    const parked = new Set(shared("spaces.waiting") ?? []);
+    const all = this.ordered();
+    const rows = all.filter((r) => !parked.has(r.w.id));
+    const waiting = all.filter((r) => parked.has(r.w.id));
     const draw = (r) => (collapsed ? this.compact(r, t) : this.row(r, t));
+    return [...this.machineGroups(t, collapsed, rows, waiting, draw), ...this.waitingSection(t, collapsed, waiting, draw)];
+  }
+
+  // Waiting spaces, under a header that folds them (shared("waiting.open"), this
+  // screen's, closed at first); folded, its count takes the most urgent status's color.
+  waitingSection(t, collapsed, waiting, draw) {
+    if (!waiting.length) return [];
+    const open = Boolean(shared("waiting.open"));
+    const URGENT = { blocked: 3, done: 2, working: 1 };
+    const top = waiting.map((r) => r.w.status).reduce((m, st) => ((URGENT[st] ?? 0) > (URGENT[m] ?? 0) ? st : m), null);
+    const head = h_flex().id("waiting-head").h(26).mt(6).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(6)
+      .text_size(11).text_color(t.dim).cursor_pointer().hover((st) => st.bg(t.hover).text_color(t.foreground))
+      .when(collapsed, (el) => el.w(RAIL_CELL).justify_center().tooltip(`Waiting · ${waiting.length}`))
+      .on_click((_e, cx) => { setShared("waiting.open", !open); cx.notify(); })
+      .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
+      .when(!collapsed, (el) => el.child(div().flex_1().child("Waiting")))
+      .child(div().flex_none().text_color(!open && top ? t[top] : t.dim).child(String(waiting.length)));
+    return [collapsed ? railCell(head) : head, ...(open ? waiting.map(draw) : [])];
+  }
+
+  // The rows, under a header per machine once one isn't this computer.
+  machineGroups(t, collapsed, rows, waiting, draw) {
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
     const loading = m => {
       const layout = machines().find(k => k.name === m)?.layout;
@@ -608,7 +661,8 @@ export default class Spaces extends View {
             .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover(s => s.bg(t.hover))
             .on_click((_e, cx) => { cx.stop_propagation(); cx.write_to_clipboard(login); this.copiedLogin = login; cx.notify(); })
             .child(this.copiedLogin === login ? "Copied" : "Copy")))] : [];
-      return [cell(head), ...guidance, ...(folded ? [] : mine.length ? mine.map(draw) : [loading(m) ? loadingRow(m) : cell(empty)])];
+      const parkedHere = waiting.some((r) => (r.w.machine ?? null) === m);
+      return [cell(head), ...guidance, ...(folded ? [] : mine.length ? mine.map(draw) : parkedHere ? [] : [loading(m) ? loadingRow(m) : cell(empty)])];
     });
   }
 

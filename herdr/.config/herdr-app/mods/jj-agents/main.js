@@ -1,4 +1,5 @@
 // Agents in grouped or priority views; parents take their most urgent sub-agent's place.
+// Agents of spaces in Waiting are in a group of their own at the end, folded at first.
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -61,8 +62,8 @@ const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[
 const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
 
-// An agent's right-click menu (jj-menu): pin, link. A popup is as tall as its items.
-const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 200, height: 120, props: { tab: "agent", target: { terminal: a.address } } });
+// An agent's right-click menu (jj-menu): pin, link, Waiting. A popup is as tall as its items.
+const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 160, props: { tab: "agent", target: { terminal: a.address } } });
 
 function duration(ms) {
   const m = Math.floor(ms / 60000);
@@ -298,10 +299,18 @@ export default class Agents extends View {
     const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
+    // Agents of spaces in Waiting go to its group at the end, and into the order
+    // next/prev (jj-tabs) go by only while it's open.
+    const parked = new Set(shared("spaces.waiting") ?? []);
+    const waitingOpen = Boolean(shared("waiting.open"));
+    const waiting = list.filter((a) => parked.has(a.space));
+    list = list.filter((a) => !parked.has(a.space));
     const pinned = list.filter((a) => a.pinned);
     const rest = list.filter((a) => !a.pinned);
     list = [...pinned, ...rest];
-    setAgentOrder(list.map((a) => a.address));
+    const order = [...list, ...(waitingOpen ? waiting : [])].map((a) => a.address);
+    setAgentOrder(order);
+    if (JSON.stringify(order) !== JSON.stringify(shared("agents.order") ?? [])) setShared("agents.order", order);
 
     const withKids = (a, i) => {
       const subs = collapsed ? [] : this.tree(all, a.address);
@@ -422,10 +431,12 @@ export default class Agents extends View {
       if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
       else groups.push({ id, label: byPriority ? SECTION[r] : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
     }
+    if (waiting.length) groups.push({ id: "waiting", label: "Waiting", status: null, members: waiting, waiting: true });
+    const isFolded = (g) => (g.waiting ? !waitingOpen : this.folded.has(g.id));
 
     // A group's header; it folds the group. Folded, it says how many and the most urgent state.
     const header = (g) => {
-      const open = !this.folded.has(g.id);
+      const open = !isFolded(g);
       const top = g.members.reduce((m, a) => ((RANK[a.status] ?? 0) > (RANK[m] ?? 0) ? a.status : m), null);
       return h_flex()
         .id(g.id)
@@ -440,19 +451,21 @@ export default class Agents extends View {
         .cursor_pointer()
         .hover((s) => s.text_color(t.foreground))
         .on_click((_e, cx) => {
-          open ? this.folded.add(g.id) : this.folded.delete(g.id);
+          if (g.waiting) setShared("waiting.open", !open);
+          else open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         })
+        .when(Boolean(g.waiting), (el) => el.mt(6))
         .child(div().truncate().text_color(t[g.status] ?? t.dim).child(g.label))
-        .when(byPriority || !open, (el) => el.child(div().text_color(t.dim).child(String(g.members.length))))
+        .when(byPriority || !open || Boolean(g.waiting), (el) => el.child(div().text_color(g.waiting && !open && top && top !== "idle" ? t[top] : t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
           .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
           .child(svg("mods/workspace-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim)));
     };
     const rows = collapsed
-      ? list.flatMap(withKids)
-      : groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : g.members.flatMap(withKids))]);
+      ? [...list, ...(waitingOpen ? waiting : [])].flatMap(withKids)
+      : groups.flatMap((g) => [header(g), ...(isFolded(g) ? [] : g.members.flatMap(withKids))]);
 
     return v_flex()
       .size_full()

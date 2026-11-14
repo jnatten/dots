@@ -20,9 +20,9 @@ adding a file. Everything else in `~/.config/herdr-app` is Herdr's: clone shippe
 mods and layouts (`mod.clone`, `layout.clone`) rather than editing them.
 
 Links added by hand in the link dialog (ctrl-a g for the focused agent, ctrl-a G for
-the space) aren't in any file: they live in the `jj-links` herdr-core document on the
-machine each space and agent is on (`mods/jj-spaces/docs.js`), so every screen sees
-the same ones.
+the space) and the Waiting mark (ctrl-a H) aren't in any file: they live in the
+`jj-links` herdr-core document on the machine each space and agent is on
+(`mods/jj-spaces/docs.js`), so every screen sees the same ones.
 
 ## Working on mods
 
