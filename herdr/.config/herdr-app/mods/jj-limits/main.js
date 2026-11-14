@@ -1,12 +1,14 @@
-// Claude Code plan limits as pies at the bottom of the sidebar, from the file the
+// The shown Claude session's context (context.js; hover for its breakdown) and
+// Claude Code's plan limits as pies at the bottom of the sidebar, from what the
 // Claude status line writes (claude/.claude/hooks/statusline.sh in dots), then
 // the Spacing and Settings buttons. It also keeps the spacing dialog's settings in
 // jj-settings.json (settings.js).
 
 import { View, div, svg, PathBuilder } from "gpui-kit";
-import { h_flex } from "gpui-base";
+import { h_flex, HoverCard } from "gpui-base";
 import { theme, home, readTextFile, watchFolder, layout, run } from "herdr";
 import { syncSettings } from "./settings.js";
+import { contextPanel, measure, shownSession } from "./context.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -82,6 +84,7 @@ export default class Limits extends View {
   render() {
     const t = theme();
     const now = Date.now() / 1000;
+    const session = shownSession();
     const shown = WINDOWS.map(([key, short, long]) => ({ key, short, long, w: this.limits?.[key] })).filter((x) => x.w);
     const collapsed = narrow();
     const button = (id, icon, tip, action) => div().id(id).flex_none().p(3).rounded(5).text_color(t.dim)
@@ -89,10 +92,21 @@ export default class Limits extends View {
       .on_click(action)
       .child(svg(icon).size(13));
     const settings = button("settings", "mods/workspace-chrome/settings.svg", "Settings", () => run("app.settings"));
+    const context = (s) => {
+      const fill = s.context >= 80 ? t.blocked : s.context >= 60 ? t.ansi3 : t.muted;
+      const trigger = h_flex()
+        .id("limit-context")
+        .gap(6)
+        .items_center()
+        .on_hover((on, cx) => on && measure(s, cx))
+        .child(pie(s.context / 100, 13, fill, t.dim))
+        .when(!collapsed, (el) => el.child(div().text_color(s.context >= 60 ? fill : t.muted).child(`ctx ${Math.round(s.context)}%`)));
+      return HoverCard.new("context-card").anchor("bottom_left").open_delay(200).trigger(trigger).content(contextPanel(t, s));
+    };
     return h_flex()
       .size_full()
-      .px(collapsed ? 0 : 16)
-      .gap(collapsed ? 8 : 14)
+      .px(collapsed ? 0 : 12)
+      .gap(collapsed ? 8 : 10)
       .items_center()
       .when(collapsed, (el) => el.justify_center())
       .bg(t.chrome)
@@ -100,6 +114,7 @@ export default class Limits extends View {
       .border_color(t.border)
       .text_size(11.8)
       .text_color(t.muted)
+      .when(Boolean(session), (el) => el.child(context(session)))
       .children(
         shown.map(({ key, short, long, w }) => {
           const stale = w.resets_at && w.resets_at < now;
