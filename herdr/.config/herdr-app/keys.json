@@ -17,6 +17,7 @@
     "cmd-[": "jj-tabs.agent-prev",
     "cmd-shift-l": "layout.switch",
     "cmd-n": "space.new",
+    "cmd-shift-n": "jj-tabs.new-window",
     "cmd-p": "mod.open:jj-picker",
     "cmd-shift-p": "app.palette",
     "cmd-k": "mod.open:jj-sessions",
