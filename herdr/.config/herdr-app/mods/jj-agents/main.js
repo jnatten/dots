@@ -265,6 +265,22 @@ export default class Agents extends View {
       .child(this.status(t, { status: st }, compact));
   }
 
+  // What a Claude agent runs now, as claude/.claude/hooks/herdr-activity.sh in dots labels
+  // its terminal: subagents and shells, in the working color while it works.
+  activity(t, a, labels) {
+    const subagents = Number(labels?.["claude.subagents"]) || 0;
+    const shells = Number(labels?.["claude.shells"]) || 0;
+    if (!subagents && !shells) return null;
+    const color = a.status === "working" ? t.working : t.dim;
+    const item = (kind, icon, n, what) => h_flex().id(`act-${kind}-${a.address}`).flex_none().gap(2).items_center().text_size(11).text_color(color)
+      .tooltip(`${n} ${what}${n === 1 ? "" : "s"} running`)
+      .child(svg(icon).size(12))
+      .when(n > 1, (el) => el.child(String(n)));
+    return h_flex().flex_none().gap(6).items_center()
+      .when(subagents > 0, (el) => el.child(item("sub", "mods/jj-agents/bot.svg", subagents, "subagent")))
+      .when(shells > 0, (el) => el.child(item("sh", "mods/workspace-chrome/terminal.svg", shells, "shell")));
+  }
+
   // compact: a ! for blocked where a header already says "Needs you".
   status(t, a, compact = false) {
     const color = t[a.status] ?? t.dim;
@@ -387,6 +403,7 @@ export default class Agents extends View {
       const idle = a.status === "idle" && !a.focused;
       const off = shared("github.hidden")?.[a.space] ?? [];
       const prs = gh.shown ? (gh.shown.agents?.[a.address] ?? []) : (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
+      const act = this.activity(t, a, all.find((k) => k.address === a.address)?.labels);
       const isPinned = a.pinned;
       // Under a space header the space goes without saying; an automatic tab number says nothing.
       // Without a space header above (priority, pinned) the row names its space.
@@ -417,6 +434,7 @@ export default class Agents extends View {
         .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
         .when(subs.length > 0, el => el.child(fold(a, subs)))
         .when(prs.length > 0, el => el.child(kindBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, a.space)))
+        .when(Boolean(act), el => el.child(act))
         .when(Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
         .child(this.status(t, a, byPriority && !isPinned));
       return line;
