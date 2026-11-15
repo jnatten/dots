@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, focused, nextCommand } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, focused, nextCommand, exec, home, notify } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -72,6 +72,13 @@ export default class Tabs extends View {
         }
         if (command === "waiting") {
           setShared("waiting.open", !shared("waiting.open"));
+          continue;
+        }
+        // Another window onto the same spaces (new-window.sh, in the main app home).
+        if (command === "new-window") {
+          exec("sh", [`${home()}/.config/herdr-app/new-window.sh`])
+            .then((r) => r.code === 0 || notify({ title: "Couldn't open a window", body: (r.stderr || r.stdout).trim(), level: "error" }))
+            .catch((e) => notify({ title: "Couldn't open a window", body: String(e?.message ?? e), level: "error" }));
           continue;
         }
         if (command === "wait") {

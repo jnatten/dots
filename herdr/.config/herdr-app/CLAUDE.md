@@ -19,6 +19,13 @@ home folder, `~/.config/herdr-app`:
 adding a file. Everything else in `~/.config/herdr-app` is Herdr's: clone shipped
 mods and layouts (`mod.clone`, `layout.clone`) rather than editing them.
 
+More windows onto the same spaces (cmd-shift-n) are more Herdr apps, each with a home
+of its own: `new-window.sh` makes `~/.config/herdr-app-2`, `-3`, … with this setup's
+files linked from `~/.config/herdr-app`, and opens it. `jj-state.json` there is this
+Mac's state the windows share (space colors, archived sessions), not in dots.
+`HERDR_APP_HOME=~/.config/herdr-app-2 herdr-app status` (or `do`, `ls`, `shot`) asks
+that window.
+
 Links added by hand in the link dialog (ctrl-a g for the focused agent, ctrl-a G for
 the space) and the Waiting mark (ctrl-a H) aren't in any file: they live in the
 `jj-links` herdr-core document on the machine each space and agent is on

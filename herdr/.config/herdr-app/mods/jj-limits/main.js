@@ -2,7 +2,7 @@
 // Claude Code's plan limits as pies at the bottom of the sidebar, from what the
 // Claude status line writes (claude/.claude/hooks/statusline.sh in dots), then
 // the Spacing and Settings buttons. It also keeps the spacing dialog's settings in
-// jj-settings.json (settings.js).
+// jj-settings.json and what every window shows alike in jj-state.json (settings.js).
 
 import { View, div, svg, PathBuilder } from "gpui-kit";
 import { h_flex, HoverCard } from "gpui-base";
