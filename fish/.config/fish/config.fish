@@ -8,9 +8,7 @@ end
 
 if test "$(uname -s)" = "Darwin"
   set -g __local_ssh_auth_sock ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
-  if not set -q SSH_CONNECTION
-    set -gx SSH_AUTH_SOCK $__local_ssh_auth_sock
-  end
+  __ssh_agent
 end
 
 if status is-login

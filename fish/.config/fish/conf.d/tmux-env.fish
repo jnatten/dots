@@ -3,8 +3,8 @@
 # Re-sync from the tmux session environment (which tmux updates on attach
 # via update-environment) before each prompt and command.
 # SSH_AUTH_SOCK is only taken from tmux while attached over ssh; locally tmux
-# holds whatever the last client had (often unset or a dead socket), so use
-# the local agent instead.
+# holds whatever the last client had (often unset or a dead socket), so pick
+# the agent as any shell would (ssh-agent.fish).
 function __refresh_tmux_env --on-event fish_prompt --on-event fish_preexec
     set -q TMUX; or return
 
@@ -23,7 +23,7 @@ function __refresh_tmux_env --on-event fish_prompt --on-event fish_preexec
         set -l line (tmux show-environment SSH_AUTH_SOCK 2>/dev/null)
         string match -q -- "SSH_AUTH_SOCK=*" $line
         and set -gx SSH_AUTH_SOCK (string split -m1 -- = $line)[2]
-    else if set -q __local_ssh_auth_sock
-        set -gx SSH_AUTH_SOCK $__local_ssh_auth_sock
+    else
+        __ssh_agent
     end
 end
