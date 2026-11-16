@@ -788,7 +788,8 @@ export default class Spaces extends View {
 
   // Folders, each with its spaces (folded: only the shown one), then Other, machines
   // that need you, and Waiting. Publishes the order next/prev and ctrl-1..9 go by
-  // (shared("spaces.order")) and every space in list order (shared("spaces.listed")).
+  // (shared("spaces.order")), every space in list order (shared("spaces.listed")) and
+  // the folder each filed space is in (shared("spaces.folder"), for jj-agents).
   grouped(t, collapsed) {
     const sp = spaces();
     const tree = this.tree(sp, panes());
@@ -831,7 +832,9 @@ export default class Spaces extends View {
     }
     out.push(...this.waitingSection(t, collapsed, tree.waiting, draw));
     this.hidden = hidden;
+    const filed = Object.fromEntries(tree.list.flatMap((f) => tree.inside.get(f.id).map((r) => [r.w.id, f.id])));
     for (const [key, value] of [["spaces.order", order], ["spaces.listed", listed]]) if (JSON.stringify(value) !== JSON.stringify(shared(key) ?? [])) setShared(key, value);
+    if (JSON.stringify(filed) !== JSON.stringify(shared("spaces.folder") ?? {})) setShared("spaces.folder", filed);
     return out;
   }
 

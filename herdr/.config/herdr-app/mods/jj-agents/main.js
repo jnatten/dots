@@ -1,4 +1,6 @@
-// Agents in grouped or priority views; parents take their most urgent sub-agent's place.
+// Agents grouped by space or by folder (as jj-spaces files spaces, shared("spaces.folder")),
+// or in priority sections; parents take their most urgent sub-agent's place. Grouped, the
+// ones that need you can go first in a group of their own (shared("agents.needs-first")).
 // Agents of spaces in Waiting are in a group of their own at the end, folded at first.
 // A row leads with the agent's description: words given in its Description dialog
 // ({ describe: address }, ctrl-a d), else its own title. They're kept as jj.description
@@ -80,10 +82,13 @@ const kidStatus = (k, listed) => {
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
+  { id: "folders", label: "Grouped by folder", icon: "folder" },
 ];
 const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[0];
 const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
+// Folder colors, as the jj-spaces sidebar draws them.
+const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
 
 // An agent's right-click menu (jj-menu): pin, description, link, Waiting. A popup is as tall as its items.
 const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 196, props: { tab: "agent", target: { terminal: a.address } } });
@@ -231,6 +236,8 @@ export default class Agents extends View {
 
   sortMenu(t) {
     const on = sortOf().id;
+    const first = Boolean(shared("agents.needs-first"));
+    const priority = on === "priority";
     return v_flex()
       .w_full()
       .p(5)
@@ -252,7 +259,21 @@ export default class Agents extends View {
         })
         .child(svg(`mods/workspace-chrome/${s.icon}.svg`).size(14).flex_none().text_color(t.muted))
         .child(div().flex_1().child(s.label))
-        .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))));
+        .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))))
+      .child(div().mx(7).my(4).h(1).bg(t.border))
+      .child(h_flex()
+        .id("sort-needs-first")
+        .h(31)
+        .px(8)
+        .gap(9)
+        .rounded(7)
+        .items_center()
+        .text_color(priority ? t.dim : t.foreground)
+        .when(!priority, (el) => el.hover((el) => el.bg(t.hover)).on_click(() => setShared("agents.needs-first", !first)))
+        .when(priority, (el) => el.tooltip("Priority always puts them first"))
+        .child(this.status(t, { status: "blocked" }, true))
+        .child(div().flex_1().child("Needs you on top"))
+        .when(first || priority, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(priority ? t.dim : t.foreground))));
   }
 
   initDescribe(cx) {
@@ -419,6 +440,7 @@ export default class Agents extends View {
     const tabCounts = new Map();
     for (const a of list) tabCounts.set(a.tab, (tabCounts.get(a.tab) ?? 0) + 1);
     const byPriority = sort.id === "priority";
+    const byFolder = sort.id === "folders";
     const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
@@ -434,9 +456,11 @@ export default class Agents extends View {
     const waitingOpen = Boolean(shared("waiting.open"));
     const waiting = list.filter((a) => parked.has(a.space));
     list = list.filter((a) => !parked.has(a.space));
+    const urgent = new Set(!byPriority && shared("agents.needs-first") ? list.filter((a) => !a.pinned && rankOf(a) === RANK.blocked).map((a) => a.address) : []);
+    const needs = list.filter((a) => urgent.has(a.address));
     const pinned = list.filter((a) => a.pinned);
-    const rest = list.filter((a) => !a.pinned);
-    list = [...pinned, ...rest];
+    const rest = list.filter((a) => !a.pinned && !urgent.has(a.address));
+    list = [...needs, ...pinned, ...rest];
     const order = [...list, ...(waitingOpen ? waiting : [])].map((a) => a.address);
     setAgentOrder(order);
     if (JSON.stringify(order) !== JSON.stringify(shared("agents.order") ?? [])) setShared("agents.order", order);
@@ -522,8 +546,9 @@ export default class Agents extends View {
       const act = this.activity(t, a, term?.labels);
       const isPinned = a.pinned;
       // Under a space header the space goes without saying; an automatic tab number says nothing.
-      // Without a space header above (priority, pinned) the row names its space.
-      const full = byPriority || isPinned;
+      // Without a space header above (priority, folders, pinned, needs you) the row names its space.
+      const full = byPriority || byFolder || isPinned || urgent.has(a.address);
+      const compact = (byPriority && !isPinned) || urgent.has(a.address);
       const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
       // Under a description: its space and named tab, or the agent's latest update. What isn't shown goes in the tooltip.
       const tab = tabs.get(a.tab);
@@ -565,14 +590,14 @@ export default class Agents extends View {
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(prs.length > 0, el => el.child(prBadges()))
           .when(Boolean(act), el => el.child(act)))
-          .child(this.status(t, a, byPriority && !isPinned));
+          .child(this.status(t, a, compact));
       }
       return frame.py(4).items_start()
         .child(v_flex().flex_1().min_w(0)
           .child(ago(h_flex().h(20).gap(9).items_center()
             .child(text)
             .when(subs.length > 0, el => el.child(fold(a, subs))))
-            .child(this.status(t, a, byPriority && !isPinned)))
+            .child(this.status(t, a, compact)))
           .child(h_flex().h(16).gap(8).items_center().text_size(11.5).text_color(t.dim)
             .child(div().flex_1().min_w(0).truncate().child(under))
             .when(Boolean(machine), el => el.child(machineTag))
@@ -580,14 +605,20 @@ export default class Agents extends View {
             .when(Boolean(act), el => el.child(act))));
     };
 
-    // Groups in list order: spaces (grouped) or priority sections. Agents of a
-    // space are next to each other in agents(), so neighbours make a group.
-    const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
+    // Groups in list order: spaces, folders or priority sections. Agents of a space
+    // or folder are next to each other in the sorted list, so neighbours make a group.
+    const groups = [
+      ...(needs.length ? [{ id: "needs", label: SECTION[4], status: "blocked", members: needs, count: true }] : []),
+      ...(pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : []),
+    ];
+    const filed = shared("spaces.folder") ?? {};
+    const folders = new Map((shared("space-folders")?.folders ?? []).map((f) => [f.id, f]));
     for (const a of rest) {
       const r = rankOf(a) || RANK.idle;
-      const id = byPriority ? `sec-${r}` : `sp-${a.space}`;
+      const f = byFolder ? (folders.get(filed[a.space]) ?? null) : null;
+      const id = byPriority ? `sec-${r}` : byFolder ? `fd-${f?.id ?? "other"}` : `sp-${a.space}`;
       if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
-      else groups.push({ id, label: byPriority ? SECTION[r] : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
+      else groups.push({ id, label: byPriority ? SECTION[r] : byFolder ? (f?.name ?? "Other") : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a], folder: byFolder ? (f ?? {}) : null });
     }
     if (waiting.length) groups.push({ id: "waiting", label: "Waiting", status: null, members: waiting, waiting: true });
     const isFolded = (g) => (g.waiting ? !waitingOpen : this.folded.has(g.id));
@@ -614,8 +645,10 @@ export default class Agents extends View {
           cx.notify();
         })
         .when(Boolean(g.waiting), (el) => el.mt(6))
+        .when(Boolean(g.folder), (el) => el.child(svg("mods/workspace-chrome/folder.svg").size(12).flex_none()
+          .text_color(g.folder.color ? (MARK[g.folder.color] ?? t[g.folder.color] ?? t.dim) : t.dim)))
         .child(div().truncate().text_color(t[g.status] ?? t.dim).child(g.label))
-        .when(byPriority || !open || Boolean(g.waiting), (el) => el.child(div().text_color(g.waiting && !open && top && top !== "idle" ? t[top] : t.dim).child(String(g.members.length))))
+        .when(byPriority || !open || Boolean(g.waiting) || Boolean(g.count), (el) => el.child(div().text_color(g.waiting && !open && top && top !== "idle" ? t[top] : t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
           .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
@@ -649,7 +682,7 @@ export default class Agents extends View {
                 .text_size(11)
                 .text_color(t.dim)
                 .hover((s) => s.text_color(t.foreground))
-                .on_click(() => openOverlay({ mod: "jj-agents", kind: "popup", width: 200, height: 140, props: { sortMenu: true } }))
+                .on_click(() => openOverlay({ mod: "jj-agents", kind: "popup", width: 200, height: 190, props: { sortMenu: true } }))
                 .tooltip(`Sort agents: ${sort.label}`)
                 .child(svg(`mods/workspace-chrome/${sort.icon}.svg`).size(14)),
             ),
