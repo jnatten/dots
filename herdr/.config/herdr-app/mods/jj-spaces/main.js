@@ -20,7 +20,7 @@ import { FINAL, branchName, expand, fetchGitHub, githubRepo, isCard, kinds, scan
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
 import { canon, edited, setWaiting, split, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
-import { MARK, applyChange, empty, folderOf, foldersOf, live, matchOf, merge, nextRank, pathOn, tidy, tilde, updateFolders, writeChange } from "./folders.js";
+import { MARK, applyChange, empty, folderOf, foldersOf, live, matchOf, merge, nextRank, ownPaths, pathsOn, tidy, tilde, updateFolders, writeChange } from "./folders.js";
 import { folderInit, folderRender } from "./folder-dialog.js";
 
 function find(node, id) {
@@ -234,7 +234,7 @@ export default class Spaces extends View {
       const id = a.id ?? `f${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       const was = st.folders[id];
       const rec = { name: a.name, color: a.color ?? null, rank: was && !was.gone ? was.rank : nextRank(st), at: now };
-      this.change([{ kind: "folder", id, rec }, ...Object.entries(a.paths ?? {}).map(([key, path]) => ({ kind: "path", key, id, path }))]);
+      this.change([{ kind: "folder", id, rec }, ...Object.entries(a.paths ?? {}).map(([key, paths]) => ({ kind: "path", key, id, paths: paths ?? [] }))]);
     } else if (a.op === "delete" && st.folders[a.id]) {
       this.change([{ kind: "folder", id: a.id, rec: { ...st.folders[a.id], gone: true, at: now } }]);
     } else if (a.op === "unpin") {
@@ -303,7 +303,7 @@ export default class Spaces extends View {
   publishFolders() {
     const st = this.folderState;
     const keys = ["", ...this.machines.map((m) => m.name)];
-    const folders = live(st).map((f) => ({ id: f.id, name: f.name, color: f.color ?? null, paths: Object.fromEntries(keys.map((k) => [k, pathOn(st, f.id, k, this.homes)]).filter(([, at]) => at)) }));
+    const folders = live(st).map((f) => ({ id: f.id, name: f.name, color: f.color ?? null, paths: Object.fromEntries(keys.map((k) => [k, pathsOn(st, f.id, k, this.homes)]).filter(([, at]) => at)) }));
     const pins = {};
     for (const [key, of] of Object.entries(st.pins)) for (const [bare, id] of Object.entries(of)) if (id === "" || (st.folders[id] && !st.folders[id].gone)) pins[key ? `${key}/${bare}` : bare] = id;
     const value = { folders, pins, homes: this.homes, machines: this.machines.map((m) => ({ name: m.name, state: m.state })) };
@@ -315,8 +315,8 @@ export default class Spaces extends View {
   }
 
   // A space dropped on a folder ("" for Other). Where its path already takes it, it just
-  // follows its path again. A folder with nothing on the space's machine yet (no path of
-  // its own there, no space of it) learns its repo as its path there, for its neighbours
+  // follows its path again. A folder with nothing on the space's machine yet (no paths of
+  // its own there, no space of it) learns its repo as a path there, for its neighbours
   // too; otherwise the space is pinned there.
   dropSpace(id, folder) {
     const s = spaces().find((x) => x.id === id);
@@ -334,8 +334,8 @@ export default class Spaces extends View {
     if (auto === folder) return this.change(pin(null));
     const path = places[1] ?? places[0];
     const others = [...(this.rowsById?.values() ?? [])].some((r) => r.folder === folder && r.w.id !== id && (r.w.machine ?? "") === key);
-    if (st.paths[key]?.[folder] || others || !path || path === "/" || path === this.homes[key]) return this.change(pin(folder));
-    const teach = { kind: "path", key, id: folder, path };
+    if (ownPaths(st, folder, key).length || others || !path || path === "/" || path === this.homes[key]) return this.change(pin(folder));
+    const teach = { kind: "path", key, id: folder, paths: [path] };
     const taught = matchOf(applyChange(JSON.parse(JSON.stringify(st)), teach), this.homes, key, places) === folder;
     this.change([teach, ...pin(taught ? null : folder)]);
     notify({ title: st.folders[folder].name, body: `Spaces in ${tilde(path, this.homes[key])}${key ? ` on ${key}` : ""} go in this folder now.`, level: "info" });
@@ -365,8 +365,8 @@ export default class Spaces extends View {
   newIn(f) {
     const keys = ["", ...this.machines.filter((m) => m.state === "connected").map((m) => m.name)];
     for (const key of keys) {
-      const at = pathOn(this.folderState, f.id, key, this.homes);
-      if (at) return { args: { folder: at.path, machine: key }, tip: `New space in ${tilde(at.path, this.homes[key])}${key ? ` on ${key}` : ""}` };
+      const path = pathsOn(this.folderState, f.id, key, this.homes)?.paths[0];
+      if (path) return { args: { folder: path, machine: key }, tip: `New space in ${tilde(path, this.homes[key])}${key ? ` on ${key}` : ""}` };
     }
     return null;
   }

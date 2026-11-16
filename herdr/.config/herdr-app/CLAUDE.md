@@ -33,7 +33,7 @@ the space) and the Waiting mark (ctrl-a H) aren't in any file: they live in the
 
 Space folders live in the `jj-folders` herdr-core document on every machine
 (`mods/jj-spaces/folders.js`): each folder's name, color and order on all of them
-(newest wins), and on each machine its own path for a folder and the spaces there
+(newest wins), and on each machine its own paths for a folder and the spaces there
 dragged into one. The spaces sidebar is the only writer; the menu and the folder dialog
 ask it through `shared("space-folders.ask")`. Folded folders are this Mac's
 (`jj-state.json`).

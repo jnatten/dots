@@ -43,9 +43,12 @@ const waitingItem = (space, label) => {
 function askFolders(op) {
   setShared("space-folders.ask", [...(shared("space-folders.ask") ?? []), op]);
 }
+// Tall enough for a field per path on each machine (and its "Add a path"); it scrolls past that.
 const folderDialog = (folder) => {
-  const n = (shared("space-folders")?.machines ?? []).length;
-  openOverlay({ mod: "jj-spaces", kind: "dialog", width: 540, height: 256 + 38 * n, props: { folder } });
+  const sf = shared("space-folders") ?? {};
+  const f = folder.id && (sf.folders ?? []).find((x) => x.id === folder.id);
+  const fields = ["", ...(sf.machines ?? []).map((m) => m.name)].reduce((n, k) => n + Math.max(1, f?.paths?.[k]?.own ? f.paths[k].paths.length : 1), 0);
+  openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: Math.min(620, 230 + 36 * fields + 26 * (1 + (sf.machines ?? []).length)), props: { folder } });
 };
 const connected = () => (shared("space-folders")?.machines ?? []).filter((m) => m.state === "connected").map((m) => m.name);
 
@@ -140,9 +143,11 @@ function items(p, git) {
     case "folder": {
       const f = (shared("space-folders")?.folders ?? []).find((x) => x.id === tg.id);
       if (!f) return [];
-      const on = ["", ...connected()].filter((k) => f.paths[k]);
+      const where = (k, path) => (f.paths[k].paths.length > 1 ? ` in ${path.split("/").pop()}` : " here");
+      const news = ["", ...connected()].filter((k) => f.paths[k])
+        .flatMap((k) => f.paths[k].paths.map((path) => [`New space${where(k, path)}${k ? ` on ${k}` : ""}`, "space.new", { folder: path, machine: k }]));
       return [
-        ...on.map((k) => [k ? `New space here on ${k}` : "New space here", "space.new", { folder: f.paths[k].path, machine: k }]),
+        ...news,
         ["Edit folder\u2026", "folder-dialog", { id: f.id }],
         ["Delete folder", "folder-op", { op: "delete", id: f.id }],
       ];
