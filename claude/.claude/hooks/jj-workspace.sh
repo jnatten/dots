@@ -26,17 +26,37 @@ git_main_root() {
   dirname "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)"
 }
 
+# Rebuildable output git lists as one entry instead of walking (node_modules alone is
+# ~100k files), so includes inside them aren't copied
+SKIP_DIRS=(
+  .jj .git
+  node_modules .yarn .pnpm-store
+  target out .bsp .gradle .metals .bloop .stack-work
+  dist build
+  .next .nx .turbo .vite .parcel-cache .svelte-kit
+  .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache
+  coverage
+  /.claude/worktrees
+)
+
 # Claude skips .worktreeinclude when a hook makes the worktree
 copy_includes() {
-  [ -f "$1/.worktreeinclude" ] || return 0
-  git -C "$1" rev-parse --git-dir >/dev/null 2>&1 || return 0
-  git -C "$1" ls-files -z --others --ignored --exclude-from=.worktreeinclude \
-    | git -C "$1" check-ignore -z --stdin \
-    | while IFS= read -r -d '' f; do
-        case $f in .claude/worktrees/*) continue ;; esac
-        mkdir -p "$2/$(dirname "$f")"
-        cp -p "$1/$f" "$2/$f"
+  local src=$1 dest=$2 skip f
+  [ -f "$src/.worktreeinclude" ] || return 0
+  git -C "$src" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  skip=$(mktemp)
+  printf '%s/\n' "${SKIP_DIRS[@]}" >"$skip"
+  others() { git -C "$src" -c core.quotePath=false ls-files --others --ignored --directory "$@" | LC_ALL=C sort; }
+  LC_ALL=C comm -23 \
+    <(others --exclude-from="$src/.worktreeinclude" --exclude-from="$skip") \
+    <(others --exclude-from="$skip") \
+    | git -C "$src" check-ignore --stdin \
+    | while IFS= read -r f; do
+        f=${f%/}
+        mkdir -p "$dest/$(dirname "$f")"
+        cp -pR "$src/$f" "$dest/$f"
       done || true
+  rm -f "$skip"
 }
 
 create() {
@@ -83,7 +103,7 @@ remove() {
       | awk -F'\t' -v p="$path" '$2 == p { print $1 }')
     [ -n "$ws" ] || { echo "no jj workspace at $path"; exit 1; }
     # snapshots the workspace first, so its changes stay in `jj log`
-    (cd "$root" && jj workspace remove "$ws")
+    (cd "$root" && jj ws-rm "$ws") 3>&-
   else
     root=$(git_main_root "$path")
     branch=$(git -C "$path" branch --show-current)

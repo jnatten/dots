@@ -204,8 +204,8 @@ export default class JjWorkspace extends View {
       const at = (x.machine ?? null) === (this.on ?? null) && place(x, ps)?.replace(/\\/g, "/");
       if (x.id === s?.id || (at && (at === top || at.startsWith(`${top}/`)))) run("space.close", { id: x.id, confirmed: true });
     }
-    const r = await jj(this.repo.main, ["workspace", "remove", current.name], this.on, 600_000);
-    return r.ok ? "" : r.err || "jj workspace remove failed.";
+    const r = await jj(this.repo.main, ["ws-rm", current.name], this.on, 600_000);
+    return r.ok ? "" : r.err || "jj ws-rm failed.";
   }
 
   key(e, cx) {

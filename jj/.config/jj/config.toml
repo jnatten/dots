@@ -61,6 +61,15 @@ ws-add = [
   'exec "$HOME/.config/jj/workspace-add.sh" "$@"',
   "jj ws-add",
 ]
+ws-rm = [
+  "util",
+  "exec",
+  "--",
+  "bash",
+  "-c",
+  'exec "$HOME/.config/jj/workspace-remove.sh" "$@"',
+  "jj ws-rm",
+]
 l = ["log", "-r", "log_this_workspace()"]
 lb = [
   "util",
