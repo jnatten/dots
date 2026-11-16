@@ -318,7 +318,7 @@ export default class JjWorkspace extends View {
       .text_size(13)
       .child(div().font_semibold().text_color(t.foreground).child(title))
       .child(div().text_color(t.muted).child(detail))
-      .when(archived > 0, (el) => el.child(div().text_color(t.blocked).child(`${archived === 1 ? "An archived Claude session lives" : `${archived} archived Claude sessions live`} here and can't be resumed after this.`)))
+      .when(archived > 0, (el) => el.child(div().text_color(t.muted).child(`${archived === 1 ? "An archived Claude session lives" : `${archived} archived Claude sessions live`} here. Resuming ${archived === 1 ? "it" : "one"} later makes the workspace again.`)))
       .when(!remove && !blocked, (el) =>
         el.child(
           Input.new(this.input)
