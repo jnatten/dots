@@ -22,12 +22,14 @@ function rotate(up) {
   for (const target of up ? ids.slice(1) : ids.slice(0, -1).reverse()) run("pane.swap", { pane: moving, target });
 }
 
-// Space and agent next/prev, as the sidebar lists them: spaces in Waiting
-// (shared("spaces.waiting")) and their agents only while its section is open
-// (shared("waiting.open")); agents in jj-agents' order (shared("agents.order")).
+// Space and agent next/prev, as the sidebar lists them (shared("spaces.order"): folders'
+// spaces, but those folded away, and Waiting's only while its section is open); agents
+// in jj-agents' order (shared("agents.order")).
 function spaceOrder() {
-  const parked = new Set(shared("spaces.waiting") ?? []);
   const ids = spaces().map((s) => s.id);
+  const listed = shared("spaces.order");
+  if (Array.isArray(listed) && listed.length) return listed.filter((id) => ids.includes(id));
+  const parked = new Set(shared("spaces.waiting") ?? []);
   return [...ids.filter((id) => !parked.has(id)), ...(shared("waiting.open") ? ids.filter((id) => parked.has(id)) : [])];
 }
 
@@ -68,6 +70,13 @@ export default class Tabs extends View {
         const command = await nextCommand();
         if (/^(space|agent)-(next|prev)$/.test(command)) {
           navigate(command);
+          continue;
+        }
+        // ctrl-1..9: the Nth space as the sidebar shows them.
+        const nth = command.match(/^space-([1-9])$/);
+        if (nth) {
+          const id = spaceOrder()[Number(nth[1]) - 1];
+          if (id) run("space.select", { id });
           continue;
         }
         if (command === "waiting") {

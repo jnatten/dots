@@ -1,7 +1,9 @@
-// Workspace spaces: stable colored avatars, in the order they're in, grouped by
-// machine when more than one is known. After a space's name, the repo
+// Workspace spaces: stable colored avatars, every machine's in one list, in the
+// folders you make (folders.js: by path, or dragged there; the rest in Other), a
+// server icon on another machine's. Machines show only while they need you (asleep, a
+// login, rebuilt, loading). After a space's name, the repo
 // its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
-// switch, right-click for its menu, drag to reorder. Spaces put in Waiting (kept on
+// switch, right-click for its menu, drag to reorder or onto a folder. Spaces put in Waiting (kept on
 // their machine, docs.js) go to a section of their own at the bottom, folded at first.
 // Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
 // those its Claude sessions opened, each with the issues or PRs it's linked to
@@ -13,11 +15,13 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
+import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, home, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
 import { FINAL, branchName, expand, fetchGitHub, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
-import { edited, setWaiting, split, updateLinks } from "./docs.js";
+import { canon, edited, setWaiting, split, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
+import { MARK, applyChange, empty, folderOf, foldersOf, live, matchOf, merge, nextRank, pathOn, tidy, tilde, updateFolders, writeChange } from "./folders.js";
+import { folderInit, folderRender } from "./folder-dialog.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -67,9 +71,23 @@ const GH_FINAL = 30 * 60000;
 const GH_RETRY = 10 * 60000;
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
-// What a stored color name looks like on an avatar (the same in every mod
-// that draws space avatars): one strong color per hue, light and dark alike.
-const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
+// A space's repo: the main checkout's folder, for a worktree too.
+const rootOf = (g) => {
+  if (!g) return null;
+  const repo = JSON.parse(g.repo)[1];
+  return repo.endsWith("/.git") ? repo.slice(0, -5) : g.top;
+};
+
+const URGENT = { blocked: 3, done: 2, working: 1 };
+const urgent = (rows) => rows.map((r) => r.w.status).reduce((m, st) => ((URGENT[st] ?? 0) > (URGENT[m] ?? 0) ? st : m), null);
+
+function loadState() {
+  try {
+    return { ...empty(), ...JSON.parse(localStorage.getItem("folders.state") ?? "null") };
+  } catch {
+    return empty();
+  }
+}
 
 // A space speaks up only when something in it needs you.
 export function glyph(status) {
@@ -88,6 +106,7 @@ function openLinks(id, agent) {
 export default class Spaces extends View {
   init(_props, cx) {
     if (props()?.link) return linkInit(this, cx);
+    if (props()?.folder) return folderInit(this, cx);
     this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked, gh: "owner/repo" }, null: not a repo
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
@@ -96,12 +115,22 @@ export default class Spaces extends View {
     this.ready = {}; // machine -> its layout was readable at the last look
     this.at = {}; // space -> its where() at the last look
     this.watching = new Set(); // local repos' git folders
-    this.pressed = null;
-    this.over = null;
+    this.pressed = null; // a space dragged
+    this.over = null; // the space row it would land next to
+    this.overFolder = null; // the folder (or "other") it would go in
+    this.moving = null; // a folder header pressed (or "other")
+    this.overMove = null; // the folder header it would land next to
+    this.hoverHead = null;
+    this.hidden = new Set(); // spaces in folded folders
+    this.folderState = loadState(); // folders.js's, every machine's merged
+    this.folderWrites = []; // changes made here, not written yet
+    this.folderMissing = new Set();
+    this.foldersAt = 0;
+    this.foldersReady = null;
+    this.homes = { ...JSON.parse(localStorage.getItem("folders.homes") ?? "{}"), "": home() };
     this.machines = [];
     this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
     for (const state of Object.values(this.reconnecting)) state.busy = false;
-    this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
     const gh = shared("github") ?? {};
     this.items = gh.items ?? {}; // url -> { kind, url, repo, number, title, state, at }
     this.agentLinks = gh.agents ?? {}; // terminal -> PR urls its Claude session recorded
@@ -144,6 +173,7 @@ export default class Spaces extends View {
     this.trelloDue(now, cx);
     this.linksDue(now, cx);
     this.waitingDue(cx);
+    this.foldersDue(now, cx);
   }
 
   // Spaces moved in or out of Waiting by the other mods (jj-menu, jj-tabs), which show it
@@ -166,6 +196,179 @@ export default class Spaces extends View {
       this.linksAt = 0;
       cx.notify();
     });
+  }
+
+  // Folder edits asked for by the menu and the folder dialog (shared("space-folders.ask"))
+  // and made here, written to the machines; then every machine's folders read again, now
+  // and then and when one comes back.
+  foldersDue(now, cx) {
+    const asks = shared("space-folders.ask") ?? [];
+    if (asks.length) {
+      setShared("space-folders.ask", []);
+      for (const a of asks) this.ask(a);
+    }
+    if (this.foldering) return;
+    const ready = machines().filter((m) => m.layout === "ready").map((m) => m.name ?? "").sort().join("\0");
+    const stale = ready !== this.foldersReady || now - this.foldersAt > (window().active ? 10000 : 60000);
+    if (!stale && !this.folderWrites.length) return;
+    this.foldersReady = ready;
+    this.foldering = true;
+    cx.spawn(async (cx) => {
+      try {
+        while (this.folderWrites.length) await this.writeFolders(this.folderWrites.splice(0));
+        await this.syncFolders();
+      } catch (e) {
+        console.log(`jj-spaces: folders: ${e?.stack ?? e}`);
+      } finally {
+        this.foldersAt = Date.now();
+        this.foldering = false;
+      }
+      cx.notify();
+    });
+  }
+
+  ask(a) {
+    const st = this.folderState;
+    const now = Date.now();
+    if (a.op === "save") {
+      const id = a.id ?? `f${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      const was = st.folders[id];
+      const rec = { name: a.name, color: a.color ?? null, rank: was && !was.gone ? was.rank : nextRank(st), at: now };
+      this.change([{ kind: "folder", id, rec }, ...Object.entries(a.paths ?? {}).map(([key, path]) => ({ kind: "path", key, id, path }))]);
+    } else if (a.op === "delete" && st.folders[a.id]) {
+      this.change([{ kind: "folder", id: a.id, rec: { ...st.folders[a.id], gone: true, at: now } }]);
+    } else if (a.op === "unpin") {
+      const [on, bare] = split(a.space);
+      this.change([{ kind: "pin", key: on ?? "", bare, folder: null }]);
+    }
+  }
+
+  // Shown at once, written by foldersDue.
+  change(changes) {
+    for (const c of changes) applyChange(this.folderState, c);
+    this.folderWrites.push(...changes);
+  }
+
+  async writeFolders(changes) {
+    const ready = new Set(machines().filter((m) => m.layout === "ready").map((m) => m.name ?? ""));
+    const by = {};
+    for (const c of changes) for (const key of c.kind === "folder" ? ready : [c.key]) (by[key] ??= []).push(c);
+    for (const [key, cs] of Object.entries(by)) {
+      try {
+        if (!ready.has(key)) throw new Error(`${key || "This computer"} isn't connected.`);
+        await updateFolders(key || null, (doc) => tidy(cs.reduce(writeChange, doc), this.folderState.folders));
+      } catch (e) {
+        notify({ title: "Couldn't save the folders", body: String(e?.message ?? e), level: "error" });
+      }
+    }
+  }
+
+  // Every machine's document read and merged; one behind (a folder changed while it was
+  // away, one gone, a space missing at two reads in a row) is brought up to date.
+  async syncFolders() {
+    const docs = {};
+    for (const m of machines().filter((m) => m.layout === "ready")) {
+      try {
+        docs[m.name ?? ""] = await foldersOf(m.name);
+      } catch {}
+    }
+    const state = merge(docs, this.folderState);
+    const missing = new Set();
+    for (const [key, doc] of Object.entries(docs)) {
+      const present = new Set(spaces().filter((s) => (s.machine ?? "") === key).map((s) => split(s.id)[1]));
+      const drop = new Set();
+      for (const bare of Object.keys(doc.spaces)) {
+        if (present.has(bare)) continue;
+        const k = `${key}\0${bare}`;
+        if (this.folderMissing.has(k)) drop.add(bare);
+        else missing.add(k);
+      }
+      const fix = (d) => tidy(d, state.folders, drop);
+      if (canon(fix(JSON.parse(JSON.stringify(doc)))) === canon(doc)) continue;
+      try {
+        const fresh = await updateFolders(key || null, fix);
+        state.paths[key] = fresh.paths;
+        state.pins[key] = fresh.spaces;
+      } catch {}
+    }
+    this.folderMissing = missing;
+    for (const c of this.folderWrites) applyChange(state, c);
+    this.folderState = state;
+    const text = JSON.stringify(state);
+    if (text !== localStorage.getItem("folders.state")) localStorage.setItem("folders.state", text);
+  }
+
+  // What the menu and the folder dialog read: the folders with where they are on each
+  // machine, spaces moved by hand, homes and machines.
+  publishFolders() {
+    const st = this.folderState;
+    const keys = ["", ...this.machines.map((m) => m.name)];
+    const folders = live(st).map((f) => ({ id: f.id, name: f.name, color: f.color ?? null, paths: Object.fromEntries(keys.map((k) => [k, pathOn(st, f.id, k, this.homes)]).filter(([, at]) => at)) }));
+    const pins = {};
+    for (const [key, of] of Object.entries(st.pins)) for (const [bare, id] of Object.entries(of)) if (id === "" || (st.folders[id] && !st.folders[id].gone)) pins[key ? `${key}/${bare}` : bare] = id;
+    const value = { folders, pins, homes: this.homes, machines: this.machines.map((m) => ({ name: m.name, state: m.state })) };
+    const text = JSON.stringify(value);
+    if (text !== this.foldersPublished) {
+      this.foldersPublished = text;
+      setShared("space-folders", value);
+    }
+  }
+
+  // A space dropped on a folder ("" for Other). Where its path already takes it, it just
+  // follows its path again. A folder with nothing on the space's machine yet (no path of
+  // its own there, no space of it) learns its repo as its path there, for its neighbours
+  // too; otherwise the space is pinned there.
+  dropSpace(id, folder) {
+    const s = spaces().find((x) => x.id === id);
+    const st = this.folderState;
+    if (!s || (folder && (!st.folders[folder] || st.folders[folder].gone))) return;
+    const key = s.machine ?? "";
+    const bare = split(id)[1];
+    const ps = panes();
+    const g = this.git[where(s, ps)] ?? null;
+    const places = [place(s, ps), rootOf(g)];
+    const auto = matchOf(st, this.homes, key, places);
+    const was = st.pins[key]?.[bare] ?? null;
+    const pin = (to) => (to === was ? [] : [{ kind: "pin", key, bare, folder: to }]);
+    if (!folder) return this.change(pin(auto ? "" : null));
+    if (auto === folder) return this.change(pin(null));
+    const path = places[1] ?? places[0];
+    const others = [...(this.rowsById?.values() ?? [])].some((r) => r.folder === folder && r.w.id !== id && (r.w.machine ?? "") === key);
+    if (st.paths[key]?.[folder] || others || !path || path === "/" || path === this.homes[key]) return this.change(pin(folder));
+    const teach = { kind: "path", key, id: folder, path };
+    const taught = matchOf(applyChange(JSON.parse(JSON.stringify(st)), teach), this.homes, key, places) === folder;
+    this.change([teach, ...pin(taught ? null : folder)]);
+    notify({ title: st.folders[folder].name, body: `Spaces in ${tilde(path, this.homes[key])}${key ? ` on ${key}` : ""} go in this folder now.`, level: "info" });
+  }
+
+  // A folder dragged onto another: it goes where that one is.
+  reorder(from, to) {
+    const ids = live(this.folderState).map((f) => f.id);
+    const i = ids.indexOf(from);
+    const j = ids.indexOf(to);
+    if (i === -1 || j === -1 || i === j) return;
+    const rank = (id) => this.folderState.folders[id].rank ?? 0;
+    const rest = ids.filter((id) => id !== from);
+    const k = rest.indexOf(to) + (i < j ? 1 : 0);
+    const before = k > 0 ? rank(rest[k - 1]) : null;
+    const after = k < rest.length ? rank(rest[k]) : null;
+    const at = before === null ? after - 1 : after === null ? before + 1 : (before + after) / 2;
+    this.change([{ kind: "folder", id: from, rec: { ...this.folderState.folders[from], rank: at, at: Date.now() } }]);
+  }
+
+  fold(id) {
+    const now = shared("space-folders.folded") ?? [];
+    setShared("space-folders.folded", now.includes(id) ? now.filter((x) => x !== id) : [...now, id]);
+  }
+
+  // Where a new space in a folder starts: this computer, else a connected machine it's on.
+  newIn(f) {
+    const keys = ["", ...this.machines.filter((m) => m.state === "connected").map((m) => m.name)];
+    for (const key of keys) {
+      const at = pathOn(this.folderState, f.id, key, this.homes);
+      if (at) return { args: { folder: at.path, machine: key }, tip: `New space in ${tilde(at.path, this.homes[key])}${key ? ` on ${key}` : ""}` };
+    }
+    return null;
   }
 
   // Hand-made links and Waiting marks from each machine's core into shared("github.links"),
@@ -414,9 +617,10 @@ export default class Spaces extends View {
       this.ready[m.name] = ready;
     }
     if (window().active) {
+      const shown = new Set(sp.filter((s) => !this.hidden.has(s.id)).map((s) => at[s.id]));
       for (const k of keys) {
         const asks = this.git[k] || this.unsure.has(k);
-        if (asks && !this.folded.has(JSON.parse(k)[0]) && now - (this.checked[k] ?? 0) > FALLBACK) due.add(k);
+        if (asks && shown.has(k) && now - (this.checked[k] ?? 0) > FALLBACK) due.add(k);
       }
     }
     return due;
@@ -431,6 +635,13 @@ export default class Spaces extends View {
   refreshMachines(cx) {
     cx.spawn(async cx => {
       try { const r = await hc(["machine", "ls", "--json"]); if (r.code === 0) this.machines = (JSON.parse(r.stdout).machines ?? []).filter((m) => !m.temporary); } catch {}
+      // Homes, for folders on one machine at the same place under another's home.
+      for (const m of this.machines.filter((m) => m.state === "connected" && !this.homes[m.name])) {
+        const r = await exec("printenv", ["HOME"], { on: m.name }).catch(() => null);
+        if (r?.code !== 0 || !r.stdout.trim()) continue;
+        this.homes[m.name] = r.stdout.trim();
+        localStorage.setItem("folders.homes", JSON.stringify(this.homes));
+      }
       cx.notify();
     });
   }
@@ -469,8 +680,6 @@ export default class Spaces extends View {
         if (machine.session) args.push("--session", machine.session);
         if (machine.temporary) args.push("--temp");
         await ask(args);
-        this.folded.delete(name);
-        localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
         delete this.reconnecting[name];
       } catch (e) {
         state.error = String(e.message ?? e);
@@ -554,22 +763,182 @@ export default class Spaces extends View {
 
   menu(w) {
     // A popup is as tall as its items; height is only the most.
-    openOverlay({ mod: "jj-menu", kind: "popup", width: 200, height: 260, props: { tab: "space", target: { id: w.id } } });
+    openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 380, props: { tab: "space", target: { id: w.id } } });
   }
 
-  ordered() {
-    const sp = spaces(), ps = panes();
-    return sp.map((w, i) => ({ w, i, g: this.git[where(w, ps)] ?? null }));
-  }
-
-  // The rows, but those in Waiting, then the Waiting section.
-  grouped(t, collapsed) {
+  // Where each space goes: a folder (by hand, else by path), Other, or Waiting.
+  tree(sp, ps) {
+    const st = this.folderState;
+    const list = live(st);
     const parked = new Set(shared("spaces.waiting") ?? []);
-    const all = this.ordered();
-    const rows = all.filter((r) => !parked.has(r.w.id));
-    const waiting = all.filter((r) => parked.has(r.w.id));
+    const inside = new Map(list.map((f) => [f.id, []]));
+    const other = [];
+    const waiting = [];
+    sp.forEach((w, i) => {
+      const g = this.git[where(w, ps)] ?? null;
+      const r = { w, i, g, folder: null, waiting: parked.has(w.id) };
+      if (r.waiting) return waiting.push(r);
+      r.folder = folderOf(st, this.homes, w.machine ?? "", split(w.id)[1], [place(w, ps), rootOf(g)]);
+      const bucket = inside.get(r.folder);
+      if (!bucket) r.folder = null;
+      (bucket ?? other).push(r);
+    });
+    return { list, inside, other, waiting };
+  }
+
+  // Folders, each with its spaces (folded: only the shown one), then Other, machines
+  // that need you, and Waiting. Publishes the order next/prev and ctrl-1..9 go by
+  // (shared("spaces.order")) and every space in list order (shared("spaces.listed")).
+  grouped(t, collapsed) {
+    const sp = spaces();
+    const tree = this.tree(sp, panes());
+    this.rowsById = new Map([...tree.inside.values(), tree.other, tree.waiting].flat().map((r) => [r.w.id, r]));
+    this.filed = tree.list.length > 0;
+    const folded = new Set(shared("space-folders.folded") ?? []);
+    const out = [];
+    const order = [];
+    const listed = [];
+    const hidden = new Set();
     const draw = (r) => (collapsed ? this.compact(r, t) : this.row(r, t));
-    return [...this.machineGroups(t, collapsed, rows, waiting, draw), ...this.waitingSection(t, collapsed, waiting, draw)];
+    const rows = (members, shut) => {
+      for (const r of members) {
+        listed.push(r.w.id);
+        if (shut && !r.w.active) {
+          hidden.add(r.w.id);
+          continue;
+        }
+        r.n = order.push(r.w.id);
+        out.push(draw(r));
+      }
+    };
+    for (const f of tree.list) {
+      const members = tree.inside.get(f.id);
+      const color = f.color ? (MARK[f.color] ?? t[f.color]) : t.dim;
+      out.push(collapsed ? this.railHead(f.id, f.name, color, folded.has(f.id), members, t) : this.folderHead(f, color, members, folded.has(f.id), t, tree.list));
+      rows(members, folded.has(f.id));
+    }
+    const dragging = this.pressed !== null && Boolean(this.rowsById.get(this.pressed)?.folder);
+    if (this.filed && (tree.other.length || dragging)) {
+      out.push(collapsed ? this.railHead("other", "Other", t.border, folded.has("other"), tree.other, t) : this.otherHead(tree.other, folded.has("other"), t));
+      rows(tree.other, folded.has("other"));
+    } else rows(tree.other, false);
+    if (!sp.length) out.push(machines().find((m) => m.name === null)?.layout === "loading" ? this.loadingRow(t, collapsed) : this.emptyRow(t, collapsed));
+    out.push(...this.machineRows(t, collapsed));
+    const open = Boolean(shared("waiting.open"));
+    for (const r of tree.waiting) {
+      listed.push(r.w.id);
+      if (open) r.n = order.push(r.w.id);
+    }
+    out.push(...this.waitingSection(t, collapsed, tree.waiting, draw));
+    this.hidden = hidden;
+    for (const [key, value] of [["spaces.order", order], ["spaces.listed", listed]]) if (JSON.stringify(value) !== JSON.stringify(shared(key) ?? [])) setShared(key, value);
+    return out;
+  }
+
+  endDrag() {
+    this.pressed = this.over = this.overFolder = this.moving = this.overMove = null;
+  }
+
+  // A header under a dragged space (it would go in there) or a dragged folder.
+  overHead(id, cx) {
+    let changed = false;
+    if (this.pressed !== null && (this.overFolder !== id || this.over !== null)) {
+      this.overFolder = id;
+      this.over = null;
+      changed = true;
+    }
+    if (this.moving && this.moving !== "other" && id !== "other" && this.overMove !== id) {
+      this.overMove = id;
+      changed = true;
+    }
+    if (changed) cx.notify();
+  }
+
+  // Released on a header: a space goes in, a folder goes there, a click folds.
+  upOnHead(id, cx) {
+    const { pressed, moving, overMove } = this;
+    this.endDrag();
+    if (pressed !== null) this.dropSpace(pressed, id === "other" ? "" : id);
+    else if (moving === id) this.fold(id);
+    else if (moving && moving !== "other" && id !== "other" && overMove === id) this.reorder(moving, id);
+    cx.notify();
+  }
+
+  // A folder: click folds it (folded, its count takes the most urgent status's color),
+  // right-click for its menu, drag onto another to move it; spaces dragged onto it go in.
+  folderHead(f, color, members, folded, t, list) {
+    const top = urgent(members);
+    const moving = this.moving && this.moving !== "other" ? this.moving : null;
+    const from = list.findIndex((x) => x.id === moving);
+    const to = list.findIndex((x) => x.id === f.id);
+    const add = this.hoverHead === f.id ? this.newIn(f) : null;
+    return h_flex().id(`folder-${f.id}`).relative().h(26).mt(6).flex_none().px(8).gap(7).items_center().rounded(6)
+      .text_size(11).text_color(t.dim).cursor_pointer().hover((st) => st.bg(t.hover).text_color(t.foreground))
+      .when(this.pressed !== null && this.overFolder === f.id, (el) => el.bg(t.selected).text_color(t.foreground))
+      .when(moving === f.id && this.overMove !== f.id, (el) => el.opacity(0.5))
+      .when(Boolean(moving) && moving !== f.id && this.overMove === f.id, (el) => el.child(div().absolute().left(0).right(0).h(2).bg(t.accent)
+        .when(from < to, (line) => line.bottom(0))
+        .when(from > to, (line) => line.top(0))))
+      .on_hover((hovered, cx) => {
+        const next = hovered ? f.id : this.hoverHead === f.id ? null : this.hoverHead;
+        if (next !== this.hoverHead) {
+          this.hoverHead = next;
+          cx.notify();
+        }
+      })
+      .on_mouse_down("left", () => { this.moving = f.id; this.overMove = f.id; })
+      .on_mouse_down("right", () => openOverlay({ mod: "jj-menu", kind: "popup", width: 240, height: 260, props: { tab: "folder", target: { id: f.id } } }))
+      .on_mouse_move((_e, cx) => this.overHead(f.id, cx))
+      .on_mouse_up("left", (_e, cx) => this.upOnHead(f.id, cx))
+      .child(svg(`mods/workspace-chrome/chevron-${folded ? "right" : "down"}.svg`).size(11).flex_none())
+      .child(svg("mods/workspace-chrome/folder.svg").size(12).flex_none().text_color(color))
+      .child(div().flex_1().min_w(0).truncate().child(f.name))
+      .when(Boolean(add), (el) => el.child(div().id(`folder-add-${f.id}`).flex_none().px(4).rounded(4).tooltip(add.tip)
+        .hover((st) => st.bg(t.selected).text_color(t.foreground))
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click((_e, cx) => { cx.stop_propagation(); run("space.new", add.args); })
+        .child("+")))
+      .child(div().flex_none().text_color(folded && top ? t[top] : t.dim).child(String(members.length)));
+  }
+
+  // Spaces in no folder; spaces dragged onto it leave theirs.
+  otherHead(members, folded, t) {
+    const top = urgent(members);
+    return h_flex().id("other-head").h(26).mt(6).flex_none().px(8).gap(7).items_center().rounded(6)
+      .text_size(11).text_color(t.dim).cursor_pointer().hover((st) => st.bg(t.hover).text_color(t.foreground))
+      .when(this.pressed !== null && this.overFolder === "other", (el) => el.bg(t.selected).text_color(t.foreground))
+      .on_mouse_down("left", () => { this.moving = "other"; })
+      .on_mouse_move((_e, cx) => this.overHead("other", cx))
+      .on_mouse_up("left", (_e, cx) => this.upOnHead("other", cx))
+      .child(svg(`mods/workspace-chrome/chevron-${folded ? "right" : "down"}.svg`).size(11).flex_none())
+      .child(div().flex_1().child("Other"))
+      .child(div().flex_none().text_color(folded && top ? t[top] : t.dim).child(String(members.length)));
+  }
+
+  // A folder on the rail: a line (thicker folded) that folds it.
+  railHead(id, name, color, folded, members, t) {
+    const top = urgent(members);
+    return railCell(h_flex().id(`rail-${id}`).w(RAIL_CELL).h(12).mt(4).px(6).items_center().rounded(4).cursor_pointer()
+      .hover((st) => st.bg(t.hover))
+      .tooltip(`${name} · ${members.length}`)
+      .on_click(() => this.fold(id))
+      .child(div().flex_1().h(folded ? 3 : 1).rounded(1).bg(folded && top ? t[top] : color)));
+  }
+
+  loadingRow(t, collapsed) {
+    return h_flex().id("spaces-loading").h(28).flex_none().px(collapsed ? 0 : 8).items_center().when(collapsed, (el) => el.justify_center())
+      .text_size(12).text_color(t.dim).child(collapsed ? "…" : "Loading…");
+  }
+
+  emptyRow(t, collapsed) {
+    const el = h_flex().id("spaces-new").h(28).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(7)
+      .text_size(12).text_color(t.dim).hover((st) => st.bg(t.hover).text_color(t.foreground))
+      .on_click(() => run("space.new", { machine: "" }))
+      .when(collapsed, (el) => el.w(RAIL_CELL).rounded(6).justify_center().tooltip("New space")
+        .child(h_flex().size(18).rounded(5).border_1().border_color(t.dim).items_center().justify_center()
+          .child(svg("mods/workspace-chrome/plus.svg").size(10))))
+      .when(!collapsed, (el) => el.child(svg("mods/workspace-chrome/plus.svg").size(12)).child("New space"));
+    return collapsed ? railCell(el) : el;
   }
 
   // Waiting spaces, under a header that folds them (shared("waiting.open"), this
@@ -577,8 +946,7 @@ export default class Spaces extends View {
   waitingSection(t, collapsed, waiting, draw) {
     if (!waiting.length) return [];
     const open = Boolean(shared("waiting.open"));
-    const URGENT = { blocked: 3, done: 2, working: 1 };
-    const top = waiting.map((r) => r.w.status).reduce((m, st) => ((URGENT[st] ?? 0) > (URGENT[m] ?? 0) ? st : m), null);
+    const top = urgent(waiting);
     const head = h_flex().id("waiting-head").h(26).mt(6).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(6)
       .text_size(11).text_color(t.dim).cursor_pointer().hover((st) => st.bg(t.hover).text_color(t.foreground))
       .when(collapsed, (el) => el.w(RAIL_CELL).justify_center().tooltip(`Waiting · ${waiting.length}`))
@@ -586,72 +954,48 @@ export default class Spaces extends View {
       .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
       .when(!collapsed, (el) => el.child(div().flex_1().child("Waiting")))
       .child(div().flex_none().text_color(!open && top ? t[top] : t.dim).child(String(waiting.length)));
-    return [collapsed ? railCell(head) : head, ...(open ? waiting.map((r) => (collapsed ? draw(r) : this.row(r, t, true))) : [])];
+    return [collapsed ? railCell(head) : head, ...(open ? waiting.map(draw) : [])];
   }
 
-  // The rows, under a header per machine once one isn't this computer.
-  machineGroups(t, collapsed, rows, waiting, draw) {
-    const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
-    const loading = m => {
-      const layout = machines().find(k => k.name === m)?.layout;
-      return layout === "loading" || (!layout && this.machines.some(k => k.name === m && k.state === "connected"));
-    };
-    const loadingRow = m => h_flex().id(`machine-loading-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).items_center().when(collapsed, el => el.justify_center()).text_size(12).text_color(t.dim).child(collapsed ? "…" : "Loading…");
-    if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : rows.map(draw);
-    const machineNames = [null, ...remote];
-    return machineNames.flatMap((m) => {
-      const mine = rows.filter((r) => (r.w.machine ?? null) === m);
+  // A row per machine that needs you: asleep, a login (with the command to Copy),
+  // rebuilt (Connect) or loading. A click opens Settings > Machines.
+  machineRows(t, collapsed) {
+    const names = [...new Set([...spaces().map((s) => s.machine).filter(Boolean), ...this.machines.map((m) => m.name), ...Object.keys(this.reconnecting)])].sort();
+    return names.flatMap((m) => {
       const repair = this.reconnecting[m];
-      const machine = this.machines.find(k => k.name === m) ?? repair?.machine;
-      const connected = !m || machine?.state === "connected";
+      const machine = this.machines.find((k) => k.name === m) ?? repair?.machine;
+      const layout = machines().find((k) => k.name === m)?.layout;
+      const connected = machine?.state === "connected";
       const rebuilt = this.rebuilt(machine) || !!repair;
+      const loading = connected && (!layout || layout === "loading");
+      if (connected && !rebuilt && layout === "ready") return [];
       const login = machine?.state === "needs_login" ? `hc machine login ${m}` : null;
-      const folded = this.folded.has(m);
-      const icon = svg(`mods/workspace-chrome/${m ? "server" : "monitor"}.svg`).size(13).flex_none();
+      const state = loading ? "loading…" : connected ? "unavailable" : (machine?.state ?? "asleep").replace(/_/g, " ");
+      const icon = svg("mods/workspace-chrome/server.svg").size(13).flex_none();
       const badge = div().absolute().right(-3).bottom(-2).size(6).rounded(3).border_1().border_color(t.chrome).bg(connected ? t.ansi2 : t.dim);
-      const head = h_flex().id(`machine-${m ?? "local"}`).h(26).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().text_size(11).text_color(t.dim)
-        .when(collapsed, el => el.mt(4).w(RAIL_CELL).justify_center().rounded(6).tooltip(login ? `${m} needs a login: run ${login}. Click for Copy.` : m ? `${m} · ${connected ? "connected" : (machine?.state ?? "asleep").replace(/_/g, " ")}` : "This computer"))
-        .cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => {
-          if (collapsed && login) { run("app.settings", { section: "machines" }); return; }
-          folded ? this.folded.delete(m) : this.folded.add(m);
-          localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
-          cx.notify();
-        })
-        .when(!collapsed, el => el.child(icon))
-        .when(collapsed, el => el.child(div().relative().flex_none().child(icon).when(Boolean(m), el => el.child(badge))))
-        .when(!collapsed, el => el.child(div().flex_1().truncate().child(m ?? "This computer"))
-          .when(!connected && !rebuilt && !login, el => el.child(div().flex_none().child((machine?.state ?? "asleep").replace(/_/g, " "))))
-          .when(rebuilt, el => el.child(h_flex().flex_none().gap(3).items_center()
+      const head = h_flex().id(`machine-${m}`).h(26).mt(6).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(6).text_size(11).text_color(t.dim)
+        .when(!rebuilt && !loading, (el) => el.cursor_pointer().hover((st) => st.bg(t.hover)).on_click(() => run("app.settings", { section: "machines" })))
+        .when(collapsed, (el) => el.w(RAIL_CELL).justify_center().tooltip(login ? `${m} needs a login: run ${login}. Click for Settings.` : `${m} · ${rebuilt ? "rebuilt" : state}`)
+          .child(div().relative().flex_none().child(icon).child(badge)))
+        .when(!collapsed, (el) => el.child(icon).child(div().flex_1().truncate().child(m))
+          .when(!rebuilt && !login, (el) => el.child(div().flex_none().child(state)))
+          .when(rebuilt, (el) => el.child(h_flex().flex_none().gap(3).items_center()
             .child(div().max_w(140).truncate().child(repair?.error || "rebuilt ·"))
             .child(div().id(`machine-connect-${m}`).text_color(repair?.error ? t.blocked : t.muted)
-              .hover(s => s.text_color(t.foreground))
+              .hover((st) => st.text_color(t.foreground))
               .tooltip(repair?.error || "This machine was rebuilt or replaced. Click to connect to the new one.")
               .on_click((_e, cx) => { cx.stop_propagation(); this.reconnect(machine, cx); })
               .child(repair?.busy ? "Connecting…" : "Connect"))))
-          .when(connected, el => el.child(div().id(`machine-add-${m ?? "local"}`).flex_none().px(4).rounded(4).hover(s => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => { cx.stop_propagation(); run("space.new", { machine: m ?? "" }); }).child("+")))
-          .child(div().size(6).rounded(3).flex_none().bg(connected ? t.ansi2 : t.dim))
-          .child(svg(`mods/workspace-chrome/chevron-${folded ? "right" : "down"}.svg`).size(11).flex_none()));
-      const empty = h_flex().id(`machine-new-${m ?? "local"}`).h(28).flex_none().px(collapsed ? 0 : 8).gap(7).items_center().rounded(7)
-        .text_size(12).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
-        .on_click(() => run("space.new", { machine: m ?? "" }))
-        .when(collapsed, el => el.w(RAIL_CELL).rounded(6).justify_center().tooltip(`New space on ${m ?? "this computer"}`)
-          .child(h_flex().size(18).rounded(5).border_1().border_color(t.dim).items_center().justify_center()
-            .child(svg("mods/workspace-chrome/plus.svg").size(10))))
-        .when(!collapsed, el => el.child(svg("mods/workspace-chrome/plus.svg").size(12)).child("New space there"));
-      if (!collapsed && rebuilt) return [head];
-      const cell = collapsed ? railCell : (el) => el;
+          .child(div().size(6).rounded(3).flex_none().bg(connected ? t.ansi2 : t.dim)));
       const guidance = !collapsed && login ? [v_flex().px(8).pb(6).gap(3).flex_none()
         .child(div().text_size(11).text_color(t.blocked).child("needs a login: run"))
         .child(h_flex().gap(5).items_center()
           .child(div().flex_1().min_w(0).truncate().tooltip(login).text_size(11).text_color(t.muted).child(login))
           .child(div().id(`machine-login-copy-${m}`).flex_none().px(5).py(2).rounded(4)
-            .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover(s => s.bg(t.hover))
+            .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover((st) => st.bg(t.hover))
             .on_click((_e, cx) => { cx.stop_propagation(); cx.write_to_clipboard(login); this.copiedLogin = login; cx.notify(); })
             .child(this.copiedLogin === login ? "Copied" : "Copy")))] : [];
-      const parkedHere = waiting.some((r) => (r.w.machine ?? null) === m);
-      return [cell(head), ...guidance, ...(folded ? [] : mine.length ? mine.map(draw) : parkedHere ? [] : [loading(m) ? loadingRow(m) : cell(empty)])];
+      return [collapsed ? railCell(head) : head, ...guidance];
     });
   }
 
@@ -677,8 +1021,10 @@ export default class Spaces extends View {
       .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
   }
 
-  // `where`: a server icon names another machine's space (the Waiting section has no machine headers).
-  row({ w, i, g }, t, where = false) {
+  // A server icon names another machine's space. Dropped on a space of the same
+  // machine, a space moves next to it (into its folder); on another machine's, into its folder.
+  row(r, t) {
+    const { w, i, g } = r;
     const on = w.active;
     const fromIndex = this.pressed === null ? -1 : spaces().findIndex(s => s.id === this.pressed);
     const colors = shared("space.colors") ?? {};
@@ -703,24 +1049,37 @@ export default class Spaces extends View {
       .on_mouse_down("left", () => {
         this.pressed = w.id;
         this.over = w.id;
+        this.overFolder = null;
       })
       .on_mouse_move((_e, cx) => {
-        const source = spaces().find(s => s.id === this.pressed);
-        const over = source && (source.machine ?? null) === (w.machine ?? null) ? w.id : null;
-        if (this.pressed !== null && this.over !== over) {
-          this.over = over;
-          cx.notify();
+        let changed = false;
+        if (this.moving && this.overMove !== null) {
+          this.overMove = null;
+          changed = true;
         }
+        if (this.pressed !== null) {
+          const source = spaces().find(s => s.id === this.pressed);
+          const same = Boolean(source) && (source.machine ?? null) === (w.machine ?? null);
+          const over = same ? w.id : null;
+          const overFolder = same || !this.filed || r.waiting ? null : (r.folder ?? "other");
+          if (this.over !== over || this.overFolder !== overFolder) {
+            this.over = over;
+            this.overFolder = overFolder;
+            changed = true;
+          }
+        }
+        if (changed) cx.notify();
       })
       .on_mouse_up("left", (_e, cx) => {
-        const from = this.pressed;
-        const over = this.over;
-        this.pressed = null;
-        this.over = null;
+        const { pressed: from, over, overFolder } = this;
+        this.endDrag();
         if (from !== null && over === w.id && from !== w.id) {
+          const source = this.rowsById?.get(from);
+          if (this.filed && source && !source.waiting && !r.waiting && source.folder !== r.folder) this.dropSpace(from, r.folder ?? "");
           const index = spaces().findIndex(s => s.id === w.id);
           if (index !== -1) run("space.move", { id: from, index: index + 1 });
         } else if (from === w.id) run("space.select", { id: w.id });
+        else if (from !== null && overFolder !== null) this.dropSpace(from, overFolder === "other" ? "" : overFolder);
         cx.notify();
       })
       .on_mouse_down("right", () => this.menu(w))
@@ -730,16 +1089,17 @@ export default class Spaces extends View {
           .items_center()
           .child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?"))
           .child(div().flex_shrink(1).min_w(48).max_w(150).truncate().text_color(t.foreground).child(w.name))
-          .when(where && Boolean(w.machine), (el) => el.child(div().id(`space-machine-${w.id}`).flex_none().text_color(t.dim).tooltip(w.machine)
+          .when(Boolean(w.machine), (el) => el.child(div().id(`space-machine-${w.id}`).flex_none().text_color(t.dim).tooltip(w.machine)
             .child(svg("mods/workspace-chrome/server.svg").size(11))))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
           .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id)))),
       );
   }
 
-  compact({ w, i }, t) {
+  compact({ w, n }, t) {
     return railCell(h_flex()
       .id(`space-${w.id}`)
+      .tooltip(w.machine ? `${w.name} · ${w.machine}` : w.name)
       .relative()
       .w(RAIL_CELL)
       .h(26)
@@ -749,12 +1109,13 @@ export default class Spaces extends View {
       .when(w.active, (el) => el.bg(t.selected))
       .when(!w.active, (el) => el.hover((s) => s.bg(t.hover)))
       .on_click(() => run("space.select", { id: w.id }))
-      .child(div().text_color(w.active ? t.foreground : t.muted).child(String(i + 1)))
+      .child(div().text_color(w.active ? t.foreground : t.muted).child(String(n)))
       .child(div().absolute().right(5).text_color(tone(t, w.status)).child(glyph(w.status))));
   }
 
   render() {
     if (props()?.link) return linkRender(this);
+    if (props()?.folder) return folderRender(this);
     const t = theme();
     const collapsed = narrow();
     const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
@@ -770,14 +1131,18 @@ export default class Spaces extends View {
     }
     if (changed) setShared("space.colors", kept);
     this.publish(sp, panes());
+    this.publishFolders();
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
       .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())
         .when(!collapsed, el => el.child("Spaces"))
         .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
-          .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14))))
+          .tooltip("New space · right-click: on another machine, or a folder")
+          .on_click(() => run("space.new"))
+          .on_mouse_down("right", () => openOverlay({ mod: "jj-menu", kind: "popup", width: 240, height: 300, props: { tab: "new" } }))
+          .child(svg("mods/workspace-chrome/plus.svg").size(14))))
       .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 8).pb(14).overflow_y_scrollbar().mode("always")
-        .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
+        .on_mouse_up("left", (_e, cx) => { this.endDrag(); cx.notify(); })
         .children(this.grouped(t, collapsed)));
   }
 }
