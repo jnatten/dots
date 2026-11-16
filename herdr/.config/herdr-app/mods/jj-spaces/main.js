@@ -1,8 +1,8 @@
 // Workspace spaces: stable colored avatars, every machine's in one list, in the
 // folders you make (folders.js: by path, or dragged there; the rest in Other), a
 // server icon on another machine's. Machines show only while they need you (asleep, a
-// login, rebuilt, loading). After a space's name, the repo
-// its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
+// login, rebuilt, loading). After a space's name, where its first terminal is now,
+// only where unusual: branch, ahead/behind (its folder says the repo). Agent state lives in the agents list, not here. Click to
 // switch, right-click for its menu, drag to reorder or onto a folder. Spaces put in Waiting (kept on
 // their machine, docs.js) go to a section of their own at the bottom, folded at first.
 // Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
@@ -999,15 +999,12 @@ export default class Spaces extends View {
     });
   }
 
-  // Only what's unusual, after the name: "herdr \u00b7 spike \u21912 \u21931". The repo or
-  // branch goes when the name already says it (a worktree is named after its branch),
-  // and master/main go: nearly every space is on one.
+  // Only what's unusual, after the name: "spike \u21912 \u21931". The branch goes when the
+  // name already says it (a worktree is named after its branch), and master/main go:
+  // nearly every space is on one.
   gitTail(g, name, t) {
     const raw = g.branch ?? "detached";
-    const same = (a) => a.toLowerCase() === name.toLowerCase();
-    const branch = same(raw) || raw === "master" || raw === "main" ? "" : raw;
-    const repo = same(g.name) ? "" : g.name;
-    const where = [repo, branch].filter(Boolean).join(" \u00b7 ");
+    const where = raw.toLowerCase() === name.toLowerCase() || raw === "master" || raw === "main" ? "" : raw;
     return h_flex()
       .flex_1()
       .min_w(0)
