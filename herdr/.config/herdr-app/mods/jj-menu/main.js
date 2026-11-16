@@ -1,7 +1,8 @@
 // Context menus (Herdr's items). Opened as a popup with
 // props { tab: "pane" | "agent" | "tab" | "space" | "folder" | "new" | "global", target }.
 // ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
-// a command "worktree", "jj-workspace", "jj-sessions", "jj-panes", "jj-copy" or "jj-spaces" (its link dialog) opens that mod instead,
+// a command "worktree", "jj-workspace", "jj-sessions", "jj-panes", "jj-copy", "jj-spaces" (its link dialog) or
+// "jj-agents" (an agent's description) opens that mod instead,
 // "folder-dialog" the folder dialog and "folder-op" asks jj-spaces for a folder change.
 
 import { View, div, svg } from "gpui-kit";
@@ -94,7 +95,10 @@ function items(p, git) {
             ]
           : []),
         ...(inTab && agents().some((a) => a.address === tg.terminal && claude(a)) ? [["Archive session", "jj-sessions", { action: "archive", terminals: [tg.terminal] }]] : []),
-        ...agents().filter((a) => a.address === tg.terminal).map((a) => ["Link PR or issue\u2026", "jj-spaces", { link: a.space, agent: a.address }]),
+        ...agents().filter((a) => a.address === tg.terminal).flatMap((a) => [
+          ["Description\u2026", "jj-agents", { describe: a.address }],
+          ["Link PR or issue\u2026", "jj-spaces", { link: a.space, agent: a.address }],
+        ]),
         ...(inTab ? [["Close pane", "pane.close", { pane: tg.pane }]] : []),
       ];
     }
@@ -103,6 +107,7 @@ function items(p, git) {
       return a
         ? [
             [a.pinned ? "Unpin" : "Pin to the top", "terminal.pin", { terminal: a.address, pinned: !a.pinned }],
+            ["Description\u2026", "jj-agents", { describe: a.address }],
             ["Link PR or issue\u2026", "jj-spaces", { link: a.space, agent: a.address }],
             waitingItem(a.space, "its space "),
           ]
@@ -168,7 +173,7 @@ function menuIcon(command, args) {
   if (command === "jj-spaces") return "mods/jj-spaces/git-pull-request.svg";
   if (command === "folder-dialog") return `mods/workspace-chrome/${args?.id ? "folder" : "folder-plus"}.svg`;
   if (command === "folder-op") return `mods/workspace-chrome/${args?.op === "delete" ? "x" : "folder"}.svg`;
-  const name = command === "terminal.pin" ? "pin" : command === "waiting" ? "clock" : command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
+  const name = command === "terminal.pin" ? "pin" : command === "waiting" ? "clock" : command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "jj-agents" ? "square-pen" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
   return `mods/workspace-chrome/${name}.svg`;
 }
 
@@ -205,6 +210,7 @@ export default class Menu extends View {
     else if (it[1] === "waiting") askWaiting(it[2].space, it[2].waiting);
     else if (it[1] === "folder-dialog") folderDialog(it[2]);
     else if (it[1] === "folder-op") askFolders(it[2]);
+    else if (it[1] === "jj-agents") openOverlay({ mod: "jj-agents", kind: "dialog", width: 420, height: 164, props: it[2] });
     else if (it[1] === "jj-spaces") openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: it[2] });
     else if (it[1] === "jj-sessions") openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: it[2] });
     else if (it[1] === "jj-copy" && it[2].action === "copy") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: it[2] });

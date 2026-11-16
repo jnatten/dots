@@ -31,6 +31,10 @@ the space) and the Waiting mark (ctrl-a H) aren't in any file: they live in the
 `jj-links` herdr-core document on the machine each space and agent is on
 (`mods/jj-spaces/docs.js`), so every screen sees the same ones.
 
+An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
+the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every
+screen sees them and they end with the terminal. The defaults are in `jj-settings.json`.
+
 Space folders live in the `jj-folders` herdr-core document on every machine
 (`mods/jj-spaces/folders.js`): each folder's name, color and order on all of them
 (newest wins), and on each machine its own paths for a folder and the spaces there
