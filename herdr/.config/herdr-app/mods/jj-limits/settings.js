@@ -3,7 +3,7 @@
 //   that aren't in the layout (hints, links, the hidden title bar). The file wins at start
 //   and whenever it changes on disk (a pull); changes made here are written back.
 // - jj-state.json (this Mac's, linked into each window's home by new-window.sh): what
-//   every window on this Mac shows alike (space colors, archived sessions). A key it
+//   every window on this Mac shows alike (space colors, archived sessions, folded folders). A key it
 //   doesn't have yet is taken from the window that looks first, and an emptied one is
 //   kept, so a window coming back can't bring old values with it.
 // Without a file (dots not stowed there yet, no second window yet) it isn't synced.
@@ -12,7 +12,7 @@ import { appHome, readTextFile, writeTextFile, shared, setShared } from "herdr";
 
 const FILES = [
   { name: "jj-settings.json", keys: ["jj-copy.hints", "jj-links", "jj-spacing.header"], fill: false, keepEmpty: false },
-  { name: "jj-state.json", keys: ["space.colors", "jj-sessions.archived"], fill: true, keepEmpty: true },
+  { name: "jj-state.json", keys: ["space.colors", "jj-sessions.archived", "space-folders.folded"], fill: true, keepEmpty: true },
 ];
 
 const empty = (v) => v == null || (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);

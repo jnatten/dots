@@ -18,7 +18,7 @@ try:
     shared = json.load(open(sys.argv[1]))
 except Exception:
     shared = {}
-state = {k: shared[k] for k in ("space.colors", "jj-sessions.archived") if shared.get(k) is not None}
+state = {k: shared[k] for k in ("space.colors", "jj-sessions.archived", "space-folders.folded") if shared.get(k) is not None}
 open(sys.argv[2], "w").write(json.dumps(state, indent=2) + "\n")
 EOF
 for f in keys.json jj-settings.json jj-state.json CLAUDE.md; do ln -sfn "$main/$f" "$dir/$f"; done

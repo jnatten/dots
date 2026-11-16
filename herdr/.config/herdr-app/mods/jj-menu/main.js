@@ -1,7 +1,8 @@
 // Context menus (Herdr's items). Opened as a popup with
-// props { tab: "pane" | "agent" | "tab" | "space" | "global", target }.
+// props { tab: "pane" | "agent" | "tab" | "space" | "folder" | "new" | "global", target }.
 // ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
-// a command "worktree", "jj-workspace", "jj-sessions", "jj-panes", "jj-copy" or "jj-spaces" (its link dialog) opens that mod instead.
+// a command "worktree", "jj-workspace", "jj-sessions", "jj-panes", "jj-copy" or "jj-spaces" (its link dialog) opens that mod instead,
+// "folder-dialog" the folder dialog and "folder-op" asks jj-spaces for a folder change.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -37,6 +38,16 @@ const waitingItem = (space, label) => {
   const on = (shared("spaces.waiting") ?? []).includes(space);
   return [on ? `Back from Waiting` : `Move ${label}to Waiting`, "waiting", { space, waiting: !on }];
 };
+
+// A folder change, made by the spaces sidebar (jj-spaces), which keeps the folders.
+function askFolders(op) {
+  setShared("space-folders.ask", [...(shared("space-folders.ask") ?? []), op]);
+}
+const folderDialog = (folder) => {
+  const n = (shared("space-folders")?.machines ?? []).length;
+  openOverlay({ mod: "jj-spaces", kind: "dialog", width: 540, height: 256 + 38 * n, props: { folder } });
+};
+const connected = () => (shared("space-folders")?.machines ?? []).filter((m) => m.state === "connected").map((m) => m.name);
 
 const claude = (a) => !a.address.includes("/") && (a.app === "claude-code" || a.program?.key === "claude");
 
@@ -114,10 +125,28 @@ function items(p, git) {
               ...(git === "linked" ? [["Remove worktree", "worktree", { space: tg.id, action: "remove" }]] : []),
             ]),
         ["Link PR or issue\u2026", "jj-spaces", { link: tg.id }],
+        ["New folder from here\u2026", "folder-dialog", { from: tg.id }],
+        ...(tg.id in (shared("space-folders")?.pins ?? {}) ? [["Back to its own folder", "folder-op", { op: "unpin", space: tg.id }]] : []),
         waitingItem(tg.id, ""),
         ...(agents().some((a) => a.space === tg.id && claude(a)) ? [["Archive sessions & close", "jj-sessions", { action: "archive", space: tg.id }]] : []),
         ["Close", "space.close", { id: tg.id }],
       ];
+    case "new":
+      return [
+        ["New space on this computer", "space.new", { machine: "" }],
+        ...connected().map((m) => [`New space on ${m}`, "space.new", { machine: m }]),
+        ["New folder\u2026", "folder-dialog", {}],
+      ];
+    case "folder": {
+      const f = (shared("space-folders")?.folders ?? []).find((x) => x.id === tg.id);
+      if (!f) return [];
+      const on = ["", ...connected()].filter((k) => f.paths[k]);
+      return [
+        ...on.map((k) => [k ? `New space here on ${k}` : "New space here", "space.new", { folder: f.paths[k].path, machine: k }]),
+        ["Edit folder\u2026", "folder-dialog", { id: f.id }],
+        ["Delete folder", "folder-op", { op: "delete", id: f.id }],
+      ];
+    }
     default:
       return [
         ["New space", "space.new", {}],
@@ -130,14 +159,17 @@ function items(p, git) {
   }
 }
 
-function menuIcon(command) {
+function menuIcon(command, args) {
   if (command === "jj-spaces") return "mods/jj-spaces/git-pull-request.svg";
+  if (command === "folder-dialog") return `mods/workspace-chrome/${args?.id ? "folder" : "folder-plus"}.svg`;
+  if (command === "folder-op") return `mods/workspace-chrome/${args?.op === "delete" ? "x" : "folder"}.svg`;
   const name = command === "terminal.pin" ? "pin" : command === "waiting" ? "clock" : command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-sessions" ? "archive" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
   return `mods/workspace-chrome/${name}.svg`;
 }
 
 // The key bound to a command, for the hint on the right.
 function shortcut(name, args) {
+  if (args?.machine !== undefined || args?.folder) return "";
   // `pane.split:right` binds pane.split with { direction: "right" }.
   const value = args && Object.values(args)[0];
   const k = keys().find((b) => b.section === "global" && (b.action === name || b.action === `${name}:${value}`));
@@ -166,6 +198,8 @@ export default class Menu extends View {
     closeOverlay(props()?.overlay);
     if (it[1] === "worktree" || it[1] === "jj-workspace") openOverlay({ mod: it[1], kind: "dialog", ...(it[2].action === "open" ? { width: 560, height: 480 } : { width: 440, height: 260 }), props: it[2] });
     else if (it[1] === "waiting") askWaiting(it[2].space, it[2].waiting);
+    else if (it[1] === "folder-dialog") folderDialog(it[2]);
+    else if (it[1] === "folder-op") askFolders(it[2]);
     else if (it[1] === "jj-spaces") openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: it[2] });
     else if (it[1] === "jj-sessions") openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: it[2] });
     else if (it[1] === "jj-copy" && it[2].action === "copy") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: it[2] });
@@ -197,7 +231,7 @@ export default class Menu extends View {
       .children(
         list.map((it, i) =>
           v_flex()
-            .when(i > 0 && (it[1].endsWith(".close") || it[1] === "app.help" || (it[1] === "app.theme" && list[i - 1][1] !== "app.theme")), el => el.child(div().mx(7).my(4).h(1).bg(t.border)))
+            .when(i > 0 && (it[1].endsWith(".close") || it[1] === "app.help" || (it[1] === "app.theme" && list[i - 1][1] !== "app.theme") || (props()?.tab !== "space" && it[1] === "folder-dialog" && !it[2].id) || it[2]?.op === "delete"), el => el.child(div().mx(7).my(4).h(1).bg(t.border)))
             .child(h_flex()
             .id(`mi-${i}`)
             .h(31)
@@ -210,7 +244,7 @@ export default class Menu extends View {
             .when(i === this.at, (el) => el.bg(t.selected))
             .hover((s) => s.bg(t.hover))
             .on_click((_e, cx) => this.choose(i, cx))
-            .child(svg(menuIcon(it[1])).size(14).flex_none().text_color(t.muted))
+            .child(svg(menuIcon(it[1], it[2])).size(14).flex_none().text_color(t.muted))
             .child(div().flex_1().child(it[0]))
             .child(div().text_size(11).text_color(t.dim).child(shortcut(it[1], it[2])))),
         ),

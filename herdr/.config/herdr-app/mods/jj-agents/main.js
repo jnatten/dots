@@ -315,6 +315,12 @@ export default class Agents extends View {
     const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
+    else {
+      // Spaces in the sidebar's order (its folders), each one's agents together.
+      const at = new Map((shared("spaces.listed") ?? []).map((id, i) => [id, i]));
+      const of = (a) => at.get(a.space) ?? Number.MAX_SAFE_INTEGER;
+      list = [...list].sort((x, y) => of(x) - of(y));
+    }
     // Agents of spaces in Waiting go to its group at the end, and into the order
     // next/prev (jj-tabs) go by only while it's open.
     const parked = new Set(shared("spaces.waiting") ?? []);
