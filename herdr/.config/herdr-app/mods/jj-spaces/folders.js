@@ -1,10 +1,10 @@
 // Folders in the spaces list, kept in herdr-core's `jj-folders` document on every
 // machine: { folders: { id: { name, color, rank, at, gone? } } (the same everywhere,
-// the newest `at` wins), paths: { id: where the folder is on this machine },
+// the newest `at` wins), paths: { id: [where the folder is on this machine] },
 // spaces: { this machine's space id: folder id, or "" for Other } (spaces moved by hand) }.
 // Machines go by key here: "" for this computer, else their name.
 //
-// A folder on a machine without a path of its own is where it is on another machine,
+// A folder on a machine without paths of its own is where it is on another machine,
 // moved to this one's home: ~/dev/ndla/ndla on both, whoever's home that is.
 
 import { docOf, updateDoc } from "./docs.js";
@@ -45,20 +45,27 @@ export function live(state) {
 
 export const nextRank = (state) => Math.max(0, ...Object.values(state.folders).map((f) => f.rank ?? 0)) + 1;
 
-// Where folder `id` is on machine `key`: its own path there, else another machine's
-// (this computer's first) moved to this one's home. { path, own } or null.
-export function pathOn(state, id, key, homes) {
-  const own = state.paths[key]?.[id];
-  if (own) return { path: own, own: true };
+// A folder's own paths on machine `key` (the first documents kept one, not a list).
+export const ownPaths = (state, id, key) => {
+  const v = state.paths[key]?.[id];
+  return Array.isArray(v) ? v : v ? [v] : [];
+};
+
+// Where folder `id` is on machine `key`: its own paths there, else another machine's
+// (this computer's first) moved to this one's home. { paths, own } or null.
+export function pathsOn(state, id, key, homes) {
+  const own = ownPaths(state, id, key);
+  if (own.length) return { paths: own, own: true };
   const others = Object.keys(state.paths)
-    .filter((k) => k !== key && state.paths[k]?.[id])
+    .filter((k) => k !== key && ownPaths(state, id, k).length)
     .sort((a, b) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
   for (const k of others) {
-    const path = state.paths[k][id];
     const from = homes[k];
     if (!from) continue;
-    if (!under(path, from)) return { path, own: false };
-    if (homes[key]) return { path: trim(homes[key] + path.slice(from.length)), own: false };
+    const paths = ownPaths(state, id, k)
+      .map((path) => (!under(path, from) ? path : homes[key] ? trim(homes[key] + path.slice(from.length)) : null))
+      .filter(Boolean);
+    if (paths.length) return { paths, own: false };
   }
   return null;
 }
@@ -69,10 +76,11 @@ export function matchOf(state, homes, key, places) {
   let best = null;
   let depth = -1;
   for (const f of live(state)) {
-    const path = pathOn(state, f.id, key, homes)?.path;
-    if (path && path.length > depth && places.some((p) => p && under(p, path))) {
-      best = f.id;
-      depth = path.length;
+    for (const path of pathsOn(state, f.id, key, homes)?.paths ?? []) {
+      if (path.length > depth && places.some((p) => p && under(p, path))) {
+        best = f.id;
+        depth = path.length;
+      }
     }
   }
   return best;
@@ -86,8 +94,8 @@ export function folderOf(state, homes, key, bare, places) {
   return matchOf(state, homes, key, places);
 }
 
-// A change: { kind: "folder", id, rec } (every machine), { kind: "path", key, id, path }
-// or { kind: "pin", key, bare, folder } (that machine; null path or folder: none).
+// A change: { kind: "folder", id, rec } (every machine), { kind: "path", key, id, paths }
+// or { kind: "pin", key, bare, folder } (that machine; no paths, null folder: none).
 export function applyChange(state, c) {
   if (c.kind === "folder") {
     state.folders[c.id] = c.rec;
@@ -97,7 +105,7 @@ export function applyChange(state, c) {
     }
   } else if (c.kind === "path") {
     const paths = (state.paths[c.key] = { ...state.paths[c.key] });
-    if (c.path) paths[c.id] = c.path;
+    if (c.paths?.length) paths[c.id] = c.paths;
     else delete paths[c.id];
   } else if (c.kind === "pin") {
     const pins = (state.pins[c.key] = { ...state.pins[c.key] });
@@ -111,7 +119,7 @@ export function writeChange(doc, c) {
   if (c.kind === "folder") {
     if (newer(c.rec, doc.folders[c.id])) doc.folders[c.id] = c.rec;
   } else if (c.kind === "path") {
-    if (c.path) doc.paths[c.id] = c.path;
+    if (c.paths?.length) doc.paths[c.id] = c.paths;
     else delete doc.paths[c.id];
   } else if (c.kind === "pin") {
     if (c.folder === null) delete doc.spaces[c.bare];
