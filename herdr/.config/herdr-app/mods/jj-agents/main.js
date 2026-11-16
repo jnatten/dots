@@ -1,9 +1,12 @@
 // Agents in grouped or priority views; parents take their most urgent sub-agent's place.
 // Agents of spaces in Waiting are in a group of their own at the end, folded at first.
+// A row leads with the agent's description: words given in its Description dialog
+// ({ describe: address }, ctrl-a d), else its own title. They're kept as jj.description
+// and jj.description.mode labels on its terminal; the defaults are shared("jj-agents").
 
 import { View, div, image, svg } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, settings } from "herdr";
+import { v_flex, h_flex, InputState, Input } from "gpui-base";
+import { agents, terminals, panes, focused, spaces, run, hc, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, settings, nextCommand } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -39,14 +42,34 @@ function leadPanes(all) {
   return leads;
 }
 
-function title(tab, l) {
-  const prog = l?.program?.name;
+// The terminal's title when it says more than the program, a path or user@host.
+function telling(l) {
   const live = clean(l?.title);
   // clean() would strip a path's leading ~ or /: test the title with only its status glyph gone.
   const path = /^[~/]|^[A-Za-z]:\\/.test((l?.title ?? "").replace(/^[^\p{L}\p{N}~/]+/u, ""));
-  const telling = live && live !== prog && !path && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
-  return (tab.name === prog || !tab.named) && telling ? live : tab.name;
+  return live && live !== l?.program?.name && !path && !live.includes("@") && live.toLowerCase() !== l?.program?.key ? live : null;
 }
+
+function title(tab, l) {
+  const live = telling(l);
+  return (tab.name === l?.program?.name || !tab.named) && live ? live : tab.name;
+}
+
+const DESC = "jj.description";
+const MODE = "jj.description.mode";
+// jj-spacing's Agents tab keeps what differs from these.
+const PREF_DEFAULTS = { description: "title", line: "space" };
+const pref = (key) => shared("jj-agents")?.[key] ?? PREF_DEFAULTS[key];
+const MODES = [["title", "Agent's title"], ["custom", "Custom"], ["off", "None"]];
+
+const modeOf = (labels) => (labels?.[DESC]?.trim() ? "custom" : (labels?.[MODE] || pref("description")) === "off" ? "off" : "title");
+
+function describe(a, labels) {
+  const mode = modeOf(labels);
+  return mode === "custom" ? labels[DESC].trim() : mode === "title" ? telling(a) : null;
+}
+
+const describeDialog = (address) => openOverlay({ mod: "jj-agents", kind: "dialog", width: 420, height: 164, props: { describe: address } });
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 // A sub-agent without a pane isn't in agents(): its raw word, error counting as
 // blocked. It's never done: it reports to its parent, and the parent's done is the news.
@@ -62,8 +85,8 @@ const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[
 const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
 
-// An agent's right-click menu (jj-menu): pin, link, Waiting. A popup is as tall as its items.
-const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 160, props: { tab: "agent", target: { terminal: a.address } } });
+// An agent's right-click menu (jj-menu): pin, description, link, Waiting. A popup is as tall as its items.
+const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 196, props: { tab: "agent", target: { terminal: a.address } } });
 
 function duration(ms) {
   const m = Math.floor(ms / 60000);
@@ -143,6 +166,15 @@ function kindBadges(urls, items, t, id, space) {
 export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
+    if (props()?.describe) return this.initDescribe(cx);
+    cx.spawn(async () => {
+      for (;;) {
+        if ((await nextCommand()) !== "describe") continue;
+        const f = focused();
+        const a = agents().find((x) => x.address === (f?.agent ?? f?.shown ?? f?.terminal)) ?? agents().find((x) => x.focused && x.space === f?.space);
+        if (a) describeDialog(a.address);
+      }
+    });
     this.folded = new Set();
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
@@ -223,6 +255,78 @@ export default class Agents extends View {
         .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))));
   }
 
+  initDescribe(cx) {
+    const address = props().describe;
+    const labels = terminals().find((k) => k.address === address)?.labels ?? {};
+    const a = agents().find((x) => x.address === address);
+    this.mode = modeOf(labels);
+    this.error = "";
+    this.input = InputState.new({ placeholder: telling(a) ?? "What this agent is working on", value: labels[DESC]?.trim() ?? "" });
+    this.input.on("change", (_e, cx) => { if (this.input.value().trim()) this.mode = "custom"; cx.notify(); });
+    this.input.on("submit", (_e, cx) => this.saveDescription(cx));
+    this.inputFocused = true;
+    this.input.on("focus", (_e, cx) => { this.inputFocused = true; cx.notify(); });
+    this.input.on("blur", (_e, cx) => { this.inputFocused = false; cx.notify(); });
+    this.handle = cx.focus_handle();
+    this.handle.focus();
+    this.input.focus();
+  }
+
+  // Only what the default doesn't already give is kept: custom words, or a mode unlike it.
+  saveDescription(cx) {
+    const text = this.input.value().replace(/\s+/g, " ").trim().slice(0, 120);
+    const mode = this.mode === "custom" && !text ? "title" : this.mode;
+    const own = mode === "custom" ? text : "";
+    const override = own || mode === pref("description") ? "" : mode;
+    cx.spawn(async (cx) => {
+      const r = await hc(["label", props().describe, `${DESC}=${own}`, `${MODE}=${override}`]).catch((e) => ({ code: 1, stderr: String(e) }));
+      if (r.code === 0) return closeOverlay(props().overlay);
+      this.error = (r.stderr || r.stdout || "hc label failed").trim().split("\n")[0];
+      cx.notify();
+    });
+  }
+
+  describeView(t) {
+    const a = agents().find((x) => x.address === props().describe);
+    const tab = a && spaces().flatMap((s) => s.tabs).find((x) => x.id === a.tab);
+    const where = a ? [a.space_name, tab?.named ? tab.name : null].filter(Boolean).join(" · ") : "This agent is gone";
+    const pick = (mode) => {
+      this.mode = mode;
+      if (mode === "custom") this.input.focus();
+    };
+    const choice = ([mode, label]) => div().id(`mode-${mode}`).px(8).py(3).rounded(5).cursor_pointer()
+      .text_color(this.mode === mode ? t.foreground : t.muted)
+      .when(this.mode === mode, (el) => el.bg(t.hover))
+      .when(this.mode !== mode, (el) => el.hover((s) => s.text_color(t.foreground)))
+      .on_click((_e, cx) => { pick(mode); cx.notify(); })
+      .child(label);
+    return v_flex()
+      .id("describe")
+      .track_focus(this.handle)
+      .on_key_down((e, cx) => {
+        if (e.key === "escape") return closeOverlay(props().overlay);
+        if (e.key !== "tab") return;
+        pick(MODES[(MODES.findIndex(([m]) => m === this.mode) + 1) % MODES.length][0]);
+        cx.stop_propagation();
+        cx.notify();
+      })
+      .size_full()
+      .p(16)
+      .gap(10)
+      .bg(t.popover)
+      .text_size(13)
+      .child(h_flex().gap(8).items_center()
+        .child(div().flex_none().font_semibold().text_color(t.foreground).child("Description"))
+        .child(div().flex_1().min_w(0).truncate().text_right().text_size(11.5).text_color(t.dim).child(where)))
+      .child(h_flex().gap(2).text_size(12).children(MODES.map(choice)))
+      .child(Input.new(this.input).h(32).px(10).items_center().rounded(6).border(1)
+        .border_color(this.inputFocused && this.mode === "custom" ? t.accent : t.input).bg(t.background)
+        .text_color(this.mode === "custom" ? t.foreground : t.dim))
+      .child(h_flex().gap(8).items_center().text_size(11).text_color(t.dim)
+        .child(div().flex_1().min_w(0).truncate().text_color(t.blocked).child(this.error))
+        .child("tab choose · ↵ save · esc close"));
+  }
+
   peek(addr) {
     run("terminal.peek", { terminal: addr });
   }
@@ -295,11 +399,14 @@ export default class Agents extends View {
   render(cx) {
     const t = theme();
     if (props()?.sortMenu) return this.sortMenu(t);
+    if (props()?.describe) return this.describeView(t);
     const collapsed = narrow();
     const sort = sortOf();
     let list = agents();
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
+    const terms = new Map(all.map((k) => [k.address, k]));
+    const line2 = pref("line");
     const gh = shared("github") ?? {};
     this.migratePins(all);
     const shown = focused()?.agent;
@@ -367,7 +474,7 @@ export default class Agents extends View {
         .when(!open, (el) => el.child(String(subs.length)));
     };
 
-    // A row reads "space \u00b7 detail": the detail is a tab someone named or the
+    // Without a description a row reads "space \u00b7 detail": the detail is a tab someone named or the
     // agent's own title, never an automatic tab number unless two rows would
     // otherwise read the same.
     // Read the pane snapshot once: every host read copies the whole list into JS.
@@ -389,6 +496,8 @@ export default class Agents extends View {
     const row = (a, i, subs = []) => {
       const pic = icon(a.program, 16, t.foreground);
       const more = detail.get(a.address);
+      const term = terms.get(a.address);
+      const desc = describe(a, term?.labels);
       // An agent on another machine (`vps/t7`) says which.
       const machine = a.address.includes("/") ? a.address.split("/")[0] : null;
       if (collapsed) {
@@ -400,6 +509,7 @@ export default class Agents extends View {
           .items_center()
           .gap(4)
           .hover((s) => s.bg(t.hover))
+          .when(Boolean(desc), (el) => el.tooltip(desc))
           .on_click(() => run("pane.focus", { pane: a.pane }))
           .on_mouse_down("right", () => menu(a))
           .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(t.muted).child(String(i + 1)))
@@ -409,41 +519,65 @@ export default class Agents extends View {
       const idle = a.status === "idle" && !a.focused;
       const off = shared("github.hidden")?.[a.space] ?? [];
       const prs = gh.shown ? (gh.shown.agents?.[a.address] ?? []) : (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
-      const act = this.activity(t, a, all.find((k) => k.address === a.address)?.labels);
+      const act = this.activity(t, a, term?.labels);
       const isPinned = a.pinned;
       // Under a space header the space goes without saying; an automatic tab number says nothing.
       // Without a space header above (priority, pinned) the row names its space.
       const full = byPriority || isPinned;
       const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
-      const line = h_flex()
+      // Under a description: its space and named tab, or the agent's latest update. What isn't shown goes in the tooltip.
+      const tab = tabs.get(a.tab);
+      const where = [full ? a.space_name : null, tab?.named && tab.name !== desc ? tab.name : null].filter(Boolean).join(" · ");
+      const update = clean(term?.report?.msg) || null;
+      const under = line2 === "space" ? (desc ? where : null) : line2 === "update" ? update : null;
+      const tip = [desc, desc && under !== where ? where : null, under !== update ? update : null].filter(Boolean);
+      const text = (desc
+        ? div().flex_1().min_w(0).truncate().text_color(idle ? t.muted : t.foreground).child(desc)
+        : h_flex().flex_1().min_w(0).gap(5).items_center()
+          .child(div().min_w(0).max_w(full && more ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
+          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
+        .id(`ag-text-${a.address}`)
+        .when(tip.length > 0, el => el.tooltip(tip.join("\n")));
+      const machineTag = div().text_size(10).text_color(t.dim).child(machine ?? "");
+      const prBadges = () => kindBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, a.space);
+      const frame = h_flex()
         .id(`ag-${a.address}`)
         .px(8)
-        .h(30)
         .flex_none()
         .rounded(8)
-        .items_center()
         .gap(9)
         .when(a.focused, (el) => el.bg(t.selected))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
         .on_click(() => run("pane.focus", { pane: a.pane }))
         .on_mouse_down("right", () => menu(a))
-        .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
+        .when(Boolean(pic), el => el.child(h_flex().id(`agent-fold-${a.address}`).flex_none().h(20).items_center()
           .when(subs.length > 0, el => el.on_click((_e, cx) => {
             cx.stop_propagation();
             this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
             cx.notify();
-          })).child(pic)))
-        .child(h_flex().flex_1().min_w(0).gap(5).items_center()
-          .child(div().min_w(0).max_w(full && more ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
-        .when(Boolean(machine), el => el.child(div().text_size(10).text_color(t.dim).child(machine)))
-        .when(subs.length > 0, el => el.child(fold(a, subs)))
-        .when(prs.length > 0, el => el.child(kindBadges(prs, gh.items ?? {}, t, `gh-${a.address}`, a.space)))
-        .when(Boolean(act), el => el.child(act))
-        .when(Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
-        .child(this.status(t, a, byPriority && !isPinned));
-      return line;
+          })).child(pic)));
+      const ago = (el) => el.when(Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))));
+      if (!under) {
+        return ago(frame.h(30).items_center()
+          .child(text)
+          .when(Boolean(machine), el => el.child(machineTag))
+          .when(subs.length > 0, el => el.child(fold(a, subs)))
+          .when(prs.length > 0, el => el.child(prBadges()))
+          .when(Boolean(act), el => el.child(act)))
+          .child(this.status(t, a, byPriority && !isPinned));
+      }
+      return frame.py(4).items_start()
+        .child(v_flex().flex_1().min_w(0)
+          .child(ago(h_flex().h(20).gap(9).items_center()
+            .child(text)
+            .when(subs.length > 0, el => el.child(fold(a, subs))))
+            .child(this.status(t, a, byPriority && !isPinned)))
+          .child(h_flex().h(16).gap(8).items_center().text_size(11.5).text_color(t.dim)
+            .child(div().flex_1().min_w(0).truncate().child(under))
+            .when(Boolean(machine), el => el.child(machineTag))
+            .when(prs.length > 0, el => el.child(prBadges()))
+            .when(Boolean(act), el => el.child(act))));
     };
 
     // Groups in list order: spaces (grouped) or priority sections. Agents of a
