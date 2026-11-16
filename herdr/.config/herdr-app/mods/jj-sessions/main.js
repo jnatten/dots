@@ -34,10 +34,16 @@ const ago = (s) => {
   return d < 3600 ? `${Math.max(1, Math.round(d / 60))}m` : d < 86400 ? `${Math.round(d / 3600)}h` : d < 86400 * 60 ? `${Math.round(d / 86400)}d` : `${Math.round(d / 86400 / 30)}mo`;
 };
 
+// A workspace Claude Code's WorktreeCreate hook makes: <repo>/.claude/worktrees/<name>.
+function worktree(cwd) {
+  const m = cwd.match(/^(.*)\/\.claude\/worktrees\/([^/]+)/);
+  return m ? { repo: m[1], name: m[2], root: m[0] } : null;
+}
+
 // "rekkert › guest-limits" for a workspace kept inside or beside its repo, else the folder's name.
 function label(cwd) {
-  const claude = cwd.match(/^(.*)\/\.claude\/worktrees\/([^/]+)/);
-  if (claude) return `${base(claude[1])} › ${claude[2]}`;
+  const claude = worktree(cwd);
+  if (claude) return `${base(claude.repo)} › ${claude.name}`;
   const herdr = cwd.match(/\/\.herdr\/workspaces\/([^/]+)\/([^/]+)/);
   if (herdr) return `${herdr[1]} › ${herdr[2]}`;
   return base(cwd) || cwd;
@@ -99,14 +105,67 @@ async function spaceFor(cwd) {
   return null;
 }
 
-async function resume(rec) {
-  if ((await exec("test", ["-d", rec.cwd])).code !== 0) return `${tilde(rec.cwd)} no longer exists.`;
+const jj = (cwd, args) => exec("jj", ["--color=never", "--no-pager", ...args], { cwd, timeout: 600_000 });
+
+// The folders among dirs that don't exist.
+async function missing(dirs) {
+  if (!dirs.length) return new Set();
+  const r = await exec("sh", ["-c", 'for d; do [ -d "$d" ] || printf "%s\\n" "$d"; done', "sh", ...dirs]);
+  return new Set(r.stdout.split("\n").filter(Boolean));
+}
+
+// The commit a removed workspace was on, as of the operation before jj forgot it.
+async function lastCommit(repo, name) {
+  const ops = await jj(repo, ["--ignore-working-copy", "op", "log", "--no-graph", "-T", 'id ++ "\\t" ++ description.first_line() ++ "\\n"']);
+  const op = ops.stdout
+    .split("\n")
+    .map((line) => line.split("\t"))
+    .find(([, d]) => d?.match(/^(?:forget|remove) workspaces? (.+)$/)?.[1].split(", ").includes(name))?.[0];
+  if (!op) return null;
+  const r = await jj(repo, ["--ignore-working-copy", "--at-op", `${op}-`, "log", "--no-graph", "-r", `${name}@`, "-T", 'change_id ++ "\\t" ++ empty ++ "\\t" ++ parents.map(|p| p.change_id()).join(" ")']);
+  const [change, empty, parents = ""] = r.stdout.trim().split("\t");
+  return r.code === 0 && change ? { change, empty: empty === "true", parents: parents.split(" ").filter(Boolean) } : null;
+}
+
+// A removed .claude/worktrees workspace made again by the WorktreeCreate hook, on the
+// commit it had. null when cwd wasn't one or its repo is gone too.
+async function revive(cwd) {
+  const w = worktree(cwd);
+  if (!w || (await missing([w.repo])).size) return null;
+  const input = JSON.stringify({ hook_event_name: "WorktreeCreate", cwd: w.repo, name: w.name });
+  const r = await exec("sh", ["-c", 'printf %s "$1" | "$2"', "sh", input, `${home()}/.claude/hooks/jj-workspace.sh`], { cwd: w.repo, timeout: 600_000 });
+  const root = (r.stdout ?? "").trim().split("\n").pop();
+  if (r.code !== 0 || !root) throw new Error((r.stderr || r.stdout || "").trim().split("\n").pop() || "The WorktreeCreate hook failed.");
+  const at = await lastCommit(w.repo, w.name);
+  if (at && (at.empty || (await jj(root, ["edit", at.change])).code !== 0) && at.parents.length) await jj(root, ["new", ...at.parents]);
+  const inner = root + cwd.slice(w.root.length);
+  return (await missing([inner])).size ? root : inner;
+}
+
+// The repo a removed workspace was in, else the nearest folder above cwd that exists.
+async function nearest(cwd) {
+  let dir = worktree(cwd)?.repo ?? cwd;
+  while (dir && (await missing([dir])).size) dir = dir.slice(0, dir.lastIndexOf("/"));
+  return dir || null;
+}
+
+// here: when the session's folder is gone, resume in its repo rather than remaking it.
+async function resume(rec, here = false) {
+  let cwd = rec.cwd;
+  if ((await missing([cwd])).size) {
+    try {
+      cwd = (!here && (await revive(cwd))) || (await nearest(cwd));
+    } catch (error) {
+      return error.message;
+    }
+    if (!cwd) return `${tilde(rec.cwd)} no longer exists.`;
+  }
   const argv = ["claude", "--resume", rec.id];
-  const s = await spaceFor(rec.cwd);
+  const s = await spaceFor(cwd);
   if (s) {
     run("space.select", { id: s.id });
-    run("tab.new", { space: s.id, folder: rec.cwd, argv });
-  } else run("space.new", { folder: rec.cwd, machine: "", argv });
+    run("tab.new", { space: s.id, folder: cwd, argv });
+  } else run("space.new", { folder: cwd, machine: "", argv });
   forget(rec.id);
   return "";
 }
@@ -168,10 +227,31 @@ export default class Sessions extends View {
     if (!folders.length || this.checking) return;
     this.checking = true;
     cx.spawn(async (cx) => {
-      for (const c of folders) this.gone[c] = (await exec("test", ["-d", c])).code !== 0;
+      const gone = await missing(folders).catch(() => new Set());
+      for (const c of folders) this.gone[c] = gone.has(c);
       this.checking = false;
       cx.notify();
     });
+  }
+
+  // Resumes a session, its folder made again or (here) its repo used when it's gone.
+  start(s, here, cx, done) {
+    if (this.busy) return;
+    this.busy = s.id;
+    this.error = "";
+    cx.notify();
+    cx.spawn(async (cx) => {
+      this.error = await resume(s, here);
+      this.busy = null;
+      if (!this.error) done?.();
+      cx.notify();
+    });
+  }
+
+  // What resuming s does when its folder is gone: ↵ makes its workspace again, ⇧ uses the repo.
+  goneHint(s, enter, shift) {
+    const w = worktree(s.cwd);
+    return w ? `${enter} recreate workspace · ${shift} resume in ${base(w.repo)}` : `${enter} resume in a parent folder`;
   }
 
   initConfirm(cx, p) {
@@ -188,6 +268,7 @@ export default class Sessions extends View {
     this.at = 0;
     this.open = undefined;
     this.history = undefined;
+    this.gone = {};
     this.childOf = [];
     this.scroll = ScrollHandle.new();
     searching++;
@@ -206,7 +287,7 @@ export default class Sessions extends View {
       this.error = "";
       cx.notify();
     });
-    this.input.on("submit", (_e, cx) => this.go(this.items()[this.at], cx));
+    this.input.on("submit", (e, cx) => this.go(this.items()[this.at], cx, Boolean(e?.shift)));
     this.input.focus();
     cx.spawn(async (cx) => {
       this.open = await live();
@@ -214,6 +295,9 @@ export default class Sessions extends View {
     });
     cx.spawn(async (cx) => {
       this.history = await history().catch(() => []);
+      cx.notify();
+      const gone = await missing([...new Set([...archived(), ...this.history].map((s) => s.cwd).filter(Boolean))]).catch(() => new Set());
+      this.gone = Object.fromEntries([...gone].map((c) => [c, true]));
       cx.notify();
     });
   }
@@ -254,17 +338,13 @@ export default class Sessions extends View {
     return this.sections().flatMap(({ kind, list }) => list.map((s) => ({ kind: kind === "waiting" ? s.kind : kind, s })));
   }
 
-  go(it, cx) {
+  go(it, cx, here = false) {
     if (!it) return;
     if (it.kind === "open" || it.kind === "space") {
       this.hide();
       return it.kind === "open" ? run("pane.focus", { pane: it.s.pane }) : run("space.select", { id: it.s.id });
     }
-    cx.spawn(async (cx) => {
-      this.error = await resume(it.s);
-      if (!this.error) return this.hide();
-      cx.notify();
-    });
+    this.start(it.s, here, cx, () => this.hide());
   }
 
   dismiss(it) {
@@ -311,16 +391,11 @@ export default class Sessions extends View {
           this.hovered = on ? r.id : hovered ? null : this.hovered;
           cx.notify();
         })
-        .on_click((_e, cx) => {
-          if (gone) return;
-          cx.spawn(async (cx) => {
-            this.error = await resume(r);
-            cx.notify();
-          });
-        })
+        .on_click((e, cx) => this.start(r, e.modifiers.shift, cx))
+        .when(Boolean(gone), (el) => el.tooltip(this.goneHint(r, "click", "⇧-click")))
         .child(svg(ICON("archive")).size(13).flex_none().text_color(t.dim))
         .child(div().flex_1().min_w(0).truncate().text_color(gone ? t.dim : t.foreground).child(r.title))
-        .child(div().flex_none().max_w(96).truncate().text_size(11.5).text_color(t.dim).child(gone ? "gone" : label(r.cwd)))
+        .child(div().flex_none().max_w(96).truncate().text_size(11.5).text_color(t.dim).child(this.busy === r.id ? "resuming…" : gone ? "gone" : label(r.cwd)))
         .child(
           h_flex()
             .w(22)
@@ -454,10 +529,10 @@ export default class Sessions extends View {
         .cursor_pointer()
         .when(on, (el) => el.bg(t.selected))
         .when(!on, (el) => el.hover((st) => st.bg(t.hover)))
-        .on_click((_e, cx) => this.go({ kind, s }, cx))
+        .on_click((e, cx) => this.go({ kind, s }, cx, e.modifiers.shift))
         .child(h_flex().w(14).flex_none().justify_center().child(icon))
         .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(s.title))
-        .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(s.machine ? `${s.machine} · ${label(s.cwd)}` : label(s.cwd)))
+        .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.gone[s.cwd] && kind !== "open" ? " · gone" : ""}`))
         .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : ago(s.at)));
     };
     const children = [];
@@ -473,7 +548,8 @@ export default class Sessions extends View {
     }
     const empty = items.length === 0 && !sections.some((s) => s.loading);
     const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
-    const hint = { open: "↵ go to · ⌘⇧A archive", space: "↵ go to", archived: "↵ resume · ^D forget", history: "↵ resume" }[selected?.kind] ?? "";
+    const resuming = selected && this.gone[selected.s.cwd] ? this.goneHint(selected.s, "↵", "⇧↵") : "↵ resume";
+    const hint = this.busy ? "resuming…" : ({ open: "↵ go to · ⌘⇧A archive", space: "↵ go to", archived: `${resuming} · ^D forget`, history: resuming }[selected?.kind] ?? "");
     return v_flex()
       .id("sessions")
       .track_focus(this.handle)
