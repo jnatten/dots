@@ -41,8 +41,6 @@ const RAIL_CELL = 32;
 const railCell = (el) => h_flex().flex_none().justify_center().child(el);
 const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
 const base = (path) => path.replace(/\/+$/, "").split("/").pop();
-const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
-const ARCHIVE = "jj-sessions.archived";
 
 // The nearest bookmarks under @, as the starship prompt shows them: "main",
 // "main*~2", "2 bookmarks", "?". null outside jj.
@@ -564,15 +562,6 @@ export default class Spaces extends View {
     return sp.map((w, i) => ({ w, i, g: this.git[where(w, ps)] ?? null }));
   }
 
-  // Archived Claude sessions in a workspace, leaving out those in workspaces nested inside it.
-  archivedIn(path, nested = []) {
-    return (shared(ARCHIVE) ?? []).filter((r) => inside(r.cwd, path) && !nested.some((p) => inside(r.cwd, p))).length;
-  }
-
-  archiveBadge(count, t) {
-    return h_flex().flex_none().gap(3).items_center().text_size(11.5).text_color(t.dim).child(svg("mods/workspace-chrome/archive.svg").size(11)).child(String(count));
-  }
-
   // The rows, but those in Waiting, then the Waiting section.
   grouped(t, collapsed) {
     const parked = new Set(shared("spaces.waiting") ?? []);
@@ -744,11 +733,7 @@ export default class Spaces extends View {
           .when(where && Boolean(w.machine), (el) => el.child(div().id(`space-machine-${w.id}`).flex_none().text_color(t.dim).tooltip(w.machine)
             .child(svg("mods/workspace-chrome/server.svg").size(11))))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
-          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id))))
-          .when(Boolean(g?.top), (el) => {
-            const count = this.archivedIn(g.top, g.linked ? [] : Object.values(this.git).filter((k) => k?.linked && k.repo === g.repo).map((k) => k.top));
-            return count > 0 ? el.child(this.archiveBadge(count, t)) : el;
-          }),
+          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id)))),
       );
   }
 
