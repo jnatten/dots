@@ -15,10 +15,10 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, home, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
+import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, home, appHome, readTextFile, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
 import { FINAL, branchName, expand, fetchGitHub, fetchUnread, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
-import { canon, edited, setWaiting, split, updateLinks } from "./docs.js";
+import { backfillHistory, canon, edited, forgetHistory, setWaiting, split, updateHistory, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
 import { MARK, applyChange, empty, folderOf, foldersOf, live, matchOf, merge, nextRank, ownPaths, pathsOn, tidy, tilde, updateFolders, writeChange } from "./folders.js";
 import { folderInit, folderRender } from "./folder-dialog.js";
@@ -70,10 +70,21 @@ const GH_OPEN = 2 * 60000;
 const GH_FINAL = 30 * 60000;
 const GH_RETRY = 10 * 60000;
 const GH_UNREAD = 60000;
+// Each machine's Claude transcripts are read for jj-tasks this often while the window is in front.
+const BACKFILL = 15 * 60000;
 // jj-spacing's Sidebar tab keeps what differs from these.
 const PREF_DEFAULTS = { icon: "shown", branch: "hidden" };
 const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
+
+// The links a machine's Claude transcripts show (history.mjs, run there).
+const nodes = {};
+async function transcriptLinks(on) {
+  const script = await readTextFile(`${appHome()}/mods/jj-spaces/history.mjs`);
+  nodes[on ?? ""] ??= (await exec("sh", ["-lc", "command -v node"], { on })).stdout.trim() || "node";
+  const r = await exec(nodes[on ?? ""], ["--input-type=module", "-e", script], { on, timeout: 300000 });
+  return r.code === 0 ? JSON.parse(r.stdout) : [];
+}
 
 // A space's repo: the main checkout's folder, for a worktree too.
 const rootOf = (g) => {
@@ -149,6 +160,7 @@ export default class Spaces extends View {
     this.unreadAt = 0;
     this.unreading = false;
     this.linksAt = 0;
+    this.backfilled = {}; // machine ("" here) -> when its transcripts were last read
     this.missing = new Set(); // "machine\0space" with links whose space wasn't there at the last sync
     this.cards = new Set(); // Trello card urls shown somewhere
     this.trelloRetry = 0;
@@ -182,6 +194,8 @@ export default class Spaces extends View {
     this.trelloDue(now, cx);
     this.linksDue(now, cx);
     this.waitingDue(cx);
+    this.forgetDue(cx);
+    this.backfillDue(now, cx);
     this.foldersDue(now, cx);
   }
 
@@ -205,6 +219,92 @@ export default class Spaces extends View {
       this.linksAt = 0;
       cx.notify();
     });
+  }
+
+  // Links the tasks list (jj-sessions) asked ended sessions to forget, in
+  // shared("tasks.forget.ask"): [{ id: "<machine>/<session id>", url }].
+  forgetDue(cx) {
+    const asks = shared("tasks.forget.ask") ?? [];
+    if (!asks.length || this.forgetting) return;
+    setShared("tasks.forget.ask", []);
+    this.forgetting = true;
+    cx.spawn(async (cx) => {
+      for (const ask of asks) {
+        const [on, sid] = split(ask.id);
+        try {
+          await forgetHistory(on, [sid], ask.url);
+        } catch (e) {
+          notify({ title: "Couldn't forget the link", body: String(e?.message ?? e), level: "error" });
+        }
+      }
+      this.forgetting = false;
+      this.linksAt = 0;
+      cx.notify();
+    });
+  }
+
+  // Each machine's transcripts' links into its jj-tasks, for sessions from before it was
+  // kept or outside Herdr: once it's in, then every 15 minutes while the window is in front.
+  backfillDue(now, cx) {
+    if (this.backfilling) return;
+    const due = machines().filter((m) => {
+      const at = this.backfilled[m.name ?? ""];
+      return m.layout === "ready" && (!at || (window().active && now - at > BACKFILL));
+    });
+    if (!due.length) return;
+    this.backfilling = true;
+    cx.spawn(async (cx) => {
+      for (const m of due) {
+        this.backfilled[m.name ?? ""] = Date.now();
+        try {
+          const found = await transcriptLinks(m.name ?? null);
+          if (found.length) await backfillHistory(m.name ?? null, found);
+        } catch {}
+      }
+      this.backfilling = false;
+      this.linksAt = 0;
+      cx.notify();
+    });
+  }
+
+  // Every link jj-tasks' sessions had, on every machine.
+  historyLinks() {
+    return [...new Set(Object.values(shared("tasks.sessions") ?? {}).flatMap((e) => e.links ?? []))];
+  }
+
+  // This machine's live Claude sessions with links, into its jj-tasks: every link each
+  // has had, and where and what it is, newer when it gains one or hourly. Not while the
+  // link dialog edits, so an unlink isn't put back. Its sessions as they now are.
+  async recordHistory(on, mine, before) {
+    const now = Math.floor(Date.now() / 1000);
+    const as = agents();
+    const direct = shared("github")?.shown?.direct ?? {};
+    const rows = terminals()
+      .filter((t) => t.state === "live" && mine(t.address) && t.labels?.["claude.session"] && direct[t.address]?.length)
+      .map((t) => {
+        const a = as.find((a) => a.address === t.address);
+        return {
+          sid: t.labels["claude.session"],
+          links: direct[t.address],
+          cwd: t.labels["claude.cwd"] ?? "",
+          title: t.labels["jj.description"] || a?.title || t.title || a?.tab_name || "",
+          space: a ? split(a.space)[1] : "",
+          spaceName: a?.space_name ?? "",
+          terminal: split(t.address)[1],
+        };
+      });
+    const doc = await updateHistory(on, (doc) => {
+      if (edited() !== before) return doc;
+      for (const { sid, ...r } of rows) {
+        const was = doc.sessions[sid];
+        const links = [...new Set([...(was?.links ?? []), ...r.links])];
+        const off = (was?.off ?? []).filter((u) => !r.links.includes(u));
+        if (was && links.length === was.links.length && off.length === (was.off?.length ?? 0) && now - (was.at ?? 0) < 3600) continue;
+        doc.sessions[sid] = { ...r, links, ...(off.length && { off }), at: now };
+      }
+      return doc;
+    });
+    return doc.sessions;
   }
 
   // Folder edits asked for by the menu and the folder dialog (shared("space-folders.ask"))
@@ -384,7 +484,8 @@ export default class Spaces extends View {
   // shared("github.hidden"), shared("github.agent-links") and shared("spaces.waiting"),
   // where the rows, the agents list and the dialog read them. A space or agent missing at two syncs in a row on a
   // machine whose layout is in loses its links there; the first time per machine, what
-  // this screen kept itself is moved in.
+  // this screen kept itself is moved in. Its live Claude sessions' links go in its
+  // jj-tasks, and every machine's sessions there into shared("tasks.sessions").
   linksDue(now, cx) {
     if (this.syncing || now - this.linksAt < (window().active ? 10000 : 60000)) return;
     this.syncing = true;
@@ -397,6 +498,7 @@ export default class Spaces extends View {
       for (const [key, into] of Object.entries(cache))
         for (const [id, urls] of Object.entries(shared(key) ?? {})) if (urls?.length && names.has(machineOf(id))) into[id] = urls;
       let waiting = (shared("spaces.waiting") ?? []).filter((id) => names.has(machineOf(id)));
+      const tasks = Object.fromEntries(Object.entries(shared("tasks.sessions") ?? {}).filter(([id]) => names.has(machineOf(id))));
       const moved = new Set(shared("github.links.moved") ?? []);
       const missing = new Set();
       for (const m of known.filter((m) => m.layout === "ready")) {
@@ -437,11 +539,17 @@ export default class Spaces extends View {
           waiting = [...waiting.filter((id) => !mine(id)), ...Object.entries(doc.spaces).filter(([, e]) => e.waiting).map(([bare]) => full(bare))];
           moved.add(on ?? "");
         } catch {}
+        try {
+          const sessions = await this.recordHistory(on, mine, before);
+          for (const id of Object.keys(tasks)) if (mine(id)) delete tasks[id];
+          for (const [sid, e] of Object.entries(sessions)) tasks[full(sid)] = { ...e, machine: on };
+        } catch {}
       }
       this.missing = missing;
       if (edited() === before) {
         for (const [key, value] of Object.entries(cache)) if (JSON.stringify(value) !== JSON.stringify(shared(key) ?? {})) setShared(key, value);
         if (moved.size !== (shared("github.links.moved") ?? []).length) setShared("github.links.moved", [...moved]);
+        if (canon(tasks) !== canon(shared("tasks.sessions") ?? {})) setShared("tasks.sessions", tasks);
         const asked = this.asking || (shared("spaces.waiting.ask") ?? []).length > 0;
         if (!asked && JSON.stringify(waiting) !== JSON.stringify(shared("spaces.waiting") ?? [])) setShared("spaces.waiting", waiting);
       } else this.linksAt = 0;
@@ -496,7 +604,7 @@ export default class Spaces extends View {
     if (this.fetching || now < this.ghRetry) return;
     const active = window().active;
     const old = (at, final) => active && now - (at ?? 0) > (final ? GH_FINAL : GH_OPEN);
-    const urls = [...new Set([...Object.values(shared("github.links") ?? {}).flat(), ...Object.values(shared("github.agent-links") ?? {}).flat(), ...Object.values(this.agentLinks).flat()])]
+    const urls = [...new Set([...Object.values(shared("github.links") ?? {}).flat(), ...Object.values(shared("github.agent-links") ?? {}).flat(), ...Object.values(this.agentLinks).flat(), ...this.historyLinks()])]
       .filter((u) => !isCard(u) && (!this.items[u]?.links || this.stale.has(u) || old(this.items[u].at, FINAL.has(this.items[u].state))));
     const keys = [...new Set(sp.map((s) => this.branchKey(s, ps)).filter(Boolean))].filter((k) => !this.branchPrs[k] || old(this.branchPrs[k].at, false));
     if (!urls.length && !keys.length) return;
@@ -556,7 +664,7 @@ export default class Spaces extends View {
     if (!connect && (this.trelloBlocked === ask || now < this.trelloRetry)) return;
     const active = window().active;
     const old = (it) => !it || (active && now - (it.at ?? 0) > (FINAL.has(it.state) ? GH_FINAL : GH_OPEN));
-    const urls = [...this.cards].filter((u) => connect || old(this.items[u]));
+    const urls = [...new Set([...this.cards, ...this.historyLinks().filter(isCard)])].filter((u) => connect || old(this.items[u]));
     if (!urls.length && !connect) return;
     this.connected = pressed;
     this.carding = true;
@@ -594,15 +702,16 @@ export default class Spaces extends View {
       if (k && this.branchPrs[k]?.url) branches[s.id] = this.branchPrs[k].url;
     }
     // Kept whatever the Links tab says, so turning something back on shows it at once.
-    const direct = [...Object.values(kept).flat(), ...Object.values(agentKept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches)];
+    const direct = [...Object.values(kept).flat(), ...Object.values(agentKept).flat(), ...Object.values(this.agentLinks).flat(), ...Object.values(branches), ...this.historyLinks()];
     const used = new Set(expand([...new Set(direct)], this.items).map((e) => e.url));
     for (const u of Object.keys(this.items)) if (!used.has(u)) delete this.items[u];
     // Each space's links: by hand on it and on its agents, then its branch's PR and its
-    // Claude sessions', less those hidden, then what they bring along; agents' the same,
-    // for the agents list.
+    // Claude sessions', less those hidden, then what they bring along; agents' the same
+    // with their space's own (by hand and its branch's), for the agents list.
     const cfg = linkSettings(shared("jj-links"));
+    const mineOf = (own, auto, off) => [...new Set([...own, ...auto.filter((u) => u && !off.has(u))])];
     const shownOf = (own, auto, off) => {
-      const mine = [...new Set([...own, ...auto.filter((u) => u && !off.has(u))])];
+      const mine = mineOf(own, auto, off);
       return expand(mine, this.items, cfg).map((e) => e.url).filter((u) => mine.includes(u) || !off.has(u));
     };
     const as = agents();
@@ -613,13 +722,19 @@ export default class Spaces extends View {
       return [s.id, shownOf(own, auto, new Set(hidden[s.id] ?? []))];
     }));
     const shownAgents = {};
+    const unexpanded = {}; // terminal -> its links before what they bring along, for jj-tasks
     for (const a of as) {
-      const urls = shownOf(agentKept[a.address] ?? [], this.agentLinks[a.address] ?? [], new Set(hidden[a.space] ?? []));
+      const own = [...(agentKept[a.address] ?? []), ...(kept[a.space] ?? [])];
+      const auto = [...(this.agentLinks[a.address] ?? []), branches[a.space]];
+      const off = new Set(hidden[a.space] ?? []);
+      const urls = shownOf(own, auto, off);
       if (urls.length) shownAgents[a.address] = urls;
+      const mine = mineOf(own, auto, off);
+      if (mine.length) unexpanded[a.address] = mine;
     }
     this.cards = new Set([...this.links.values(), ...Object.values(shownAgents)].flat().filter(isCard));
     const unread = Object.fromEntries(Object.entries(this.unread).filter(([k, u]) => !(this.dismissed[k] >= u.at)));
-    const gh = { items: this.items, agents: this.agentLinks, branches, shown: { agents: shownAgents }, trello: this.trello, unread };
+    const gh = { items: this.items, agents: this.agentLinks, branches, shown: { agents: shownAgents, direct: unexpanded }, trello: this.trello, unread };
     const text = JSON.stringify(gh);
     if (text !== this.published) {
       this.published = text;

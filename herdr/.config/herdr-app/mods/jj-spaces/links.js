@@ -1,7 +1,8 @@
 // The link dialog of a space, or of one of its agents: its GitHub PRs and issues and
-// Trello cards, those linked by hand (a space's include its agents') beside its
-// branch's PR and its Claude sessions', then what those bring along (a PR's issues,
-// an issue's PRs, their Trello cards: "via #12"), then its repo's open PRs to link.
+// Trello cards, those linked by hand (a space's include its agents', an agent's its
+// space's) beside its branch's PR and its Claude sessions', then what those bring
+// along (a PR's issues, an issue's PRs, their Trello cards: "via #12"), then its
+// repo's open PRs to link.
 // Typing filters both (a number picks that one; a URL or owner/repo#12 is looked up).
 // ^D (or the row's button) unlinks one linked by hand, and hides the others from the
 // space and its agents until ^D shows them again. Both are kept on the space's
@@ -10,10 +11,10 @@
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
-import { props, closeOverlay, theme, spaces, panes, agents, exec, shared, setShared } from "herdr";
+import { props, closeOverlay, theme, spaces, panes, agents, terminals, exec, shared, setShared } from "herdr";
 import { badge, expand, githubRepo, openPrs, resolve } from "./github.js";
 import { linkSettings } from "./trello.js";
-import { editLinks, linksOf, split } from "./docs.js";
+import { editLinks, forgetHistory, linksOf, split } from "./docs.js";
 
 const spaceOf = () => spaces().find((s) => s.id === props()?.link);
 const agentOf = () => agents().find((a) => a.address === props()?.agent);
@@ -128,11 +129,16 @@ function enter(view, cx) {
 }
 
 // Unlinks a row from the space or agent it was linked to by hand; hides or shows
-// again one from the branch or Claude, in the space.
+// again one from the branch or Claude, in the space. What's unlinked or hidden is
+// forgotten by the Claude sessions it was on too (jj-tasks).
 function drop(view, id, r, cx) {
   if (!r || r.pr) return;
   if (r.owner) save(view, r.owner, (e) => ({ ...e, links: without(e.links, r.url) }), cx);
   else save(view, { space: id }, (e) => ({ ...e, hidden: r.hidden ? without(e.hidden, r.url) : add(e.hidden, r.url) }), cx);
+  if (!r.owner && r.hidden) return;
+  const on = r.owner?.agent ? [r.owner.agent] : agents().filter((a) => a.space === id).map((a) => a.address);
+  const sids = terminals().filter((t) => on.includes(t.address)).map((t) => t.labels?.["claude.session"]).filter(Boolean);
+  if (sids.length) forgetHistory(split(id)[0], sids, r.url).catch(() => null);
 }
 
 const REFERENCE = /github\.com\/|trello\.com\/c\/|^[\w.-]+\/[\w.-]+#\d+$/;
@@ -171,6 +177,8 @@ export function linkRender(view) {
   if (agent) {
     for (const url of handLinks(agent)) push(url, "linked", { agent: agent.address });
     for (const url of gh.agents?.[agent.address] ?? []) push(url, "Claude session");
+    for (const url of shared("github.links")?.[id] ?? []) push(url, "space", { space: id });
+    push(gh.branches?.[id], "branch");
   } else {
     const mates = agents().filter((a) => a.space === id);
     for (const url of shared("github.links")?.[id] ?? []) push(url, "linked", { space: id });
