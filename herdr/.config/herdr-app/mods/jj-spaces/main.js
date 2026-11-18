@@ -70,6 +70,9 @@ const GH_OPEN = 2 * 60000;
 const GH_FINAL = 30 * 60000;
 const GH_RETRY = 10 * 60000;
 const GH_UNREAD = 60000;
+// jj-spacing's Sidebar tab keeps what differs from these.
+const PREF_DEFAULTS = { branch: "hidden" };
+const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
 // A space's repo: the main checkout's folder, for a worktree too.
@@ -1040,7 +1043,7 @@ export default class Spaces extends View {
   // nearly every space is on one.
   gitTail(g, name, t) {
     const raw = g.branch ?? "detached";
-    const where = raw.toLowerCase() === name.toLowerCase() || raw === "master" || raw === "main" ? "" : raw;
+    const where = pref("branch") === "hidden" || raw.toLowerCase() === name.toLowerCase() || raw === "master" || raw === "main" ? "" : raw;
     return h_flex()
       .flex_1()
       .min_w(0)
@@ -1121,7 +1124,7 @@ export default class Spaces extends View {
           .gap(9)
           .items_center()
           .child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?"))
-          .child(div().flex_shrink(1).min_w(48).max_w(150).truncate().text_color(t.foreground).child(w.name))
+          .child(div().flex_shrink(1).min_w(48).when(pref("branch") !== "hidden", (el) => el.max_w(150)).truncate().text_color(t.foreground).child(w.name))
           .when(Boolean(w.machine), (el) => el.child(div().id(`space-machine-${w.id}`).flex_none().text_color(t.dim).tooltip(w.machine)
             .child(svg("mods/workspace-chrome/server.svg").size(11))))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())

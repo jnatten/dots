@@ -5,7 +5,8 @@
 // Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
 // an issue's PRs, Trello cards) and where 1Password keeps the Trello key and token,
 // kept as shared("jj-links"); Connect asks 1Password again (shared("jj-links.connect")).
-// Its Agents tab picks what the agents sidebar (jj-agents) says of each agent: its own
+// Its Sidebar tab picks whether space rows (jj-spaces) show their branch, kept as
+// shared("jj-spaces"), and what the agents list (jj-agents) says of each agent: its own
 // title or nothing, and under it its space and tab, its latest update or nothing, kept as
 // shared("jj-agents").
 // What isn't in the layout is saved in jj-settings.json by jj-limits.
@@ -24,7 +25,7 @@ const STEP = 2;
 const BARS = [["always", "Shown"], ["hover", "On hover"], ["none", "Hidden"]];
 const HEADER = { content: { mod: "pane" }, height: 26, position: "top" };
 const HINTS = "jj-copy.hints";
-const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"], ["agents", "Agents"]];
+const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"], ["sidebar", "Sidebar"]];
 
 // jj-spaces/trello.js's DEFAULTS.
 const LINKS = "jj-links";
@@ -40,23 +41,24 @@ const FIELDS = [
 ];
 const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
 
-// jj-agents' PREF_DEFAULTS.
-const AGENTS = "jj-agents";
-const AGENT_DEFAULTS = { description: "title", line: "space" };
-const AGENT_ROWS = [
-  { key: "description", label: "Description", options: [["title", "Agent's title"], ["off", "Off"]] },
-  { key: "line", label: "Second line", options: [["space", "Space \u00b7 tab"], ["update", "Latest update"], ["off", "Off"]] },
+// jj-spaces' and jj-agents' PREF_DEFAULTS.
+const PREFS = { "jj-spaces": { branch: "hidden" }, "jj-agents": { description: "title", line: "space" } };
+const SIDEBAR_ROWS = [
+  { store: "jj-spaces", key: "branch", label: "Branch", options: [["shown", "Shown"], ["hidden", "Hidden"]] },
+  { store: "jj-agents", key: "description", label: "Description", options: [["title", "Agent's title"], ["off", "Off"]] },
+  { store: "jj-agents", key: "line", label: "Second line", options: [["space", "Space \u00b7 tab"], ["update", "Latest update"], ["off", "Off"]] },
 ];
-const agentValue = (key) => shared(AGENTS)?.[key] ?? AGENT_DEFAULTS[key];
+const SECTIONS = { "jj-spaces": "Spaces", "jj-agents": "Agents" };
+const prefValue = (row) => shared(row.store)?.[row.key] ?? PREFS[row.store][row.key];
 
-function setAgent(key, value) {
-  const { [key]: _, ...rest } = shared(AGENTS) ?? {};
-  setShared(AGENTS, value === AGENT_DEFAULTS[key] ? rest : { ...rest, [key]: value });
+function setPref(row, value) {
+  const { [row.key]: _, ...rest } = shared(row.store) ?? {};
+  setShared(row.store, value === PREFS[row.store][row.key] ? rest : { ...rest, [row.key]: value });
 }
 
-function cycleAgent(row, delta) {
-  const i = row.options.findIndex(([v]) => v === agentValue(row.key));
-  setAgent(row.key, row.options[(i + delta + row.options.length) % row.options.length][0]);
+function cyclePref(row, delta) {
+  const i = row.options.findIndex(([v]) => v === prefValue(row));
+  setPref(row, row.options[(i + delta + row.options.length) % row.options.length][0]);
 }
 
 // Options side by side, the chosen one raised.
@@ -139,7 +141,7 @@ export default class Spacing extends View {
     this.at = 0;
     this.hint = 0;
     this.link = 0;
-    this.agent = 0;
+    this.side = 0;
     this.tab = TABS.find(([id]) => id === localStorage.getItem("tab"))?.[0] ?? "spacing";
     this.patterns = null;
     this.handle = cx.focus_handle();
@@ -188,11 +190,11 @@ export default class Spacing extends View {
     const up = e.key === "up" || e.key === "k";
     const down = e.key === "down" || e.key === "j";
     const step = e.key === "left" || e.key === "h" || e.key === "-" ? -1 : e.key === "right" || e.key === "l" || e.key === "+" || e.key === "=" ? 1 : 0;
-    if (this.tab === "agents") {
-      const n = AGENT_ROWS.length;
-      if (up) this.agent = (this.agent + n - 1) % n;
-      else if (down) this.agent = (this.agent + 1) % n;
-      else if (step) cycleAgent(AGENT_ROWS[this.agent], step);
+    if (this.tab === "sidebar") {
+      const n = SIDEBAR_ROWS.length;
+      if (up) this.side = (this.side + n - 1) % n;
+      else if (down) this.side = (this.side + 1) % n;
+      else if (step) cyclePref(SIDEBAR_ROWS[this.side], step);
       else return false;
       return true;
     }
@@ -347,29 +349,30 @@ export default class Spacing extends View {
         for (const f of FIELDS) this.fields[f.key].set_value(LINK_DEFAULTS[f.key]);
       } : null,
       resetLabel: "Reset to defaults",
-      hint: this.editing ? "↵ save · esc close" : "↑↓ choose · space toggle · tab agents · esc close",
+      hint: this.editing ? "↵ save · esc close" : "↑↓ choose · space toggle · tab sidebar · esc close",
     };
   }
 
-  agents(t) {
+  sidebar(t) {
     const row = (r, i) => h_flex()
-      .id(`agent-${r.key}`)
+      .id(`side-${r.key}`)
       .h(34)
       .px(8)
       .gap(6)
       .flex_none()
       .items_center()
       .rounded(7)
-      .when(i === this.agent, (el) => el.bg(t.selected))
-      .on_click((_e, cx) => { this.agent = i; cx.notify(); })
+      .when(i === this.side, (el) => el.bg(t.selected))
+      .on_click((_e, cx) => { this.side = i; cx.notify(); })
       .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(r.label))
-      .child(segmented(t, `agent-${r.key}`, r.options, agentValue(r.key), (v) => { this.agent = i; setAgent(r.key, v); }));
+      .child(segmented(t, `side-${r.key}`, r.options, prefValue(r), (v) => { this.side = i; setPref(r, v); }));
+    const section = (store) => div().px(8).pt(6).flex_none().text_size(11).text_color(t.dim).child(SECTIONS[store]);
     return {
       body: v_flex().flex_1().min_h(0).gap(4)
-        .children(AGENT_ROWS.map(row))
+        .children(SIDEBAR_ROWS.flatMap((r, i) => [...(SIDEBAR_ROWS[i - 1]?.store !== r.store ? [section(r.store)] : []), row(r, i)]))
         .child(div().px(8).pt(10).text_size(11.5).text_color(t.dim)
           .child("The agent's title is Claude's /rename or AI title, or the title another agent sets. The latest update is Claude's summary of its last turn. Right-click an agent to give it a description of its own or hide its description.")),
-      reset: Object.keys(shared(AGENTS) ?? {}).length ? () => setShared(AGENTS, {}) : null,
+      reset: Object.keys(PREFS).some((store) => Object.keys(shared(store) ?? {}).length) ? () => { for (const store of Object.keys(PREFS)) setShared(store, {}); } : null,
       resetLabel: "Reset to defaults",
       hint: "↑↓ choose · ←→ change · tab spacing · esc close",
     };
@@ -377,7 +380,7 @@ export default class Spacing extends View {
 
   render() {
     const t = theme();
-    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.tab === "agents" ? this.agents(t) : this.spacing(t);
+    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.tab === "sidebar" ? this.sidebar(t) : this.spacing(t);
     const tab = ([id, label]) => div().id(`tab-${id}`).px(10).py(4).rounded(6).cursor_pointer()
       .text_color(this.tab === id ? t.foreground : t.muted)
       .when(this.tab === id, (el) => el.bg(t.selected))
