@@ -109,7 +109,8 @@ function icon(p, size, color) {
 
 // The PRs an agent's Claude session opened, with their issues and Trello cards, as
 // jj-spaces finds them (shared("github")), drawn as jj-spaces/github.js draws them:
-// GitHub's colors, [light, dark], and Trello's blue.
+// GitHub's colors, [light, dark], and Trello's blue; a PR's review after its icon, and a
+// dot on it while GitHub has unread news about it.
 const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"], BLUE = ["#0c66e4", "#579dff"];
 const GH = {
   open: { icon: "mods/jj-spaces/git-pull-request.svg", color: GREEN, label: "Open" },
@@ -126,19 +127,27 @@ const GH = {
 };
 const FINAL = new Set(["merged", "closed", "issue-done", "issue-skip", "trello-done", "trello-archived"]);
 const kindOf = (url, it) => it?.kind ?? (/trello\.com\/c\//.test(url) ? "trello" : /\/issues\/\d+/.test(url) ? "issue" : "pr");
+const REVIEW = {
+  APPROVED: { icon: "mods/workspace-chrome/check.svg", color: GREEN, label: "Approved" },
+  CHANGES_REQUESTED: { icon: "mods/jj-spaces/file-diff.svg", color: ["#cf222e", "#f85149"], label: "Changes requested" },
+};
+const UNREAD = ["#0969da", "#4493f8"];
+const prKey = (it) => (it?.kind === "pr" && it.repo && it.number ? `${it.repo}#${it.number}`.toLowerCase() : null);
+const reviewOf = (it) => (it && GH[it.state] && !FINAL.has(it.state) ? REVIEW[it.review] ?? null : null);
+const unreadOf = (it) => shared("github")?.unread?.[prKey(it)] ?? null;
 
 function tipOf(url, it) {
   const s = GH[it?.state];
   if (kindOf(url, it) === "trello") return [it?.repo || "Trello card", it?.list, s?.label, it?.title].filter(Boolean).join(" · ");
   const number = it?.number ?? url.match(/\/(\d+)\/?$/)?.[1] ?? "?";
-  return [`${it?.repo ?? ""}#${number}`, s?.label, it?.title].filter(Boolean).join(" · ");
+  return [`${it?.repo ?? ""}#${number}`, s?.label, reviewOf(it)?.label, unreadOf(it) && "New activity", it?.title].filter(Boolean).join(" · ");
 }
 
 // One icon per kind, in the state of the one most worth a look, with how many when
 // more than one; a click opens the link, or the space's link dialog when there are several.
 function kindBadges(urls, items, t, id, space) {
   const dark = Boolean(settings()?.dark);
-  const rank = (u) => (!GH[items[u]?.state] ? 2 : FINAL.has(items[u].state) ? 1 : 0);
+  const rank = (u) => (!GH[items[u]?.state] ? 4 : FINAL.has(items[u].state) ? 2 : 0) + (unreadOf(items[u]) ? 0 : 1);
   const fallback = { pr: GH.open.icon, issue: GH["issue-open"].icon, trello: GH["trello-open"].icon };
   const groups = ["pr", "issue", "trello"].map((kind) => urls.filter((u) => kindOf(u, items[u]) === kind)).filter((g) => g.length);
   return h_flex()
@@ -149,6 +158,7 @@ function kindBadges(urls, items, t, id, space) {
       const lead = g.reduce((a, b) => (rank(b) < rank(a) ? b : a));
       const kind = kindOf(lead, items[lead]);
       const s = GH[items[lead]?.state];
+      const review = reviewOf(items[lead]);
       return h_flex()
         .id(`${id}-${kind}`)
         .flex_none()
@@ -160,10 +170,14 @@ function kindBadges(urls, items, t, id, space) {
         .tooltip(g.map((u) => tipOf(u, items[u])).join("\n"))
         .on_click((_e, cx) => {
           cx.stop_propagation();
-          if (g.length > 1) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: space } });
-          else cx.spawn(async () => { await exec("open", [lead]).catch(() => null); });
+          if (g.length > 1) return openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: space } });
+          const news = unreadOf(items[lead]);
+          if (news) setShared("github.read.ask", [...(shared("github.read.ask") ?? []), { key: prKey(items[lead]), at: news.at }]);
+          cx.spawn(async () => { await exec("open", [lead]).catch(() => null); });
         })
-        .child(div().flex_none().child(svg(s?.icon ?? fallback[kind]).size(11)))
+        .child(div().relative().flex_none().child(svg(s?.icon ?? fallback[kind]).size(11))
+          .when(g.some((u) => unreadOf(items[u])), (d) => d.child(div().absolute().top(-2).right(-3).size(6).rounded(3).bg(UNREAD[dark ? 1 : 0]))))
+        .when(Boolean(review), (el) => el.child(div().flex_none().text_color(review.color[dark ? 1 : 0]).child(svg(review.icon).size(10))))
         .when(g.length > 1, (el) => el.child(String(g.length)));
     }));
 }
