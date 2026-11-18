@@ -60,7 +60,7 @@ function title(tab, l) {
 const DESC = "jj.description";
 const MODE = "jj.description.mode";
 // jj-spacing's Agents tab keeps what differs from these.
-const PREF_DEFAULTS = { description: "title", line: "space" };
+const PREF_DEFAULTS = { icon: "shown", description: "title", line: "space" };
 const pref = (key) => shared("jj-agents")?.[key] ?? PREF_DEFAULTS[key];
 const MODES = [["title", "Agent's title"], ["custom", "Custom"], ["off", "None"]];
 
@@ -381,11 +381,12 @@ export default class Agents extends View {
   subRow(t, s, shown, compact) {
     const k = s.t;
     const st = kidStatus(k, this.listed);
-    const pic = icon(k.program, 14, t.foreground);
+    const bare = pref("icon") === "hidden";
+    const pic = bare ? null : icon(k.program, 14, t.foreground);
     const on = k.address === shown;
     return h_flex()
       .id(`sub-${k.address}`)
-      .pl(39)
+      .pl(bare ? 14 : 39)
       .pr(8)
       .rounded(8)
       .h(26)
@@ -532,7 +533,7 @@ export default class Agents extends View {
     }
 
     const row = (a, i, subs = []) => {
-      const pic = icon(a.program, 16, t.foreground);
+      const pic = pref("icon") === "hidden" ? null : icon(a.program, 16, t.foreground);
       const more = detail.get(a.address);
       const term = terms.get(a.address);
       const desc = describe(a, term?.labels);
