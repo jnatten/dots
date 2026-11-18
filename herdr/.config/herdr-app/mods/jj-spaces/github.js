@@ -2,13 +2,15 @@
 // session (its transcript's "pr-link" lines, as Claude desktop reads them), the
 // PR of a branch, and the state of each, asked of GitHub with one GraphQL query.
 // Each comes with what it's linked to: a PR's issues, an issue's PRs, and the
-// Trello cards in their descriptions (trello.js asks Trello about those).
+// Trello cards in their descriptions (trello.js asks Trello about those). A PR's badge
+// marks its review (approved, changes requested) and, with a dot, GitHub's unread
+// notifications about it (shared("github").unread, by prKey).
 
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { exec, settings } from "herdr";
+import { exec, settings, shared, setShared } from "herdr";
 
-const PR = "__typename url number title state isDraft isInMergeQueue repository { nameWithOwner }";
+const PR = "__typename url number title state isDraft isInMergeQueue reviewDecision repository { nameWithOwner }";
 const ISSUE = "__typename url number title state stateReason repository { nameWithOwner }";
 const PR_LINKED = `${PR} body closingIssuesReferences(first: 10) { nodes { ${ISSUE} body } }`;
 const ISSUE_LINKED = `${ISSUE} body closedByPullRequestsReferences(first: 10, includeClosedPrs: true) { nodes { ${PR} body } }`;
@@ -36,6 +38,22 @@ export const GH = {
   "trello-archived": { icon: "mods/jj-spaces/trello.svg", color: GRAY, label: "Archived" },
 };
 export const FINAL = new Set(["merged", "closed", "issue-done", "issue-skip", "trello-done", "trello-archived"]);
+// An open PR's review, and GitHub's unread blue.
+const REVIEW = {
+  APPROVED: { icon: "mods/workspace-chrome/check.svg", color: GREEN, label: "Approved" },
+  CHANGES_REQUESTED: { icon: "mods/jj-spaces/file-diff.svg", color: ["#cf222e", "#f85149"], label: "Changes requested" },
+};
+const UNREAD = ["#0969da", "#4493f8"];
+
+export const prKey = (it) => (it?.kind === "pr" && it.repo && it.number ? `${it.repo}#${it.number}`.toLowerCase() : null);
+const reviewOf = (it) => (it && GH[it.state] && !FINAL.has(it.state) ? REVIEW[it.review] ?? null : null);
+const unreadOf = (it) => shared("github")?.unread?.[prKey(it)] ?? null;
+
+// The PRs opened from a badge: their news is read, until there's newer (jj-spaces keeps it).
+function markRead(its) {
+  const read = its.map((it) => [prKey(it), unreadOf(it)]).filter(([, u]) => u).map(([key, u]) => ({ key, at: u.at }));
+  if (read.length) setShared("github.read.ask", [...(shared("github.read.ask") ?? []), ...read]);
+}
 
 export function stateOf(n) {
   if (n.__typename === "Issue") return n.state === "OPEN" ? "issue-open" : n.stateReason === "NOT_PLANNED" ? "issue-skip" : "issue-done";
@@ -47,7 +65,7 @@ export function stateOf(n) {
 const parseUrl = (url) => url.match(/github\.com\/([^/]+\/[^/]+)\/(pull|issues)\/(\d+)/);
 
 export function itemOf(n, at) {
-  return { kind: n.__typename === "Issue" ? "issue" : "pr", url: n.url, repo: n.repository?.nameWithOwner ?? "", number: n.number, title: n.title ?? "", state: stateOf(n), at, links: linkedOf(n).map((l) => l.url), trello: cardsIn(n.body) };
+  return { kind: n.__typename === "Issue" ? "issue" : "pr", url: n.url, repo: n.repository?.nameWithOwner ?? "", number: n.number, title: n.title ?? "", state: stateOf(n), review: n.reviewDecision ?? null, at, links: linkedOf(n).map((l) => l.url), trello: cardsIn(n.body) };
 }
 
 // A node and those it's linked to, into `items`. Those come without `links` of their
@@ -70,7 +88,7 @@ export function unknown(url, at) {
 
 export function tipOf(it, s) {
   if (it.kind === "trello") return [it.repo || "Trello card", it.list, s?.label, it.title].filter(Boolean).join(" · ");
-  return [`${it.repo}#${it.number ?? "?"}`, s?.label, it.title].filter(Boolean).join(" · ");
+  return [`${it.repo}#${it.number ?? "?"}`, s?.label, reviewOf(it)?.label, unreadOf(it) && "New activity", it.title].filter(Boolean).join(" · ");
 }
 
 // `urls`, then what they bring along: a PR's issues and an issue's PRs (`related`),
@@ -155,6 +173,23 @@ export async function resolve(text, repo) {
   return itemOf(n, Date.now());
 }
 
+// The PRs GitHub has unread notifications about, by prKey: { id, reason, at (ms) }.
+// CI runs and merges or closes aren't news: the badge's own state says those.
+export async function fetchUnread() {
+  const q = '.[] | select(.subject.type == "PullRequest" and .reason != "ci_activity" and .reason != "state_change") | {id, url: .subject.url, reason, at: .updated_at} | tojson';
+  const r = await exec("gh", ["api", "notifications", "--paginate", "-q", q], { timeout: 30000 });
+  if (r.code !== 0) throw new Error((r.stderr || "gh api notifications failed").trim());
+  const out = {};
+  for (const line of r.stdout.split("\n")) {
+    try {
+      const n = JSON.parse(line);
+      const m = n.url?.match(/\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/);
+      if (m) out[`${m[1]}#${m[2]}`.toLowerCase()] = { id: n.id, reason: n.reason, at: Date.parse(n.at) || 0 };
+    } catch {}
+  }
+  return out;
+}
+
 // Each URL's state, and each { repo, branch }'s newest PR (an open one first).
 // ok: false when GitHub couldn't be asked at all.
 export async function fetchGitHub(urls, branches) {
@@ -192,6 +227,15 @@ const open = (url, cx) => cx.spawn(async () => { await exec("open", [url]).catch
 const iconOf = (it, s) => s?.icon ?? (it.kind === "issue" ? GH["issue-open"].icon : it.kind === "trello" ? GH["trello-open"].icon : GH.open.icon);
 const colorOf = (s, t) => (s ? s.color[settings()?.dark ? 1 : 0] : t.dim);
 
+// The icon, with a dot when there's news, and the lead PR's review after it.
+function marks(el, it, s, news, t) {
+  const review = reviewOf(it);
+  return el
+    .child(div().relative().flex_none().child(svg(iconOf(it, s)).size(11))
+      .when(news, (d) => d.child(div().absolute().top(-2).right(-3).size(6).rounded(3).bg(colorOf({ color: UNREAD }, t)))))
+    .when(Boolean(review), (el) => el.child(div().flex_none().text_color(colorOf(review, t)).child(svg(review.icon).size(10))));
+}
+
 // A state-colored icon with its number, for the link dialog; a click opens the link.
 export function badge(url, items, t, id) {
   const it = items[url] ?? unknown(url, 0);
@@ -206,16 +250,16 @@ export function badge(url, items, t, id) {
     .cursor_pointer()
     .tooltip(tipOf(it, s))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-    .on_click((_e, cx) => { cx.stop_propagation(); open(url, cx); })
-    .child(div().flex_none().child(svg(iconOf(it, s)).size(11)))
+    .on_click((_e, cx) => { cx.stop_propagation(); markRead([it]); open(url, cx); })
+    .map((el) => marks(el, it, s, Boolean(unreadOf(it)), t))
     .child(String(it.number ?? "?"));
 }
 
 // One icon per kind (PR, issue, Trello card), in the state of the one most worth a
-// look (open before done, known before unknown), with how many when more than one.
-// A click opens the link, or calls `many` (the link dialog) when there are several.
+// look (open before done, known before unknown, news first), with how many when more
+// than one. A click opens the link, or calls `many` (the link dialog) when there are several.
 export function kinds(urls, items, t, id, many) {
-  const rank = (u) => (!GH[items[u]?.state] ? 2 : FINAL.has(items[u].state) ? 1 : 0);
+  const rank = (u) => (!GH[items[u]?.state] ? 4 : FINAL.has(items[u].state) ? 2 : 0) + (unreadOf(items[u]) ? 0 : 1);
   const groups = ["pr", "issue", "trello"].map((kind) => urls.filter((u) => (items[u] ?? unknown(u, 0)).kind === kind)).filter((g) => g.length);
   return h_flex()
     .flex_none()
@@ -235,8 +279,13 @@ export function kinds(urls, items, t, id, many) {
         .cursor_pointer()
         .tooltip(g.map((u) => { const x = items[u] ?? unknown(u, 0); return tipOf(x, GH[x.state]); }).join("\n"))
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click((_e, cx) => { cx.stop_propagation(); g.length > 1 ? many() : open(lead, cx); })
-        .child(div().flex_none().child(svg(iconOf(it, s)).size(11)))
+        .on_click((_e, cx) => {
+          cx.stop_propagation();
+          if (g.length > 1) return many();
+          markRead([it]);
+          open(lead, cx);
+        })
+        .map((el) => marks(el, it, s, g.some((u) => unreadOf(items[u])), t))
         .when(g.length > 1, (el) => el.child(String(g.length)));
     }));
 }

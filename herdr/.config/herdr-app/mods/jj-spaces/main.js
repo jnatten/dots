@@ -16,7 +16,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, home, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
-import { FINAL, branchName, expand, fetchGitHub, githubRepo, isCard, kinds, scanAgent } from "./github.js";
+import { FINAL, branchName, expand, fetchGitHub, fetchUnread, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
 import { canon, edited, setWaiting, split, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
@@ -69,6 +69,7 @@ const FALLBACK = 60000;
 const GH_OPEN = 2 * 60000;
 const GH_FINAL = 30 * 60000;
 const GH_RETRY = 10 * 60000;
+const GH_UNREAD = 60000;
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
 // A space's repo: the main checkout's folder, for a worktree too.
@@ -140,6 +141,10 @@ export default class Spaces extends View {
     this.scanQueue = new Set();
     this.stale = new Set(); // urls to ask GitHub about again now
     this.ghRetry = 0;
+    this.unread = gh.unread ?? {}; // prKey -> { id, reason, at }: GitHub's unread notifications about PRs
+    this.dismissed = {}; // prKey -> the news opened from a badge (its at)
+    this.unreadAt = 0;
+    this.unreading = false;
     this.linksAt = 0;
     this.missing = new Set(); // "machine\0space" with links whose space wasn't there at the last sync
     this.cards = new Set(); // Trello card urls shown somewhere
@@ -170,6 +175,7 @@ export default class Spaces extends View {
     if (due.size) this.refreshGit(due, cx);
     this.claudeDue(cx);
     this.githubDue(now, sp, ps, cx);
+    this.unreadDue(now, cx);
     this.trelloDue(now, cx);
     this.linksDue(now, cx);
     this.waitingDue(cx);
@@ -507,6 +513,32 @@ export default class Spaces extends View {
     });
   }
 
+  // GitHub's unread notifications about PRs, each minute while the window is active and
+  // a PR is shown. News opened from a badge (shared("github.read.ask")) stays read until
+  // there's newer, or GitHub agrees.
+  unreadDue(now, cx) {
+    const asks = shared("github.read.ask") ?? [];
+    if (asks.length) {
+      setShared("github.read.ask", []);
+      for (const a of asks) this.dismissed[a.key] = Math.max(this.dismissed[a.key] ?? 0, a.at);
+      cx.notify();
+    }
+    if (this.unreading || now < this.unreadAt || !window().active) return;
+    if (!Object.values(this.items).some((it) => it.kind === "pr")) return;
+    this.unreading = true;
+    cx.spawn(async (cx) => {
+      try {
+        this.unread = await fetchUnread();
+        for (const [key, at] of Object.entries(this.dismissed)) if (!this.unread[key] || this.unread[key].at > at) delete this.dismissed[key];
+        this.unreadAt = Date.now() + GH_UNREAD;
+      } catch {
+        this.unreadAt = Date.now() + GH_RETRY;
+      }
+      this.unreading = false;
+      cx.notify();
+    });
+  }
+
   // The Trello cards shown that are new or due, while Trello linking is on. After
   // 1Password said no, only once the Links tab's Connect is pressed (or the refs
   // change), which also asks about every card again.
@@ -547,8 +579,8 @@ export default class Spaces extends View {
     cx.notify();
   }
 
-  // What the other mods read: every linked item's state, agents' PRs and spaces'
-  // branch PRs. Written only when it changed.
+  // What the other mods read: every linked item's state, agents' PRs, spaces' branch
+  // PRs and the PRs with unread news. Written only when it changed.
   publish(sp, ps) {
     const kept = shared("github.links") ?? {};
     const hidden = shared("github.hidden") ?? {};
@@ -583,7 +615,8 @@ export default class Spaces extends View {
       if (urls.length) shownAgents[a.address] = urls;
     }
     this.cards = new Set([...this.links.values(), ...Object.values(shownAgents)].flat().filter(isCard));
-    const gh = { items: this.items, agents: this.agentLinks, branches, shown: { agents: shownAgents }, trello: this.trello };
+    const unread = Object.fromEntries(Object.entries(this.unread).filter(([k, u]) => !(this.dismissed[k] >= u.at)));
+    const gh = { items: this.items, agents: this.agentLinks, branches, shown: { agents: shownAgents }, trello: this.trello, unread };
     const text = JSON.stringify(gh);
     if (text !== this.published) {
       this.published = text;
