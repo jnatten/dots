@@ -5,10 +5,10 @@
 // Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
 // an issue's PRs, Trello cards) and where 1Password keeps the Trello key and token,
 // kept as shared("jj-links"); Connect asks 1Password again (shared("jj-links.connect")).
-// Its Sidebar tab picks whether space rows (jj-spaces) show their branch, kept as
-// shared("jj-spaces"), and what the agents list (jj-agents) says of each agent: its own
-// title or nothing, and under it its space and tab, its latest update or nothing, kept as
-// shared("jj-agents").
+// Its Sidebar tab picks whether space rows (jj-spaces) show their icon and branch, kept as
+// shared("jj-spaces"), and whether the agents list (jj-agents) shows each agent's icon and
+// what it says of it: its own title or nothing, and under it its space and tab, its latest
+// update or nothing, kept as shared("jj-agents").
 // What isn't in the layout is saved in jj-settings.json by jj-limits.
 
 import { View, div, svg } from "gpui-kit";
@@ -42,9 +42,12 @@ const FIELDS = [
 const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
 
 // jj-spaces' and jj-agents' PREF_DEFAULTS.
-const PREFS = { "jj-spaces": { branch: "hidden" }, "jj-agents": { description: "title", line: "space" } };
+const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden" }, "jj-agents": { icon: "shown", description: "title", line: "space" } };
+const SHOWN = [["shown", "Shown"], ["hidden", "Hidden"]];
 const SIDEBAR_ROWS = [
-  { store: "jj-spaces", key: "branch", label: "Branch", options: [["shown", "Shown"], ["hidden", "Hidden"]] },
+  { store: "jj-spaces", key: "icon", label: "Icon", options: SHOWN },
+  { store: "jj-spaces", key: "branch", label: "Branch", options: SHOWN },
+  { store: "jj-agents", key: "icon", label: "Icon", options: SHOWN },
   { store: "jj-agents", key: "description", label: "Description", options: [["title", "Agent's title"], ["off", "Off"]] },
   { store: "jj-agents", key: "line", label: "Second line", options: [["space", "Space \u00b7 tab"], ["update", "Latest update"], ["off", "Off"]] },
 ];
@@ -355,7 +358,7 @@ export default class Spacing extends View {
 
   sidebar(t) {
     const row = (r, i) => h_flex()
-      .id(`side-${r.key}`)
+      .id(`side-${r.store}-${r.key}`)
       .h(34)
       .px(8)
       .gap(6)
@@ -365,7 +368,7 @@ export default class Spacing extends View {
       .when(i === this.side, (el) => el.bg(t.selected))
       .on_click((_e, cx) => { this.side = i; cx.notify(); })
       .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(r.label))
-      .child(segmented(t, `side-${r.key}`, r.options, prefValue(r), (v) => { this.side = i; setPref(r, v); }));
+      .child(segmented(t, `side-${r.store}-${r.key}`, r.options, prefValue(r), (v) => { this.side = i; setPref(r, v); }));
     const section = (store) => div().px(8).pt(6).flex_none().text_size(11).text_color(t.dim).child(SECTIONS[store]);
     return {
       body: v_flex().flex_1().min_h(0).gap(4)
