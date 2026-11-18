@@ -1,20 +1,19 @@
 // Claude Code sessions: the sidebar's Archived block, the session search (as
 // the overlay, mod.open; spaces in Waiting and their sessions in a section of their
-// own), and the archive confirmation ({ action: "archive", terminals? | space? }).
+// own), the archive confirmation ({ action: "archive", terminals? | space? }) and the
+// tasks list ({ tasks: true }, tasks.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
 import { agents, spaces, panes, layout, focused, theme, shared, setShared, props, run, exec, hc, home, appHome, readTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
+import { ARCHIVE, archived, forget, base, ago, worktree, label, place, missing, resume } from "./sessions.js";
+import { taskInit, taskRender } from "./tasks.js";
 
-const ARCHIVE = "jj-sessions.archived";
 const FOLDED = 41;
 const LIST = 440;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
 // Space avatar colors, as the jj-spaces sidebar draws them.
 const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
-
-const archived = () => shared(ARCHIVE) ?? [];
-const forget = (id) => setShared(ARCHIVE, archived().filter((r) => r.id !== id));
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -26,34 +25,6 @@ function find(node, id) {
 }
 
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
-const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
-const base = (path) => path.replace(/\/+$/, "").split("/").pop();
-const tilde = (path) => (path.startsWith(home()) ? `~${path.slice(home().length)}` : path);
-const ago = (s) => {
-  const d = Date.now() / 1000 - s;
-  return d < 3600 ? `${Math.max(1, Math.round(d / 60))}m` : d < 86400 ? `${Math.round(d / 3600)}h` : d < 86400 * 60 ? `${Math.round(d / 86400)}d` : `${Math.round(d / 86400 / 30)}mo`;
-};
-
-// A workspace Claude Code's WorktreeCreate hook makes: <repo>/.claude/worktrees/<name>.
-function worktree(cwd) {
-  const m = cwd.match(/^(.*)\/\.claude\/worktrees\/([^/]+)/);
-  return m ? { repo: m[1], name: m[2], root: m[0] } : null;
-}
-
-// "rekkert › guest-limits" for a workspace kept inside or beside its repo, else the folder's name.
-function label(cwd) {
-  const claude = worktree(cwd);
-  if (claude) return `${base(claude.repo)} › ${claude.name}`;
-  const herdr = cwd.match(/\/\.herdr\/workspaces\/([^/]+)\/([^/]+)/);
-  if (herdr) return `${herdr[1]} › ${herdr[2]}`;
-  return base(cwd) || cwd;
-}
-
-function place(s, ps) {
-  const tabs = new Set((s.tabs ?? []).map((c) => c.id));
-  return ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
-}
-
 const claude = (a) => !a.address.includes("/") && (a.app === "claude-code" || a.program?.key === "claude");
 
 async function sessionOf(pid) {
@@ -90,86 +61,6 @@ async function history() {
   return r.code === 0 ? JSON.parse(r.stdout) : [];
 }
 
-async function root(dir) {
-  const r = await exec("jj", ["--ignore-working-copy", "workspace", "root"], { cwd: dir }).catch(() => null);
-  return r?.code === 0 ? r.stdout.trim() : dir;
-}
-
-async function spaceFor(cwd) {
-  const target = await root(cwd);
-  const ps = panes();
-  for (const s of spaces()) {
-    const at = !s.machine && place(s, ps);
-    if (at && inside(at, target) && (await root(at)) === target) return s;
-  }
-  return null;
-}
-
-const jj = (cwd, args) => exec("jj", ["--color=never", "--no-pager", ...args], { cwd, timeout: 600_000 });
-
-// The folders among dirs that don't exist.
-async function missing(dirs) {
-  if (!dirs.length) return new Set();
-  const r = await exec("sh", ["-c", 'for d; do [ -d "$d" ] || printf "%s\\n" "$d"; done', "sh", ...dirs]);
-  return new Set(r.stdout.split("\n").filter(Boolean));
-}
-
-// The commit a removed workspace was on, as of the operation before jj forgot it.
-async function lastCommit(repo, name) {
-  const ops = await jj(repo, ["--ignore-working-copy", "op", "log", "--no-graph", "-T", 'id ++ "\\t" ++ description.first_line() ++ "\\n"']);
-  const op = ops.stdout
-    .split("\n")
-    .map((line) => line.split("\t"))
-    .find(([, d]) => d?.match(/^(?:forget|remove) workspaces? (.+)$/)?.[1].split(", ").includes(name))?.[0];
-  if (!op) return null;
-  const r = await jj(repo, ["--ignore-working-copy", "--at-op", `${op}-`, "log", "--no-graph", "-r", `${name}@`, "-T", 'change_id ++ "\\t" ++ empty ++ "\\t" ++ parents.map(|p| p.change_id()).join(" ")']);
-  const [change, empty, parents = ""] = r.stdout.trim().split("\t");
-  return r.code === 0 && change ? { change, empty: empty === "true", parents: parents.split(" ").filter(Boolean) } : null;
-}
-
-// A removed .claude/worktrees workspace made again by the WorktreeCreate hook, on the
-// commit it had. null when cwd wasn't one or its repo is gone too.
-async function revive(cwd) {
-  const w = worktree(cwd);
-  if (!w || (await missing([w.repo])).size) return null;
-  const input = JSON.stringify({ hook_event_name: "WorktreeCreate", cwd: w.repo, name: w.name });
-  const r = await exec("sh", ["-c", 'printf %s "$1" | "$2"', "sh", input, `${home()}/.claude/hooks/jj-workspace.sh`], { cwd: w.repo, timeout: 600_000 });
-  const root = (r.stdout ?? "").trim().split("\n").pop();
-  if (r.code !== 0 || !root) throw new Error((r.stderr || r.stdout || "").trim().split("\n").pop() || "The WorktreeCreate hook failed.");
-  const at = await lastCommit(w.repo, w.name);
-  if (at && (at.empty || (await jj(root, ["edit", at.change])).code !== 0) && at.parents.length) await jj(root, ["new", ...at.parents]);
-  const inner = root + cwd.slice(w.root.length);
-  return (await missing([inner])).size ? root : inner;
-}
-
-// The repo a removed workspace was in, else the nearest folder above cwd that exists.
-async function nearest(cwd) {
-  let dir = worktree(cwd)?.repo ?? cwd;
-  while (dir && (await missing([dir])).size) dir = dir.slice(0, dir.lastIndexOf("/"));
-  return dir || null;
-}
-
-// here: when the session's folder is gone, resume in its repo rather than remaking it.
-async function resume(rec, here = false) {
-  let cwd = rec.cwd;
-  if ((await missing([cwd])).size) {
-    try {
-      cwd = (!here && (await revive(cwd))) || (await nearest(cwd));
-    } catch (error) {
-      return error.message;
-    }
-    if (!cwd) return `${tilde(rec.cwd)} no longer exists.`;
-  }
-  const argv = ["claude", "--resume", rec.id];
-  const s = await spaceFor(cwd);
-  if (s) {
-    run("space.select", { id: s.id });
-    run("tab.new", { space: s.id, folder: cwd, argv });
-  } else run("space.new", { folder: cwd, machine: "", argv });
-  forget(rec.id);
-  return "";
-}
-
 function archive(targets, space) {
   const at = Math.floor(Date.now() / 1000);
   const ids = new Set(targets.map((s) => s.id));
@@ -184,18 +75,21 @@ function archive(targets, space) {
 
 // Open search overlays: cmd-shift-a archives their selection rather than the focused pane's session.
 let searching = 0;
+// The open tasks list, which ctrl-a t closes again.
+let tasksOverlay = null;
 
 const confirmArchive = (args) => openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: { action: "archive", ...args } });
 
 export default class Sessions extends View {
   init(_props, cx) {
     const p = props() ?? {};
-    this.mode = p.action === "archive" ? "confirm" : p.overlay ? "search" : "block";
+    this.mode = p.action === "archive" ? "confirm" : p.tasks ? "tasks" : p.overlay ? "search" : "block";
     this.error = "";
     this.handle = cx.focus_handle();
     if (this.mode === "block") return this.initBlock(cx);
     this.handle.focus();
     if (this.mode === "confirm") return this.initConfirm(cx, p);
+    if (this.mode === "tasks") return taskInit(this, cx);
     this.initSearch(cx);
   }
 
@@ -205,6 +99,7 @@ export default class Sessions extends View {
 
   close() {
     if (this.mode === "search") searching--;
+    if (this.mode === "tasks") tasksOverlay = null;
   }
 
   initBlock(cx) {
@@ -215,7 +110,9 @@ export default class Sessions extends View {
     this.checkGone(cx, true);
     cx.spawn(async () => {
       for (;;) {
-        if ((await nextCommand()) !== "archive" || searching > 0) continue;
+        const command = await nextCommand();
+        if (command === "tasks") tasksOverlay = tasksOverlay ? closeOverlay(tasksOverlay) : openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 0.7, props: { tasks: true } });
+        if (command !== "archive" || searching > 0) continue;
         const terminal = focused()?.terminal;
         confirmArchive({ terminals: terminal ? [terminal] : [] });
       }
@@ -363,6 +260,7 @@ export default class Sessions extends View {
 
   render() {
     const t = theme();
+    if (this.mode === "tasks") return taskRender(this, t);
     return this.mode === "block" ? this.renderBlock(t) : this.mode === "confirm" ? this.renderConfirm(t) : this.renderSearch(t);
   }
 

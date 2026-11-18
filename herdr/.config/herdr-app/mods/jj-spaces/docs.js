@@ -3,6 +3,10 @@
 // waiting? } }, agents: { "<terminal address>": { links } } } with that machine's bare
 // ids, so every screen sees and edits the same ones. Asked through `hc connect`; doc.set
 // only writes over the version it was given.
+// Beside it, `jj-tasks` remembers which Claude sessions had which links, for the tasks
+// list (ctrl-a t), after their terminals end: { sessions: { "<session id>": { links, off?,
+// cwd, title, space?, spaceName?, terminal?, at } } } on the machine the session ran on,
+// `off` the links it was told to forget, which its transcript doesn't bring back.
 
 import { exec } from "herdr";
 
@@ -98,3 +102,46 @@ export async function editLinks(target, change) {
 }
 
 export const setWaiting = (id, waiting) => editLinks({ space: id }, (e) => ({ ...e, waiting }));
+
+const shapedTasks = (stored) => ({ sessions: stored?.sessions ?? {} });
+// Sessions jj-tasks keeps on each machine, the newest.
+const HISTORY = 1000;
+
+function capped(doc) {
+  const ids = Object.keys(doc.sessions);
+  if (ids.length > HISTORY) for (const id of ids.sort((a, b) => doc.sessions[b].at - doc.sessions[a].at).slice(HISTORY)) delete doc.sessions[id];
+  return doc;
+}
+
+export const updateHistory = (on, update) => updateDoc("jj-tasks", on, shapedTasks, (doc) => capped(update(doc)));
+
+// url no longer had by these sessions, nor brought back by their transcripts.
+export async function forgetHistory(on, sids, url) {
+  edits++;
+  try {
+    return await updateHistory(on, (doc) => {
+      for (const sid of sids) {
+        const e = (doc.sessions[sid] ??= { links: [], at: Math.floor(Date.now() / 1000) });
+        e.links = e.links.filter((u) => u !== url);
+        e.off = [...new Set([...(e.off ?? []), url])];
+      }
+      return doc;
+    });
+  } finally {
+    edits++;
+  }
+}
+
+// Sessions found in a machine's transcripts (history.mjs) into its jj-tasks: their links,
+// less those forgotten, beside what's kept.
+export const backfillHistory = (on, found) =>
+  updateHistory(on, (doc) => {
+    for (const s of found) {
+      const was = doc.sessions[s.id];
+      const off = new Set(was?.off ?? []);
+      const links = [...new Set([...(was?.links ?? []), ...s.links.filter((u) => !off.has(u))])];
+      if (!links.length || links.length === (was?.links?.length ?? 0)) continue;
+      doc.sessions[s.id] = { ...was, cwd: was?.cwd || s.cwd, title: was?.title || s.title, links, at: Math.max(was?.at ?? 0, s.at) };
+    }
+    return doc;
+  });

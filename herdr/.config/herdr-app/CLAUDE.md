@@ -29,7 +29,15 @@ that window.
 Links added by hand in the link dialog (ctrl-a g for the focused agent, ctrl-a G for
 the space) and the Waiting mark (ctrl-a H) aren't in any file: they live in the
 `jj-links` herdr-core document on the machine each space and agent is on
-(`mods/jj-spaces/docs.js`), so every screen sees the same ones.
+(`mods/jj-spaces/docs.js`), so every screen sees the same ones. An agent also has its
+space's own links (by hand and its branch's PR).
+
+Which Claude sessions had which links outlives their terminals: the spaces sidebar keeps
+every link a running session has had in the `jj-tasks` herdr-core document on the machine
+it runs on, by session id, and shares all machines' as `shared("tasks.sessions")`. The
+tasks list (ctrl-a t, `mods/jj-sessions/tasks.js`) shows them by task, and resumes a
+session where it ran or (⌘↵) copies it from another machine and resumes it here
+(`mods/jj-sessions/sessions.js`).
 
 An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
 the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every
