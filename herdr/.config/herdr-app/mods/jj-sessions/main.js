@@ -1,7 +1,7 @@
 // Claude Code sessions: the sidebar's Archived block, the session search (as
 // the overlay, mod.open; spaces in Waiting and their sessions in a section of their
 // own), the archive confirmation ({ action: "archive", terminals? | space? }) and the
-// tasks list ({ tasks: true }, tasks.js).
+// tasks list ({ tasks: true }, or one task's sessions with { url }, tasks.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -99,7 +99,9 @@ export default class Sessions extends View {
 
   close() {
     if (this.mode === "search") searching--;
-    if (this.mode === "tasks") tasksOverlay = null;
+    if (this.mode === "tasks" && !props()?.url) tasksOverlay = null;
+    // The board it was opened over takes the keyboard back.
+    if (this.mode === "tasks" && props()?.parent) setShared("board.focus", Date.now());
   }
 
   initBlock(cx) {

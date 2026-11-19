@@ -1,5 +1,6 @@
-// Trello cards for the sidebar: board, list and name, asked of Trello's API with a
-// key and token read from 1Password (`op`) once per Herdr run and kept only in memory.
+// Trello cards for the sidebar: board, list and name, and whole boards for the board
+// (ctrl-a T), asked of Trello's API with a key and token read from 1Password (`op`)
+// once per Herdr run and kept only in memory (copies of jj-spaces share it).
 // What to link and where the key and token are: shared("jj-links"), set in the
 // spacing dialog's Links tab (jj-spacing keeps a copy of DEFAULTS).
 
@@ -60,4 +61,48 @@ export async function fetchCards(urls, cfg) {
     };
   }
   return items;
+}
+
+async function ask(path, cfg) {
+  const { key, token } = await credentials(cfg);
+  const r = await fetch(`https://api.trello.com/1/${path}`, { headers: { Authorization: `OAuth oauth_consumer_key="${key}", oauth_token="${token}"` } });
+  if (r.status === 401) {
+    const why = (await r.text()).trim();
+    if (/permission/i.test(why)) throw new Error("This token's member can't see this board.");
+    auth = null;
+    throw new OpError(`Trello refused the key and token: ${why || "401"}.`);
+  }
+  if (!r.ok) throw new Error(`Trello said ${r.status}: ${(await r.text()).trim().slice(0, 200)}`);
+  return r.json();
+}
+
+// The open boards the token's member is on: [{ id, name }].
+export async function fetchBoardList(cfg) {
+  const boards = await ask("members/me/boards?filter=open&fields=name", cfg);
+  return boards.map((b) => ({ id: b.id, name: b.name ?? "" })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const GITHUB = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:pull|issues)\/\d+/g;
+
+// A board's open lists in order, each with its open cards as items (trello: the GitHub
+// PRs and issues in a card's description).
+export async function fetchBoard(id, cfg) {
+  const b = await ask(`boards/${id}?fields=name,url&lists=open&list_fields=name,pos&cards=open&card_fields=name,desc,idList,idShort,shortLink,labels,due,dueComplete,idMembers,pos&members=all&member_fields=initials,fullName`, cfg);
+  const at = Date.now();
+  const members = Object.fromEntries((b.members ?? []).map((m) => [m.id, { initials: m.initials ?? "?", name: m.fullName ?? "" }]));
+  const lists = [...(b.lists ?? [])].sort((x, y) => x.pos - y.pos).map((l) => ({ id: l.id, name: l.name ?? "", cards: [] }));
+  const byId = Object.fromEntries(lists.map((l) => [l.id, l]));
+  for (const c of [...(b.cards ?? [])].sort((x, y) => x.pos - y.pos)) {
+    const list = byId[c.idList];
+    if (!list) continue;
+    list.cards.push({
+      kind: "trello", url: `https://trello.com/c/${c.shortLink}`, repo: b.name ?? "", list: list.name, number: c.idShort ?? null, title: c.name ?? "",
+      state: c.dueComplete ? "trello-done" : "trello-open", at,
+      labels: (c.labels ?? []).map((l) => ({ name: l.name ?? "", color: l.color ?? null })),
+      due: c.due ? Date.parse(c.due) : null, dueComplete: Boolean(c.dueComplete),
+      members: (c.idMembers ?? []).map((m) => members[m]).filter(Boolean),
+      github: [...new Set((c.desc ?? "").match(GITHUB) ?? [])],
+    });
+  }
+  return { id, name: b.name ?? "", url: b.url ?? "", lists, at };
 }

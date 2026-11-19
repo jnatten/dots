@@ -1,7 +1,7 @@
 // Two files beside the layout, mirrored into shared(), where the mods read and write them:
 // - jj-settings.json (in dots, so shared between machines): the spacing dialog's settings
 //   that aren't in the layout (hints, links, the hidden title bar, space branches, agent
-//   descriptions). The file wins at start and whenever it changes on disk (a pull); changes
+//   descriptions, the board's repos and Trello boards). The file wins at start and whenever it changes on disk (a pull); changes
 //   made here are written back.
 // - jj-state.json (this Mac's, linked into each window's home by new-window.sh): what
 //   every window on this Mac shows alike (space colors, archived sessions, folded folders). A key it
@@ -12,7 +12,7 @@
 import { appHome, readTextFile, writeTextFile, shared, setShared } from "herdr";
 
 const FILES = [
-  { name: "jj-settings.json", keys: ["jj-copy.hints", "jj-links", "jj-spacing.header", "jj-agents", "jj-spaces"], fill: false, keepEmpty: false },
+  { name: "jj-settings.json", keys: ["jj-copy.hints", "jj-links", "jj-spacing.header", "jj-agents", "jj-spaces", "jj-board"], fill: false, keepEmpty: false },
   { name: "jj-state.json", keys: ["space.colors", "jj-sessions.archived", "space-folders.folded"], fill: true, keepEmpty: true },
 ];
 

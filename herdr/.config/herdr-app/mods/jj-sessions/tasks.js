@@ -4,7 +4,8 @@
 // them as shared("tasks.sessions"); running ones add their links now. ↵ opens a task, goes
 // to a running session or resumes an ended one where it ran; ⌘↵ brings one from another
 // machine here first; ^D forgets an ended one's link.
-// A jj-sessions overlay with props { tasks: true }.
+// A jj-sessions overlay with props { tasks: true }. With { url, parent? } it's that task's
+// sessions only, the board's (ctrl-a T) session picker: picking one closes `parent` too.
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -82,7 +83,7 @@ export function taskInit(view, cx) {
   view.childOf = [];
   view.gone = {};
   view.scroll = ScrollHandle.new();
-  view.input = InputState.new({ placeholder: "Search tasks and their sessions…" });
+  view.input = InputState.new({ placeholder: props()?.url ? "Search its sessions…" : "Search tasks and their sessions…" });
   view.input.on("change", (_e, cx) => {
     view.text = view.input.value();
     view.at = 0;
@@ -108,6 +109,7 @@ const goneOf = (view, s) => view.gone[`${s.machine ?? ""}\0${s.cwd}`];
 // [{ name, rows }]: open tasks, then finished ones, each newest first, with their sessions
 // running first; filtered by words every one of which is in the task or the session.
 function sections(view) {
+  const only = props()?.url;
   const items = shared("github")?.items ?? {};
   const words = view.text.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const by = new Map();
@@ -120,8 +122,9 @@ function sections(view) {
     shown.sort((a, b) => Boolean(b.running) - Boolean(a.running) || b.at - a.at);
     return { url, it, sessions: shown, at: Math.max(...list.map((s) => s.at)), done: FINAL.has(it.state) };
   });
-  const rowsOf = (list) => list.sort((a, b) => b.at - a.at).flatMap((task) => [{ kind: "task", task }, ...task.sessions.map((s) => ({ kind: "session", task, s }))]);
-  const matching = tasks.filter((t) => t.sessions.length);
+  const rowsOf = (list) => list.sort((a, b) => b.at - a.at).flatMap((task) => [...(only ? [] : [{ kind: "task", task }]), ...task.sessions.map((s) => ({ kind: "session", task, s }))]);
+  const matching = tasks.filter((t) => t.sessions.length && (!only || t.url === only));
+  if (only) return [{ name: "Sessions", rows: rowsOf(matching) }].filter((sec) => sec.rows.length);
   return [
     { name: "Open", rows: rowsOf(matching.filter((t) => !t.done)) },
     { name: "Done", rows: rowsOf(matching.filter((t) => t.done)) },
@@ -132,6 +135,12 @@ function hide() {
   closeOverlay(props().overlay);
 }
 
+// Done: the board this picked a session for goes too.
+function done() {
+  hide();
+  if (props()?.parent) closeOverlay(props().parent);
+}
+
 function start(view, s, work, cx) {
   if (view.busy) return;
   view.busy = keyOf(s);
@@ -140,7 +149,7 @@ function start(view, s, work, cx) {
   cx.spawn(async (cx) => {
     view.error = await work().catch((e) => String(e?.message ?? e));
     view.busy = null;
-    if (!view.error) hide();
+    if (!view.error) done();
     cx.notify();
   });
 }
@@ -155,7 +164,7 @@ function go(view, row, cx, here = false, bringIt = false) {
   }
   const s = row.s;
   if (s.running) {
-    hide();
+    done();
     return run("agent.focus", { terminal: s.running.address });
   }
   if (bringIt && s.machine) return start(view, s, () => bring(s, here), cx);
@@ -187,6 +196,7 @@ function hintOf(view, row) {
 }
 
 export function taskRender(view, t) {
+  const only = props()?.url;
   const dark = Boolean(settings()?.dark);
   const secs = sections(view);
   view.rows = secs.flatMap((sec) => sec.rows);
@@ -219,7 +229,7 @@ export function taskRender(view, t) {
     const gone = goneOf(view, s);
     const where = view.busy === keyOf(s) ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${gone ? " · gone" : ""}`;
     return line(`tk-${task.url}-${keyOf(s)}`, i, row)
-      .pl(33)
+      .when(!props()?.url, (el) => el.pl(33))
       .child(h_flex().w(14).flex_none().justify_center().child(s.running ? div().size(7).rounded(4).bg(t[s.running.status] ?? t.idle) : svg(ICON("clock")).size(12).text_color(t.dim)))
       .child(div().flex_1().min_w(0).truncate().text_color(gone ? t.dim : t.foreground).child(s.title))
       .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(where))
@@ -229,7 +239,7 @@ export function taskRender(view, t) {
   view.childOf = [];
   let n = 0;
   for (const sec of secs) {
-    children.push(h_flex().h(26).px(10).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(`${sec.name} · ${sec.rows.filter((r) => r.kind === "task").length}`));
+    children.push(h_flex().h(26).px(10).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(`${sec.name} · ${sec.rows.filter((r) => r.kind === (only ? "session" : "task")).length}`));
     for (const row of sec.rows) {
       view.childOf[n] = children.length;
       children.push(row.kind === "task" ? taskRow(row.task, n, row) : sessionRow(row.task, row.s, n, row));
@@ -237,6 +247,7 @@ export function taskRender(view, t) {
     }
   }
   const empty = !view.rows.length;
+  const it = only ? (shared("github")?.items?.[only] ?? guess(only)) : null;
   const none = !Object.keys(shared("tasks.sessions") ?? {}).length && !view.text.trim();
   return v_flex()
     .id("tasks")
@@ -261,7 +272,7 @@ export function taskRender(view, t) {
     .gap(10)
     .bg(t.popover)
     .text_size(13)
-    .child(div().text_size(15).font_semibold().text_color(t.foreground).child("Tasks"))
+    .child(div().text_size(15).font_semibold().text_color(t.foreground).truncate().child(it ? `Sessions · ${refOf(it)}${it.title ? ` ${it.title}` : ""}` : "Tasks"))
     .child(
       h_flex()
         .h(36)
@@ -284,7 +295,7 @@ export function taskRender(view, t) {
         .overflow_y_scrollbar()
         .track_scroll(view.scroll)
         .children(children)
-        .when(empty, (el) => el.child(div().p(10).text_color(t.dim).child(none ? "No linked tasks yet. Link a PR, issue or card to an agent with ctrl-a g, or to its space with ctrl-a G." : "No matching tasks."))),
+        .when(empty, (el) => el.child(div().p(10).text_color(t.dim).child(only ? (view.text.trim() ? "No matching sessions." : "No Claude session has had this yet.") : none ? "No linked tasks yet. Link a PR, issue or card to an agent with ctrl-a g, or to its space with ctrl-a G." : "No matching tasks."))),
     )
     .when(Boolean(view.error), (el) => el.child(div().text_color(t.blocked).child(view.error)))
     .child(h_flex().justify_end().text_size(11).text_color(t.dim).child([hintOf(view, selected), "esc close"].filter(Boolean).join(" · ")));
