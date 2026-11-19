@@ -19,7 +19,7 @@ export function boardRepos() {
   });
 }
 
-const PR_FIELDS = `${PR} body updatedAt author { login } closingIssuesReferences(first: 10) { nodes { url } } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`;
+const PR_FIELDS = `${PR} body updatedAt headRefName isCrossRepository author { login } closingIssuesReferences(first: 10) { nodes { url } } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`;
 const ISSUE_FIELDS = `${ISSUE} body updatedAt author { login } assignees(first: 3) { nodes { login } } labels(first: 6) { nodes { name color } } closedByPullRequestsReferences(first: 5) { nodes { url } }`;
 const repoArgs = (repo) => {
   const [owner, name] = repo.split("/");
@@ -49,6 +49,8 @@ function prOf(n, at, login) {
     mine: Boolean(login) && n.author?.login === login,
     updated: Date.parse(n.updatedAt) || 0,
     checks: n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null,
+    branch: n.headRefName ?? null,
+    fork: Boolean(n.isCrossRepository),
   };
 }
 
@@ -92,21 +94,27 @@ export async function fetchIssues(repos) {
   return { login, issues, missing: r.missing, partial: r.failed };
 }
 
-// For each path, its own origin when it's a repo, else those of the repos right inside it.
+// For each path, its own origin when it's a repo, else those of the repos right inside it:
+// "<path>\t<origin>" lines.
 const FIND = `origin() {
-  if [ -e "$1/.jj" ]; then jj --ignore-working-copy -R "$1" git remote list 2>/dev/null | awk '$1 == "origin" { print $2 }'
-  else git -C "$1" remote get-url origin 2>/dev/null; fi
+  if [ -e "$1/.jj" ]; then u=$(jj --ignore-working-copy -R "$1" git remote list 2>/dev/null | awk '$1 == "origin" { print $2 }')
+  else u=$(git -C "$1" remote get-url origin 2>/dev/null); fi
+  if [ -n "$u" ]; then printf '%s\\t%s\\n' "$1" "$u"; fi
 }
 for d; do
   if [ -e "$d/.git" ] || [ -e "$d/.jj" ]; then origin "$d"
   else for c in "$d"/*/; do if [ -e "$c.git" ] || [ -e "$c.jj" ]; then origin "\${c%/}"; fi; done; fi
 done; true`;
 
-// The GitHub repos in the sidebar's folders on machine `on` (null: this one): "owner/repo"s.
+// The GitHub repos in the sidebar's folders on machine `on` (null: this one), and where
+// each is: [{ repo: "owner/repo", path }].
 export async function discoverRepos(folders, on) {
   const paths = [...new Set(folders.flatMap((f) => f.paths?.[on ?? ""]?.paths ?? []))];
   if (!paths.length) return [];
   const r = await exec("sh", ["-c", FIND, "sh", ...paths], { on, timeout: 30000 });
-  const repos = new Map(r.stdout.split("\n").map(githubRepo).filter(Boolean).reverse().map((repo) => [repo.toLowerCase(), repo]));
-  return [...repos.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return r.stdout.split("\n").map((line) => {
+    const [path, url] = line.split("\t");
+    const repo = githubRepo(url);
+    return repo ? { repo, path } : null;
+  }).filter(Boolean);
 }

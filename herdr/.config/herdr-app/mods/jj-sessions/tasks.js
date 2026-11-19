@@ -4,13 +4,15 @@
 // them as shared("tasks.sessions"); running ones add their links now. ↵ opens a task, goes
 // to a running session or resumes an ended one where it ran; ⌘↵ brings one from another
 // machine here first; ^D forgets an ended one's link.
-// A jj-sessions overlay with props { tasks: true }. With { url, parent? } it's that task's
-// sessions only, the board's (ctrl-a T) session picker: picking one closes `parent` too.
+// A jj-sessions overlay with props { tasks: true }. With { url, parent?, start?, item? } it's that
+// task's sessions only, the board's (ctrl-a T) session picker, and new ones to start in its
+// repos (start: { repos, others, branch, name }, where shared("board.places") has them);
+// picking one closes `parent` too.
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
 import { agents, terminals, theme, settings, shared, setShared, props, run, exec, closeOverlay } from "herdr";
-import { ago, base, bring, label, missing, resume, worktree } from "./sessions.js";
+import { ago, base, bring, label, missing, resume, startNew, worktree } from "./sessions.js";
 
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
 // jj-spaces/github.js's: GitHub's colors, [light, dark], and Trello's blue.
@@ -124,11 +126,26 @@ function sections(view) {
   });
   const rowsOf = (list) => list.sort((a, b) => b.at - a.at).flatMap((task) => [...(only ? [] : [{ kind: "task", task }]), ...task.sessions.map((s) => ({ kind: "session", task, s }))]);
   const matching = tasks.filter((t) => t.sessions.length && (!only || t.url === only));
-  if (only) return [{ name: "Sessions", rows: rowsOf(matching) }].filter((sec) => sec.rows.length);
+  if (only) return [{ name: "Sessions", rows: rowsOf(matching) }, { name: "New session", rows: newRows(words) }].filter((sec) => sec.rows.length || sec.name === "Sessions");
   return [
     { name: "Open", rows: rowsOf(matching.filter((t) => !t.done)) },
     { name: "Done", rows: rowsOf(matching.filter((t) => t.done)) },
   ].filter((sec) => sec.rows.length);
+}
+
+// The new sessions the board's picker offers: in each place the item's repos are checked
+// out (a card's, then every other repo's), in the checkout or in a new worktree.
+function newRows(words) {
+  const start = props()?.start;
+  if (!start) return [];
+  const places = shared("board.places") ?? {};
+  const wanted = start.repos.map((r) => r.toLowerCase());
+  const keys = [...wanted, ...(start.others ? Object.keys(places).filter((k) => !wanted.includes(k)).sort() : [])];
+  return keys.flatMap((key) =>
+    (places[key] ?? []).flatMap((place) =>
+      [false, true].map((own) => ({ kind: "new", key: `new:${key}:${place.machine ?? ""}:${place.path}:${own}`, repo: key, place, worktree: own, branch: start.branch, name: start.name })),
+    ),
+  ).filter((r) => words.every((w) => `new session ${r.worktree ? "worktree" : "checkout"} ${r.repo} ${r.place.path} ${r.place.machine ?? ""} ${r.branch ?? ""}`.toLowerCase().includes(w)));
 }
 
 function hide() {
@@ -158,6 +175,7 @@ function start(view, s, work, cx) {
 // copies one from another machine here first; here: in its repo when its folder is gone.
 function go(view, row, cx, here = false, bringIt = false) {
   if (!row) return;
+  if (row.kind === "new") return start(view, { id: row.key }, () => startNew({ path: row.place.path, machine: row.place.machine, worktree: row.worktree, name: row.name, branch: row.branch, url: props().url }), cx);
   if (row.kind === "task") {
     hide();
     return cx.spawn(async () => { await exec("open", [row.task.url]).catch(() => null); });
@@ -185,9 +203,10 @@ function forgetLink(row) {
 }
 
 function hintOf(view, row) {
-  if (view.busy) return "resuming…";
+  if (view.busy) return view.busy.startsWith("new:") ? "starting…" : "resuming…";
   if (!row) return "";
   if (row.kind === "task") return "↵ open";
+  if (row.kind === "new") return `↵ start${row.branch ? ` on ${row.branch}` : ""}`;
   const s = row.s;
   if (s.running) return "↵ go to";
   const w = goneOf(view, s) && worktree(s.cwd);
@@ -225,6 +244,14 @@ export function taskRender(view, t) {
       .child(div().flex_1().min_w(0).truncate().text_color(task.done ? t.muted : t.foreground).child(it.title || (it.kind === "trello" ? "Trello card" : task.url)))
       .child(h_flex().flex_none().justify_end().text_size(11).text_color(color).child(s?.label ?? ""));
   };
+  const newRow = (r, i, row) => {
+    const where = view.busy === r.key ? "starting…" : `${r.place.machine ? `${r.place.machine} · ` : ""}${label(r.worktree ? `${r.place.path}/.claude/worktrees/${r.name}` : r.place.path)}`;
+    return line(r.key, i, row)
+      .child(h_flex().w(14).flex_none().justify_center().child(svg(ICON("plus")).size(12).text_color(t.dim)))
+      .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(`New session${r.worktree ? " in a new worktree" : ""}${r.branch ? ` on ${r.branch}` : ""}`))
+      .child(div().flex_none().max_w(260).truncate().text_size(11.5).text_color(t.dim).child(where))
+      .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(r.worktree ? "worktree" : "checkout"));
+  };
   const sessionRow = (task, s, i, row) => {
     const gone = goneOf(view, s);
     const where = view.busy === keyOf(s) ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${gone ? " · gone" : ""}`;
@@ -239,15 +266,22 @@ export function taskRender(view, t) {
   view.childOf = [];
   let n = 0;
   for (const sec of secs) {
-    children.push(h_flex().h(26).px(10).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(`${sec.name} · ${sec.rows.filter((r) => r.kind === (only ? "session" : "task")).length}`));
+    const head = !only
+      ? `${sec.name} · ${sec.rows.filter((r) => r.kind === "task").length}`
+      : sec.name !== "Sessions" ? sec.name
+      : sec.rows.length ? `Sessions · ${sec.rows.length}`
+      : view.text.trim() ? "No matching sessions" : "No Claude session has had this yet";
+    children.push(h_flex().h(26).px(10).pt(6).flex_none().items_center().text_size(11).text_color(t.dim).child(head));
     for (const row of sec.rows) {
       view.childOf[n] = children.length;
-      children.push(row.kind === "task" ? taskRow(row.task, n, row) : sessionRow(row.task, row.s, n, row));
+      children.push(row.kind === "task" ? taskRow(row.task, n, row) : row.kind === "new" ? newRow(row, n, row) : sessionRow(row.task, row.s, n, row));
       n++;
     }
   }
-  const empty = !view.rows.length;
-  const it = only ? (shared("github")?.items?.[only] ?? guess(only)) : null;
+  const empty = !view.rows.length && !only;
+  const places = shared("board.places") ?? {};
+  const unplaced = (props()?.start?.repos ?? []).filter((r) => !places[r.toLowerCase()]?.length);
+  const it = only ? (props()?.item ?? shared("github")?.items?.[only] ?? guess(only)) : null;
   const none = !Object.keys(shared("tasks.sessions") ?? {}).length && !view.text.trim();
   return v_flex()
     .id("tasks")
@@ -295,7 +329,9 @@ export function taskRender(view, t) {
         .overflow_y_scrollbar()
         .track_scroll(view.scroll)
         .children(children)
-        .when(empty, (el) => el.child(div().p(10).text_color(t.dim).child(only ? (view.text.trim() ? "No matching sessions." : "No Claude session has had this yet.") : none ? "No linked tasks yet. Link a PR, issue or card to an agent with ctrl-a g, or to its space with ctrl-a G." : "No matching tasks."))),
+        .when(only && unplaced.length > 0, (el) => el.child(div().px(10).pt(8).text_size(12).text_color(t.dim).child(`No checkout of ${unplaced.join(", ")} in the sidebar's folders or spaces to start a session in.`)))
+        .when(only && !props()?.start?.repos?.length && !props()?.start?.others, (el) => el.child(div().px(10).pt(8).text_size(12).text_color(t.dim).child("No repo to start a session in.")))
+        .when(empty, (el) => el.child(div().p(10).text_color(t.dim).child(none ? "No linked tasks yet. Link a PR, issue or card to an agent with ctrl-a g, or to its space with ctrl-a G." : "No matching tasks."))),
     )
     .when(Boolean(view.error), (el) => el.child(div().text_color(t.blocked).child(view.error)))
     .child(h_flex().justify_end().text_size(11).text_color(t.dim).child([hintOf(view, selected), "esc close"].filter(Boolean).join(" · ")));
