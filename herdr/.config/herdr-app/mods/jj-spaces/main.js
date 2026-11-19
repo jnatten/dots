@@ -12,16 +12,21 @@
 // list, the link dialog and the spacing dialog's Links tab. Those linked by hand, to
 // the space or to one of its agents, live on its machine (docs.js), copied into
 // shared("github.links") and shared("github.agent-links").
+// It also finds the GitHub repos in its folders (shared("board.repos")) and, once Trello is
+// connected, the Trello boards there are (shared("trello.boards")), for the board (ctrl-a T,
+// board.js) and the spacing dialog's Board tab.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, exec, hc, home, appHome, readTextFile, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
+import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, closeOverlay, exec, hc, home, appHome, readTextFile, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
 import { FINAL, branchName, expand, fetchGitHub, fetchUnread, githubRepo, isCard, kinds, scanAgent } from "./github.js";
-import { OpError, fetchCards, linkSettings, refsOf } from "./trello.js";
+import { OpError, fetchBoardList, fetchCards, linkSettings, refsOf } from "./trello.js";
 import { backfillHistory, canon, edited, forgetHistory, setWaiting, split, updateHistory, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
 import { MARK, applyChange, empty, folderOf, foldersOf, live, matchOf, merge, nextRank, ownPaths, pathsOn, tidy, tilde, updateFolders, writeChange } from "./folders.js";
 import { folderInit, folderRender } from "./folder-dialog.js";
+import { boardInit, boardRender } from "./board.js";
+import { discoverRepos } from "./board-data.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -72,6 +77,9 @@ const GH_RETRY = 10 * 60000;
 const GH_UNREAD = 60000;
 // Each machine's Claude transcripts are read for jj-tasks this often while the window is in front.
 const BACKFILL = 15 * 60000;
+// The sidebar folders' repos are looked for this often, and Trello's boards listed.
+const BOARD_REPOS = 10 * 60000;
+const BOARD_LIST = 30 * 60000;
 // jj-spacing's Sidebar tab keeps what differs from these.
 const PREF_DEFAULTS = { icon: "shown", branch: "hidden" };
 const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
@@ -113,6 +121,9 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
+// The open board, which ctrl-a T closes again.
+let boardOverlay = null;
+
 // The link dialog for a space, or for one of its agents.
 function openLinks(id, agent) {
   if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: id, ...(agent && { agent }) } });
@@ -122,6 +133,7 @@ export default class Spaces extends View {
   init(_props, cx) {
     if (props()?.link) return linkInit(this, cx);
     if (props()?.folder) return folderInit(this, cx);
+    if (props()?.board) return boardInit(this, cx);
     this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked, gh: "owner/repo" }, null: not a repo
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
@@ -167,6 +179,11 @@ export default class Spaces extends View {
     this.trelloBlocked = null; // refsOf() and connect when 1Password said no
     this.connected = shared("jj-links.connect") ?? 0;
     this.trello = { state: "idle", error: null, cards: 0 }; // for the Links tab
+    this.boardRepos = {}; // machine ("" here) -> the GitHub repos in its sidebar folders
+    this.reposAt = 0;
+    this.reposOf = null; // shared("space-folders") they were looked for in
+    this.boardsAt = 0;
+    this.boardsAsked = this.connected;
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
@@ -175,6 +192,7 @@ export default class Spaces extends View {
       for (;;) {
         // "link": the focused agent's, else the space's; "link-space": the space's.
         const command = await nextCommand();
+        if (command === "board") boardOverlay = boardOverlay ? closeOverlay(boardOverlay) : openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
         if (command !== "link" && command !== "link-space") continue;
         const space = focused()?.space ?? spaces().find((s) => s.active)?.id;
         openLinks(space, command === "link" ? agents().find((a) => a.focused && a.space === space)?.address : null);
@@ -197,6 +215,51 @@ export default class Spaces extends View {
     this.forgetDue(cx);
     this.backfillDue(now, cx);
     this.foldersDue(now, cx);
+    this.boardDue(now, cx);
+  }
+
+  close() {
+    if (props()?.board) boardOverlay = null;
+  }
+
+  // The GitHub repos in the sidebar folders on every machine that answers (one that doesn't
+  // keeps what it had), and the Trello boards, only while Trello's key and token are at hand.
+  boardDue(now, cx) {
+    const sf = shared("space-folders");
+    const text = JSON.stringify(sf?.folders ?? []);
+    if (sf && !this.discovering && (now > this.reposAt || text !== this.reposOf)) {
+      this.discovering = true;
+      this.reposOf = text;
+      this.reposAt = now + BOARD_REPOS;
+      const on = [null, ...this.machines.filter((m) => m.state === "connected").map((m) => m.name)];
+      cx.spawn(async (cx) => {
+        for (const m of on) {
+          try {
+            this.boardRepos[m ?? ""] = await discoverRepos(sf.folders ?? [], m);
+          } catch {}
+        }
+        const all = new Map(Object.values(this.boardRepos).flat().map((r) => [r.toLowerCase(), r]));
+        const list = [...all.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+        if (JSON.stringify(list) !== JSON.stringify(shared("board.repos") ?? [])) setShared("board.repos", list);
+        this.discovering = false;
+        cx.notify();
+      });
+    }
+    const pressed = shared("jj-links.connect") ?? 0;
+    if (this.listing || this.trello.state !== "ok" || (now < this.boardsAt && pressed === this.boardsAsked)) return;
+    this.listing = true;
+    this.boardsAsked = pressed;
+    this.boardsAt = now + BOARD_LIST;
+    cx.spawn(async (cx) => {
+      try {
+        const boards = await fetchBoardList(linkSettings(shared("jj-links")));
+        if (JSON.stringify(boards) !== JSON.stringify(shared("trello.boards") ?? [])) setShared("trello.boards", boards);
+      } catch {
+        this.boardsAt = Date.now() + GH_RETRY;
+      }
+      this.listing = false;
+      cx.notify();
+    });
   }
 
   // Spaces moved in or out of Waiting by the other mods (jj-menu, jj-tabs), which show it
@@ -1267,6 +1330,7 @@ export default class Spaces extends View {
   render() {
     if (props()?.link) return linkRender(this);
     if (props()?.folder) return folderRender(this);
+    if (props()?.board) return boardRender(this);
     const t = theme();
     const collapsed = narrow();
     const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];

@@ -5,6 +5,7 @@
 // Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
 // an issue's PRs, Trello cards) and where 1Password keeps the Trello key and token,
 // kept as shared("jj-links"); Connect asks 1Password again (shared("jj-links.connect")).
+// Its Board tab picks the board's (ctrl-a T) repos and Trello boards (board-tab.js).
 // Its Sidebar tab picks whether space rows (jj-spaces) show their icon and branch, kept as
 // shared("jj-spaces"), and whether the agents list (jj-agents) shows each agent's icon and
 // what it says of it: its own title or nothing, and under it its space and tab, its latest
@@ -14,6 +15,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { layout, run, theme, props, closeOverlay, appHome, readTextFile, shared, setShared } from "herdr";
+import { boardTab, boardTabInit, boardKey } from "./board-tab.js";
 
 const DEFAULT = { gap: 6, padX: 14, padY: 12 };
 const ROWS = [
@@ -25,7 +27,7 @@ const STEP = 2;
 const BARS = [["always", "Shown"], ["hover", "On hover"], ["none", "Hidden"]];
 const HEADER = { content: { mod: "pane" }, height: 26, position: "top" };
 const HINTS = "jj-copy.hints";
-const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"], ["sidebar", "Sidebar"]];
+const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"], ["board", "Board"], ["sidebar", "Sidebar"]];
 
 // jj-spaces/trello.js's DEFAULTS.
 const LINKS = "jj-links";
@@ -160,6 +162,7 @@ export default class Spacing extends View {
       input.on("submit", (_e, cx) => { save(); this.handle.focus(); cx.notify(); });
       this.fields[f.key] = input;
     }
+    boardTabInit(this);
     cx.spawn(async (cx) => {
       try {
         this.patterns = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
@@ -201,6 +204,7 @@ export default class Spacing extends View {
       else return false;
       return true;
     }
+    if (this.tab === "board") return boardKey(this, e);
     if (this.tab === "links") {
       const n = SWITCHES.length;
       if (up) this.link = (this.link + n - 1) % n;
@@ -352,7 +356,7 @@ export default class Spacing extends View {
         for (const f of FIELDS) this.fields[f.key].set_value(LINK_DEFAULTS[f.key]);
       } : null,
       resetLabel: "Reset to defaults",
-      hint: this.editing ? "↵ save · esc close" : "↑↓ choose · space toggle · tab sidebar · esc close",
+      hint: this.editing ? "↵ save · esc close" : "↑↓ choose · space toggle · tab board · esc close",
     };
   }
 
@@ -383,7 +387,7 @@ export default class Spacing extends View {
 
   render() {
     const t = theme();
-    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.tab === "sidebar" ? this.sidebar(t) : this.spacing(t);
+    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.tab === "board" ? boardTab(this, t) : this.tab === "sidebar" ? this.sidebar(t) : this.spacing(t);
     const tab = ([id, label]) => div().id(`tab-${id}`).px(10).py(4).rounded(6).cursor_pointer()
       .text_color(this.tab === id ? t.foreground : t.muted)
       .when(this.tab === id, (el) => el.bg(t.selected))

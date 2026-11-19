@@ -10,8 +10,8 @@ import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { exec, settings, shared, setShared } from "herdr";
 
-const PR = "__typename url number title state isDraft isInMergeQueue reviewDecision repository { nameWithOwner }";
-const ISSUE = "__typename url number title state stateReason repository { nameWithOwner }";
+export const PR = "__typename url number title state isDraft isInMergeQueue reviewDecision repository { nameWithOwner }";
+export const ISSUE = "__typename url number title state stateReason repository { nameWithOwner }";
 const PR_LINKED = `${PR} body closingIssuesReferences(first: 10) { nodes { ${ISSUE} body } }`;
 const ISSUE_LINKED = `${ISSUE} body closedByPullRequestsReferences(first: 10, includeClosedPrs: true) { nodes { ${PR} body } }`;
 const NODE = `__typename ... on PullRequest { ${PR_LINKED} } ... on Issue { ${ISSUE_LINKED} }`;
@@ -19,7 +19,7 @@ const NODE = `__typename ... on PullRequest { ${PR_LINKED} } ... on Issue { ${IS
 const CARD = /https?:\/\/(?:www\.)?trello\.com\/c\/([A-Za-z0-9]{8})/;
 export const cardUrl = (text) => { const m = (text ?? "").match(CARD); return m ? `https://trello.com/c/${m[1]}` : null; };
 export const isCard = (url) => CARD.test(url ?? "");
-const cardsIn = (body) => [...new Set([...(body ?? "").matchAll(new RegExp(CARD, "g"))].map((m) => `https://trello.com/c/${m[1]}`))];
+export const cardsIn = (body) => [...new Set([...(body ?? "").matchAll(new RegExp(CARD, "g"))].map((m) => `https://trello.com/c/${m[1]}`))];
 const linkedOf = (n) => (n.closingIssuesReferences ?? n.closedByPullRequestsReferences)?.nodes ?? [];
 
 // GitHub's own colors, [light, dark]; merge-queued is the attention yellow. Trello cards in its blue.
@@ -50,7 +50,7 @@ const reviewOf = (it) => (it && GH[it.state] && !FINAL.has(it.state) ? REVIEW[it
 const unreadOf = (it) => shared("github")?.unread?.[prKey(it)] ?? null;
 
 // The PRs opened from a badge: their news is read, until there's newer (jj-spaces keeps it).
-function markRead(its) {
+export function markRead(its) {
   const read = its.map((it) => [prKey(it), unreadOf(it)]).filter(([, u]) => u).map(([key, u]) => ({ key, at: u.at }));
   if (read.length) setShared("github.read.ask", [...(shared("github.read.ask") ?? []), ...read]);
 }
@@ -141,7 +141,7 @@ export async function scanAgent(sid, on) {
   return urls;
 }
 
-async function graphql(fields) {
+export async function graphql(fields) {
   const r = await exec("gh", ["api", "graphql", "-f", `query=query { ${fields} }`], { timeout: 30000 });
   // A missing PR or repo is an error beside the rest of the data, and gh exits 1.
   return JSON.parse(r.stdout || "null")?.data ?? null;

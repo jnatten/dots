@@ -39,6 +39,14 @@ tasks list (ctrl-a t, `mods/jj-sessions/tasks.js`) shows them by task, and resum
 session where it ran or (⌘↵) copies it from another machine and resumes it here
 (`mods/jj-sessions/sessions.js`).
 
+The board (ctrl-a T, `mods/jj-spaces/board.js`, a jj-spaces overlay) shows every open PR in
+its repos and those involving you, their open issues, and a tab per Trello board, each item
+with how many sessions, PRs, issues and cards it's linked to. Its repos are those the sidebar
+finds in its folders (`shared("board.repos")`) and those added in the spacing dialog's Board
+tab; the Trello boards there come from `shared("trello.boards")`, which the sidebar lists once
+Trello is connected. What's picked is `jj-board` in `jj-settings.json`. ↵ on an item opens the
+tasks list for that item alone (`{ tasks: true, url, parent }`), whose pick closes the board too.
+
 An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
 the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every
 screen sees them and they end with the terminal. The defaults are in `jj-settings.json`.

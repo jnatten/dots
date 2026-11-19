@@ -54,6 +54,7 @@
     "ctrl-a \"": "pane.split:down",
     "ctrl-a w": "mod.open:jj-sessions",
     "ctrl-a t": "jj-sessions.tasks",
+    "ctrl-a shift-t": "jj-spaces.board",
     "ctrl-a ctrl-a": "send:\u0001",
     "ctrl-a ctrl-o": "jj-tabs.rotate-up",
     "ctrl-a alt-o": "jj-tabs.rotate-down",

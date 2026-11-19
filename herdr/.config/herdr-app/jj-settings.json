@@ -19,5 +19,14 @@
   },
   "jj-spaces": {
     "icon": "hidden"
+  },
+  "jj-board": {
+    "repos": [
+      "NDLANO/Issues"
+    ],
+    "boards": [
+      "6334241fc4c7a001b1527af7"
+    ],
+    "hideEmpty": true
   }
 }
