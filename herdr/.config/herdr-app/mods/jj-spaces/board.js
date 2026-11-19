@@ -58,7 +58,13 @@ function tabsOf() {
 export function boardInit(view, cx) {
   view.handle = cx.focus_handle();
   view.handle.focus();
+  // The session picker over it gives the keyboard back when it closes (shared("board.focus")).
   view.focusAsk = shared("board.focus");
+  cx.timer.every(150, () => {
+    if (shared("board.focus") === view.focusAsk) return;
+    view.focusAsk = shared("board.focus");
+    view.handle.focus();
+  });
   view.busy = {};
   view.note = "";
   view.picker = null;
@@ -555,11 +561,6 @@ function pickerPanel(view, t, dark) {
 }
 
 export function boardRender(view) {
-  const ask = shared("board.focus");
-  if (ask !== view.focusAsk) {
-    view.focusAsk = ask;
-    view.handle.focus();
-  }
   const t = theme();
   const dark = Boolean(settings()?.dark);
   const tabs = tabsOf();
