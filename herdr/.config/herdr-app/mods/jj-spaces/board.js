@@ -3,7 +3,8 @@
 // on in the spacing dialog's Board tab, as its columns. Each item shows how many Claude
 // sessions, PRs, issues and cards it's linked to: GitHub's own links, the cards and PRs in
 // descriptions (both ways), and the other links of the sessions that had it.
-// hjkl moves (in the lists ^D/^U half a page, ^J/^K five); ↵ picks one of its sessions (jj-sessions' tasks list for that item), ⌃↵ opens
+// hjkl moves (in the lists ^D/^U half a page, ^J/^K five); ↵ picks one of its sessions or
+// starts one in its repo (jj-sessions' tasks list for that item), ⌃↵ opens
 // it, ⌥↵ lists what it's linked to. What was fetched is kept for the next opening.
 // A jj-spaces overlay with props { board: true }.
 
@@ -239,11 +240,24 @@ function openUrl(it, cx) {
   cx.spawn(async () => { await exec("open", [it.url]).catch(() => null); });
 }
 
-// ↵: the item's sessions, in jj-sessions' tasks list for it; picking one closes the board too.
+const slug = (text) => (text ?? "").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "");
+
+// What a new session for `it` would start in: its repo (a card's: those of the PRs and
+// issues it's linked to, then any other), a PR's branch, and a worktree's name.
+function startOf(view, it) {
+  const { graph, items } = view.model;
+  const linked = [...(graph.links.get(it.url)?.keys() ?? [])].map((u) => items[u]).filter((x) => x && x.kind !== "trello" && x.repo);
+  const repos = new Map((it.kind === "trello" ? linked : [it]).map((x) => [x.repo.toLowerCase(), x.repo]));
+  const branch = it.kind === "pr" && !it.fork ? it.branch : null;
+  const name = it.kind === "pr" ? it.branch?.replaceAll("/", "-") || `pr-${it.number}` : it.kind === "issue" ? `issue-${it.number}` : `card-${slug(it.title) || it.url.split("/").pop()}`;
+  return { repos: [...repos.values()], others: it.kind === "trello", branch, name };
+}
+
+// ↵: the item's sessions, in jj-sessions' tasks list for it, with new ones to start in its
+// repo; picking one closes the board too.
 function sessions(view, it) {
   if (!it) return;
-  if (!view.model.graph.sessions.get(it.url)) return (view.note = "No Claude session has had this yet.");
-  openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 440, props: { tasks: true, url: it.url, parent: props().overlay } });
+  openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 440, props: { tasks: true, url: it.url, parent: props().overlay, start: startOf(view, it), item: { kind: it.kind, repo: it.repo, list: it.list, number: it.number, title: it.title, state: it.state } } });
 }
 
 function linkedRows(view, url) {

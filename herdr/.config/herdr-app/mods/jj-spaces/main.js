@@ -12,16 +12,17 @@
 // list, the link dialog and the spacing dialog's Links tab. Those linked by hand, to
 // the space or to one of its agents, live on its machine (docs.js), copied into
 // shared("github.links") and shared("github.agent-links").
-// It also finds the GitHub repos in its folders (shared("board.repos")) and, once Trello is
-// connected, the Trello boards there are (shared("trello.boards")), for the board (ctrl-a T,
-// board.js) and the spacing dialog's Board tab.
+// It also finds the GitHub repos in its folders (shared("board.repos")) and where they and
+// its spaces' repos are (shared("board.places")), and, once Trello is connected, the Trello
+// boards there are (shared("trello.boards")), for the board (ctrl-a T, board.js) and the
+// spacing dialog's Board tab; and links the sessions the board starts to their item.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, terminals, agents, focused, props, nextCommand, run, openOverlay, closeOverlay, exec, hc, home, appHome, readTextFile, theme, shared, setShared, watchFolder, window, layout, notify } from "herdr";
 import { FINAL, branchName, expand, fetchGitHub, fetchUnread, githubRepo, isCard, kinds, scanAgent } from "./github.js";
 import { OpError, fetchBoardList, fetchCards, linkSettings, refsOf } from "./trello.js";
-import { backfillHistory, canon, edited, forgetHistory, setWaiting, split, updateHistory, updateLinks } from "./docs.js";
+import { backfillHistory, canon, editLinks, edited, forgetHistory, setWaiting, split, updateHistory, updateLinks } from "./docs.js";
 import { linkInit, linkRender } from "./links.js";
 import { MARK, applyChange, empty, folderOf, foldersOf, live, matchOf, merge, nextRank, ownPaths, pathsOn, tidy, tilde, updateFolders, writeChange } from "./folders.js";
 import { folderInit, folderRender } from "./folder-dialog.js";
@@ -179,7 +180,7 @@ export default class Spaces extends View {
     this.trelloBlocked = null; // refsOf() and connect when 1Password said no
     this.connected = shared("jj-links.connect") ?? 0;
     this.trello = { state: "idle", error: null, cards: 0 }; // for the Links tab
-    this.boardRepos = {}; // machine ("" here) -> the GitHub repos in its sidebar folders
+    this.boardRepos = {}; // machine ("" here) -> the GitHub repos in its sidebar folders: [{ repo, path }]
     this.reposAt = 0;
     this.reposOf = null; // shared("space-folders") they were looked for in
     this.boardsAt = 0;
@@ -238,13 +239,18 @@ export default class Spaces extends View {
             this.boardRepos[m ?? ""] = await discoverRepos(sf.folders ?? [], m);
           } catch {}
         }
-        const all = new Map(Object.values(this.boardRepos).flat().map((r) => [r.toLowerCase(), r]));
+        const all = new Map(Object.values(this.boardRepos).flat().reverse().map(({ repo }) => [repo.toLowerCase(), repo]));
         const list = [...all.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
         if (JSON.stringify(list) !== JSON.stringify(shared("board.repos") ?? [])) setShared("board.repos", list);
         this.discovering = false;
         cx.notify();
       });
     }
+    if (now > (this.placesAt ?? 0)) {
+      this.placesAt = now + 5000;
+      this.publishPlaces();
+    }
+    this.linkAsksDue();
     const pressed = shared("jj-links.connect") ?? 0;
     if (this.listing || this.trello.state !== "ok" || (now < this.boardsAt && pressed === this.boardsAsked)) return;
     this.listing = true;
@@ -260,6 +266,41 @@ export default class Spaces extends View {
       this.listing = false;
       cx.notify();
     });
+  }
+
+  // Where each GitHub repo is checked out, by "owner/repo" in lower case: [{ machine, path }],
+  // those in the sidebar folders and those the spaces are in.
+  publishPlaces() {
+    const places = {};
+    const add = (repo, machine, path) => {
+      const list = (places[repo.toLowerCase()] ??= []);
+      if (path && !list.some((p) => p.machine === machine && p.path === path)) list.push({ machine, path });
+    };
+    for (const [m, found] of Object.entries(this.boardRepos)) for (const { repo, path } of found) add(repo, m || null, path);
+    for (const [key, g] of Object.entries(this.git)) if (g?.gh) add(g.gh, JSON.parse(key)[0] ?? null, rootOf(g));
+    const text = canon(places);
+    if (text !== canon(shared("board.places") ?? {})) setShared("board.places", places);
+  }
+
+  // shared("board.link.ask"): [{ url, cwd, machine, known, at }], sessions the board's session
+  // picker started. Each is linked to its item, as the link dialog would, once a Claude
+  // terminal that wasn't in `known` runs in `cwd`; forgotten after half an hour.
+  linkAsksDue() {
+    const asks = shared("board.link.ask") ?? [];
+    if (!asks.length) return;
+    const now = Date.now();
+    const live = terminals().filter((t) => t.state === "live" && (t.labels?.["claude.session"] || t.argv?.[0] === "claude"));
+    const left = asks.filter((a) => {
+      const there = (c) => c && (c === a.cwd || c.startsWith(`${a.cwd}/`));
+      const t = live.find((t) => !a.known.includes(t.address) && (split(t.address)[0] ?? null) === (a.machine ?? null) && [t.labels?.["claude.cwd"], t.cwd].some(there));
+      if (!t) return now - a.at < 30 * 60000;
+      const kept = shared("github.agent-links") ?? {};
+      const mine = kept[t.address] ?? [];
+      if (!mine.includes(a.url)) setShared("github.agent-links", { ...kept, [t.address]: [...mine, a.url] });
+      editLinks({ agent: t.address }, (e) => ({ ...e, links: e.links.includes(a.url) ? e.links : [...e.links, a.url] })).catch(() => null);
+      return false;
+    });
+    if (left.length !== asks.length) setShared("board.link.ask", left);
   }
 
   // Spaces moved in or out of Waiting by the other mods (jj-menu, jj-tabs), which show it

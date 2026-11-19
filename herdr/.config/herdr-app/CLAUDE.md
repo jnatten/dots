@@ -45,7 +45,11 @@ with how many sessions, PRs, issues and cards it's linked to. Its repos are thos
 finds in its folders (`shared("board.repos")`) and those added in the spacing dialog's Board
 tab; the Trello boards there come from `shared("trello.boards")`, which the sidebar lists once
 Trello is connected. What's picked is `jj-board` in `jj-settings.json`. ↵ on an item opens the
-tasks list for that item alone (`{ tasks: true, url, parent }`), whose pick closes the board too.
+tasks list for that item alone (`{ tasks: true, url, parent, start }`), whose pick closes the
+board too. It also starts a new session in the item's repo, where `shared("board.places")` (the
+sidebar's) has it checked out: in the checkout or a new worktree (the WorktreeCreate hook's, then
+`claude --worktree`), on a PR's branch. The sidebar links the new session to the item once it
+runs (`shared("board.link.ask")`).
 
 An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
 the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every

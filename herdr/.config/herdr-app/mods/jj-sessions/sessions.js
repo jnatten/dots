@@ -1,6 +1,7 @@
 // Claude sessions by folder, and resuming one: on the machine it ran on, in its space
 // or one for its folder there, the folder made again when it's gone; or brought from
-// another machine to this one (bring) and resumed here.
+// another machine to this one (bring) and resumed here. And starting a new one in a repo,
+// in a worktree or not, on a PR's branch (startNew).
 
 import { spaces, panes, terminals, shared, setShared, run, exec, home } from "herdr";
 
@@ -124,6 +125,45 @@ export async function resume(rec, here = false) {
     run("tab.new", { space: s.id, folder: cwd, argv });
   } else run("space.new", { folder: cwd, machine: on ?? "", argv });
   forget(rec.id);
+  return "";
+}
+
+// A new Claude session in the repo at `path` on `machine` (null: this computer), in the
+// checkout itself or in a worktree of its own named `name`: made by the WorktreeCreate hook
+// first, then taken over by Claude with --worktree. Moved to `branch` (a PR's) first when
+// there's one. The spaces sidebar links it to `url` once it runs (shared("board.link.ask")).
+// "" or what went wrong.
+export async function startNew({ path, machine, worktree: own, name, branch, url }) {
+  const on = machine ?? null;
+  if ((await missing([path], on)).size) return `${tilde(path)} isn't there${on ? ` on ${on}` : ""}.`;
+  const why = (r) => (r.stderr || r.stdout || "").trim().split("\n").pop() || `exit ${r.code}`;
+  const git = (args) => exec("git", args, { cwd: path, on, timeout: 600_000 });
+  const isJj = (await exec("test", ["-e", `${path}/.jj`], { on })).code === 0;
+  if (branch) {
+    const r = isJj ? await jj(path, ["git", "fetch", "-b", branch], on) : await git(["fetch", "origin", branch]);
+    if (r.code !== 0) return `Couldn't fetch ${branch}: ${why(r)}`;
+  }
+  let cwd = path;
+  if (own) {
+    // A plain git worktree is made on the branch it's named after.
+    if (branch && !isJj) await git(["branch", "--track", branch, `origin/${branch}`]);
+    const input = JSON.stringify({ hook_event_name: "WorktreeCreate", cwd: path, name: branch && !isJj ? branch : name });
+    const r = await exec("sh", ["-c", 'printf %s "$1" | "$HOME/.claude/hooks/jj-workspace.sh"', "sh", input], { cwd: path, on, timeout: 600_000 });
+    cwd = (r.stdout ?? "").trim().split("\n").pop();
+    if (r.code !== 0 || !cwd) return `Couldn't make the worktree: ${why(r)}`;
+  }
+  if (branch && (isJj || !own)) {
+    const r = isJj ? await jj(cwd, ["new", `${JSON.stringify(branch)}@origin`], on) : await git(["switch", branch]);
+    if (r.code !== 0) return `Couldn't move to ${branch}: ${why(r)}`;
+  }
+  const known = terminals().map((t) => t.address);
+  const argv = own ? ["claude", "--worktree", base(cwd)] : ["claude"];
+  const s = own ? null : await spaceFor(path, on);
+  if (s) {
+    run("space.select", { id: s.id });
+    run("tab.new", { space: s.id, folder: path, argv });
+  } else run("space.new", { folder: path, machine: on ?? "", argv });
+  if (url) setShared("board.link.ask", [...(shared("board.link.ask") ?? []), { url, cwd, machine: on, known, at: Date.now() }]);
   return "";
 }
 
