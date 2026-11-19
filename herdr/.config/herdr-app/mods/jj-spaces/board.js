@@ -3,7 +3,7 @@
 // on in the spacing dialog's Board tab, as its columns. Each item shows how many Claude
 // sessions, PRs, issues and cards it's linked to: GitHub's own links, the cards and PRs in
 // descriptions (both ways), and the other links of the sessions that had it.
-// hjkl moves; ↵ picks one of its sessions (jj-sessions' tasks list for that item), ⌃↵ opens
+// hjkl moves (in the lists ^D/^U half a page, ^J/^K five); ↵ picks one of its sessions (jj-sessions' tasks list for that item), ⌃↵ opens
 // it, ⌥↵ lists what it's linked to. What was fetched is kept for the next opening.
 // A jj-spaces overlay with props { board: true }.
 
@@ -195,14 +195,14 @@ function showTab(view, id) {
   view.reveal = true;
 }
 
-function move(view, dir) {
+function move(view, dir, by = 1) {
   const md = view.model;
   if (md.tab.list) {
     const n = md.rows.length;
     if (!n) return;
     let i = md.at;
-    if (dir === "down") i = Math.min(n - 1, i + 1);
-    else if (dir === "up") i = Math.max(0, i - 1);
+    if (dir === "down") i = Math.min(n - 1, i + by);
+    else if (dir === "up") i = Math.max(0, i - by);
     else {
       const cur = md.starts.filter((s) => s <= i).length - 1;
       i = dir === "right" ? (md.starts[cur + 1] ?? i) : i > md.starts[cur] ? md.starts[cur] : md.starts[Math.max(0, cur - 1)];
@@ -304,6 +304,11 @@ function key(view, e, cx) {
   if (e.key === "tab") {
     const i = tabs.findIndex((t) => t.id === view.model.tab.id);
     return showTab(view, tabs[(i + (m.shift ? tabs.length - 1 : 1)) % tabs.length].id), true;
+  }
+  if (m.control && !m.alt && !m.platform && view.model.tab.list) {
+    const half = Math.max(1, Math.floor((view.listHeight ?? 340) / 2 / 34));
+    const by = { d: half, u: half, j: 5, k: 5 }[e.key];
+    if (by) return move(view, e.key === "d" || e.key === "j" ? "down" : "up", by), true;
   }
   if (!plain) return false;
   if (/^[1-9]$/.test(e.key) && tabs[Number(e.key) - 1]) return showTab(view, tabs[Number(e.key) - 1].id), true;
@@ -418,6 +423,7 @@ function listBody(view, t, dark) {
     : tab.id === "prs" ? "No open PRs." : "No open issues.";
   return v_flex()
     .id(`list-${tab.id}`)
+    .on_size_change((size) => (view.listHeight = size.height))
     .flex_1()
     .min_h(0)
     .overflow_y_scrollbar()
@@ -591,7 +597,7 @@ export function boardRender(view) {
     gh?.partial ? "Some repos couldn't be asked." : "",
   ].filter(Boolean);
   const site = tab.list ? "GitHub" : "Trello";
-  const hint = view.picker ? "" : ["hjkl move", "↵ sessions", `⌃↵ open on ${site}`, "⌥↵ linked", !tab.list && (boardSettings().hideEmpty ? "e show empty" : "e hide empty"), "tab next", "r refresh", "esc close"].filter(Boolean).join(" · ");
+  const hint = view.picker ? "" : ["hjkl move", tab.list && "^D ^U half page", tab.list && "^J ^K 5 rows", "↵ sessions", `⌃↵ open on ${site}`, "⌥↵ linked", !tab.list && (boardSettings().hideEmpty ? "e show empty" : "e hide empty"), "tab next", "r refresh", "esc close"].filter(Boolean).join(" · ");
   return v_flex()
     .id("board")
     .relative()
