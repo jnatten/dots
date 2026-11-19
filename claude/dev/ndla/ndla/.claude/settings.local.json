@@ -1,9 +1,5 @@
 {
   "permissions": {
-    "ask": [
-      "Bash(jj commit *)",
-      "Bash(jj desc *)"
-    ],
     "allow": [
       "Bash(./mill -i *)",
       "Bash(PGPASSWORD=hemmelig psql *)",
