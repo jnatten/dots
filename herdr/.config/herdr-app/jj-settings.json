@@ -13,5 +13,11 @@
     "reveal": "hover",
     "height": 26,
     "position": "top"
+  },
+  "jj-agents": {
+    "icon": "hidden"
+  },
+  "jj-spaces": {
+    "icon": "hidden"
   }
 }
