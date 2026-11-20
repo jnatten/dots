@@ -36,6 +36,7 @@ const DESCRIBE = {
 
   "space.new": [SPACES, "New space"],
   "space.rename": [SPACES, "Rename the space"],
+  "space.close": [SPACES, "Close the space and end its terminals (asks first)"],
   "jj-tabs.space-next": [SPACES, "Next space, as the sidebar lists them"],
   "jj-tabs.space-prev": [SPACES, "Previous space"],
   "jj-tabs.space-#": [SPACES, "Show space 1–9"],
