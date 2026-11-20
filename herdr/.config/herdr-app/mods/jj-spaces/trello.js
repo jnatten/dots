@@ -63,9 +63,15 @@ export async function fetchCards(urls, cfg) {
   return items;
 }
 
-async function ask(path, cfg) {
+// The header Trello's API and its attachment downloads take.
+export async function authHeader(cfg) {
   const { key, token } = await credentials(cfg);
-  const r = await fetch(`https://api.trello.com/1/${path}`, { headers: { Authorization: `OAuth oauth_consumer_key="${key}", oauth_token="${token}"` } });
+  return `OAuth oauth_consumer_key="${key}", oauth_token="${token}"`;
+}
+
+// GET a path of Trello's API, as JSON.
+export async function ask(path, cfg) {
+  const r = await fetch(`https://api.trello.com/1/${path}`, { headers: { Authorization: await authHeader(cfg) } });
   if (r.status === 401) {
     const why = (await r.text()).trim();
     if (/permission/i.test(why)) throw new Error("This token's member can't see this board.");
