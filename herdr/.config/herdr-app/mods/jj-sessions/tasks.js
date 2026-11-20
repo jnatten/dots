@@ -3,7 +3,7 @@
 // sessions under it. jj-spaces keeps them in each machine's jj-tasks document and shares
 // them as shared("tasks.sessions"); running ones add their links now. ↵ opens a task, goes
 // to a running session or resumes an ended one where it ran; ⌘↵ brings one from another
-// machine here first; ^D forgets an ended one's link.
+// machine here first; ^D forgets an ended one's link; ⌃space previews a task (jj-spaces' preview).
 // A jj-sessions overlay with props { tasks: true }. With { url, parent?, start?, item? } it's that
 // task's sessions only, the board's (ctrl-a T) session picker, and new ones to start in its
 // repos (start: { repos, others, branch, name }, where shared("board.places") has them);
@@ -11,7 +11,7 @@
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
-import { agents, terminals, theme, settings, shared, setShared, props, run, exec, closeOverlay } from "herdr";
+import { agents, terminals, theme, settings, shared, setShared, props, run, exec, closeOverlay, openOverlay } from "herdr";
 import { ago, base, bring, label, missing, resume, startNew, worktree } from "./sessions.js";
 
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
@@ -103,6 +103,13 @@ export function taskInit(view, cx) {
   });
   view.input.on("submit", (e, cx) => go(view, view.rows[view.at], cx, Boolean(e?.shift), Boolean(e?.secondary)));
   view.input.focus();
+  // A preview over it gives the keyboard back when it closes (shared("preview.closed")).
+  view.previewed = shared("preview.closed");
+  cx.timer.every(150, () => {
+    if (shared("preview.closed") === view.previewed) return;
+    view.previewed = shared("preview.closed");
+    view.input.focus();
+  });
   // Which ended sessions' folders are gone, on each machine.
   const byMachine = {};
   for (const s of Object.values(sessionsNow())) if (!s.running && s.cwd) (byMachine[s.machine ?? ""] ??= new Set()).add(s.cwd);
@@ -211,6 +218,14 @@ function forgetLink(row) {
   setShared("tasks.forget.ask", [...(shared("tasks.forget.ask") ?? []), { id, url: row.task.url }]);
 }
 
+// ⌃space: Quick Look at the row's task (jj-spaces' preview, over this list).
+function preview(row) {
+  const url = row?.task?.url ?? props()?.url;
+  if (!url) return;
+  const it = row?.task?.it ?? props()?.item ?? guess(url);
+  openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.72, height: 0.88, props: { preview: url, item: { kind: it.kind, repo: it.repo, list: it.list, number: it.number, title: it.title, state: it.state } } });
+}
+
 function hintOf(view, row) {
   if (view.busy) return view.busy.startsWith("new:") ? "starting…" : "resuming…";
   if (!row) return "";
@@ -301,7 +316,8 @@ export function taskRender(view, t) {
       const down = e.key === "down" || (ctrl && (e.key === "j" || e.key === "n"));
       const up = e.key === "up" || (ctrl && (e.key === "k" || e.key === "p"));
       if (e.key === "escape") return hide();
-      if (down && count) view.at = (view.at + 1) % count;
+      if (ctrl && e.key === "space") preview(selected);
+      else if (down && count) view.at = (view.at + 1) % count;
       else if (up && count) view.at = (view.at + count - 1) % count;
       else if (e.key === "d" && e.modifiers.control) forgetLink(selected);
       else return;
@@ -343,5 +359,5 @@ export function taskRender(view, t) {
         .when(empty, (el) => el.child(div().p(10).text_color(t.dim).child(none ? "No linked tasks yet. Link a PR, issue or card to an agent with ctrl-a g, or to its space with ctrl-a G." : "No matching tasks."))),
     )
     .when(Boolean(view.error), (el) => el.child(div().text_color(t.blocked).child(view.error)))
-    .child(h_flex().justify_end().text_size(11).text_color(t.dim).child([hintOf(view, selected), "esc close"].filter(Boolean).join(" · ")));
+    .child(h_flex().justify_end().text_size(11).text_color(t.dim).child([hintOf(view, selected), (selected?.task || props()?.url) && "⌃space preview", "esc close"].filter(Boolean).join(" · ")));
 }

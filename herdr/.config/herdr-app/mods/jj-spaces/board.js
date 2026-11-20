@@ -5,7 +5,7 @@
 // descriptions (both ways), and the other links of the sessions that had it.
 // hjkl moves (in the lists ^D/^U half a page, ^J/^K five); ↵ picks one of its sessions or
 // starts one in its repo (jj-sessions' tasks list for that item), ⌃↵ opens
-// it, ⌥↵ lists what it's linked to. What was fetched is kept for the next opening.
+// it, ⌥↵ lists what it's linked to, space previews it (preview.js). What was fetched is kept for the next opening.
 // A jj-spaces overlay with props { board: true }.
 
 import { div, svg } from "gpui-kit";
@@ -63,11 +63,12 @@ export function boardInit(view, cx) {
   // closes (shared("board.focus")).
   const me = props()?.overlay ?? null;
   setShared("board.open", me);
-  view.focusAsk = shared("board.focus");
+  const asks = () => `${shared("board.focus")} ${shared("preview.closed")}`;
+  view.focusAsk = asks();
   cx.timer.every(150, () => {
     if (shared("board.open") !== me) setShared("board.open", me);
-    if (shared("board.focus") === view.focusAsk) return;
-    view.focusAsk = shared("board.focus");
+    if (asks() === view.focusAsk) return;
+    view.focusAsk = asks();
     view.handle.focus();
   });
   view.busy = {};
@@ -293,10 +294,17 @@ function find(url) {
   return null;
 }
 
+// Space: Quick Look at it (preview.js), over the board.
+export function preview(it) {
+  if (!it?.url) return;
+  openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.72, height: 0.88, props: { preview: it.url, item: { kind: it.kind, repo: it.repo, list: it.list, number: it.number, title: it.title, state: it.state } } });
+}
+
 function pickerKey(view, e, cx) {
   const rows = linkedRows(view, view.picker.it.url);
   const m = e.modifiers;
   if (e.key === "escape") view.picker = null;
+  else if (e.key === "space") preview(rows[view.picker.at]?.it);
   else if (e.key === "j" || e.key === "down") view.picker.at = Math.min(rows.length - 1, view.picker.at + 1);
   else if (e.key === "k" || e.key === "up") view.picker.at = Math.max(0, view.picker.at - 1);
   else if (e.key === "enter") {
@@ -320,6 +328,7 @@ function key(view, e, cx) {
   const it = view.model.item;
   view.note = "";
   if (e.key === "escape") return closeOverlay(props().overlay), true;
+  if (e.key === "space" && !m.control && !m.alt && !m.platform) return preview(it), true;
   if (e.key === "enter") {
     if (m.control) it && openUrl(it, cx);
     else if (m.alt) linked(view, it);
@@ -562,7 +571,7 @@ function pickerPanel(view, t, dark) {
           .child(div().w(150).flex_none().truncate().text_size(11.5).text_color(t.dim).child(refOf(r.it)))
           .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(r.it.title || r.url))
           .child(div().flex_none().text_size(11).text_color(t.dim).child(r.why)))))
-      .child(h_flex().flex_none().justify_end().text_size(11).text_color(t.dim).child("↵ go to · ⌃↵ open · esc back")));
+      .child(h_flex().flex_none().justify_end().text_size(11).text_color(t.dim).child("space preview · ↵ go to · ⌃↵ open · esc back")));
 }
 
 export function boardRender(view) {
@@ -617,7 +626,7 @@ export function boardRender(view) {
     gh?.partial ? "Some repos couldn't be asked." : "",
   ].filter(Boolean);
   const site = tab.list ? "GitHub" : "Trello";
-  const hint = view.picker ? "" : ["hjkl move", tab.list && "^D ^U half page", tab.list && "^J ^K 5 rows", "↵ sessions", `⌃↵ open on ${site}`, "⌥↵ linked", !tab.list && (boardSettings().hideEmpty ? "e show empty" : "e hide empty"), "tab next", "r refresh", "esc close"].filter(Boolean).join(" · ");
+  const hint = view.picker ? "" : ["hjkl move", tab.list && "^D ^U half page", tab.list && "^J ^K 5 rows", "space preview", "↵ sessions", `⌃↵ open on ${site}`, "⌥↵ linked", !tab.list && (boardSettings().hideEmpty ? "e show empty" : "e hide empty"), "tab next", "r refresh", "esc close"].filter(Boolean).join(" · ");
   return v_flex()
     .id("board")
     .relative()

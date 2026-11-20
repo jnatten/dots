@@ -51,6 +51,12 @@ sidebar's) has it checked out: in the checkout or a new worktree (the WorktreeCr
 `claude --worktree`), on a PR's branch. The sidebar links the new session to the item once it
 runs (`shared("board.link.ask")`).
 
+Space on the board (ctrl-space in the tasks list) previews the selected PR, issue or card:
+`mods/jj-spaces/preview.js`, a jj-spaces overlay `{ preview: url, item? }` fed by
+`preview-data.js` (one GraphQL query, or Trello's card API). Its images are downloaded with
+curl (a mod's fetch has no bytes) into `jj-cache/preview` in Herdr's home, GitHub's through the
+signed URLs in `bodyHTML`, Trello's with its key and token.
+
 The keybind list (prefix+? and cmd-/, `mods/jj-help`, a clone of Herdr's `help`) says what
 each binding in `keys.json` does from its `DESCRIBE` table: when adding or changing a key, give
 it a line there too (one it doesn't know falls back to Herdr's words for the command).
