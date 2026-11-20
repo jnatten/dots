@@ -1,6 +1,6 @@
 // Claude Code sessions: the sidebar's Archived block, the session search (as
 // the overlay, mod.open; spaces in Waiting and their sessions in a section of their
-// own; running ones by their description, as the agents list has it), the archive confirmation ({ action: "archive", terminals? | space? }) and the
+// own; running ones by what they need and by their description, as the agents list has them), the archive confirmation ({ action: "archive", terminals? | space? }) and the
 // tasks list ({ tasks: true }, or one task's sessions with { url }, tasks.js).
 
 import { View, div, svg } from "gpui-kit";
@@ -12,6 +12,8 @@ import { taskInit, taskRender } from "./tasks.js";
 const FOLDED = 41;
 const LIST = 440;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
+// Running sessions by what they need, as the agents list's priority sections.
+const URGENCY = [["blocked", "Needs you"], ["done", "Done"], ["working", "Working"], ["idle", "Idle"]];
 // Space avatar colors, as the jj-spaces sidebar draws them.
 const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
 
@@ -42,7 +44,7 @@ function described(s) {
   const path = /^[~/]/.test(text.replace(/^[^\p{L}\p{N}~/]+/u, ""));
   const own = live && live !== a?.program?.name && !path && !live.includes("@") && live.toLowerCase() !== a?.program?.key ? live : null;
   const desc = terminals().find((t) => t.address === s.address)?.labels?.["jj.description"]?.trim() || null;
-  return { ...s, desc, own, title: desc || own || s.raw };
+  return { ...s, desc, own, title: desc || own || s.raw, status: a?.status ?? s.status };
 }
 
 // The Claude sessions running here: ~/.claude/sessions/<pid>.json describes
@@ -243,7 +245,14 @@ export default class Sessions extends View {
       return match(w) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
     });
     return [
-      { name: "Open", kind: "open", list: open.filter((s) => !parked.has(s.space) && match(s)), loading: this.open === undefined },
+      ...(this.open === undefined
+        ? [{ name: "Open", kind: "open", list: [], loading: true }]
+        : URGENCY.map(([status, name]) => ({
+            name,
+            kind: "open",
+            list: open.filter((s) => !parked.has(s.space) && match(s) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status),
+            loading: false,
+          }))),
       { name: "Spaces", kind: "space", list: all.filter((w) => !parked.has(w.id) && match(w)), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "Archived", kind: "archived", list: archived().filter(match), loading: false },
