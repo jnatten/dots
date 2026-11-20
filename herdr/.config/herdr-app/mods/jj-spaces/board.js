@@ -58,9 +58,14 @@ function tabsOf() {
 export function boardInit(view, cx) {
   view.handle = cx.focus_handle();
   view.handle.focus();
-  // The session picker over it gives the keyboard back when it closes (shared("board.focus")).
+  // It's the open board, for ctrl-a T to close (in shared(): copies of another build of this
+  // mod don't share its module). The session picker over it gives the keyboard back when it
+  // closes (shared("board.focus")).
+  const me = props()?.overlay ?? null;
+  setShared("board.open", me);
   view.focusAsk = shared("board.focus");
   cx.timer.every(150, () => {
+    if (shared("board.open") !== me) setShared("board.open", me);
     if (shared("board.focus") === view.focusAsk) return;
     view.focusAsk = shared("board.focus");
     view.handle.focus();
