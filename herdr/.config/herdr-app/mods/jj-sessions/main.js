@@ -75,8 +75,6 @@ function archive(targets, space) {
 
 // Open search overlays: cmd-shift-a archives their selection rather than the focused pane's session.
 let searching = 0;
-// The open tasks list, which ctrl-a t closes again.
-let tasksOverlay = null;
 
 const confirmArchive = (args) => openOverlay({ mod: "jj-sessions", kind: "dialog", width: 440, height: 220, props: { action: "archive", ...args } });
 
@@ -99,12 +97,15 @@ export default class Sessions extends View {
 
   close() {
     if (this.mode === "search") searching--;
-    if (this.mode === "tasks" && !props()?.url) tasksOverlay = null;
+    if (this.mode === "tasks" && !props()?.url && shared("tasks.open") === props()?.overlay) setShared("tasks.open", null);
     // The board it was opened over takes the keyboard back.
     if (this.mode === "tasks" && props()?.parent) setShared("board.focus", Date.now());
   }
 
   initBlock(cx) {
+    // The open tasks list (shared("tasks.open"), which ctrl-a t closes) from a previous run is
+    // gone; one still open through a reload says so again (tasks.js).
+    setShared("tasks.open", null);
     this.gone = {};
     this.hovered = null;
     cx.timer.every(3000, (cx) => this.checkGone(cx, false));
@@ -113,7 +114,11 @@ export default class Sessions extends View {
     cx.spawn(async () => {
       for (;;) {
         const command = await nextCommand();
-        if (command === "tasks") tasksOverlay = tasksOverlay ? closeOverlay(tasksOverlay) : openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 0.7, props: { tasks: true } });
+        if (command === "tasks") {
+          const open = shared("tasks.open");
+          if (open) closeOverlay(open);
+          else openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 0.7, props: { tasks: true } });
+        }
         if (command !== "archive" || searching > 0) continue;
         const terminal = focused()?.terminal;
         confirmArchive({ terminals: terminal ? [terminal] : [] });
