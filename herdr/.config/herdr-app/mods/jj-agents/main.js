@@ -7,10 +7,13 @@
 // A row leads with the agent's description: words given in its Description dialog
 // ({ describe: address }, ctrl-a d), else its own title. They're kept as jj.description
 // and jj.description.mode labels on its terminal; the defaults are shared("jj-agents").
+// With jj-spaces' Agents pref on "tree" its block is hidden and the agents go under their
+// spaces there; what both draw an agent with is parts.js.
 
-import { View, div, image, svg } from "gpui-kit";
+import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, hc, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, settings, nextCommand } from "herdr";
+import { agents, terminals, panes, focused, spaces, run, hc, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, settings } from "herdr";
+import { DESC, MODE, RANK, activity, clean, describe, duration, icon, kidStatus, menu, modeOf, pref, since, statusMark, subRow, subTree, telling, trackChanges } from "./parts.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -33,8 +36,6 @@ function toggleSidebar() {
   run("layout.resize", { id: "sidebar", px: narrow() ? (shared("sidebar.width") ?? 268) : window()?.platform === "macos" ? 76 : 44 });
 }
 
-const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
-
 function leadPanes(all) {
   const leads = new Map();
   for (const p of all) {
@@ -46,41 +47,13 @@ function leadPanes(all) {
   return leads;
 }
 
-// The terminal's title when it says more than the program, a path or user@host.
-function telling(l) {
-  const live = clean(l?.title);
-  // clean() would strip a path's leading ~ or /: test the title with only its status glyph gone.
-  const path = /^[~/]|^[A-Za-z]:\\/.test((l?.title ?? "").replace(/^[^\p{L}\p{N}~/]+/u, ""));
-  return live && live !== l?.program?.name && !path && !live.includes("@") && live.toLowerCase() !== l?.program?.key ? live : null;
-}
-
 function title(tab, l) {
   const live = telling(l);
   return (tab.name === l?.program?.name || !tab.named) && live ? live : tab.name;
 }
 
-const DESC = "jj.description";
-const MODE = "jj.description.mode";
-// jj-spacing's Agents tab keeps what differs from these.
-const PREF_DEFAULTS = { icon: "shown", description: "title", line: "space" };
-const pref = (key) => shared("jj-agents")?.[key] ?? PREF_DEFAULTS[key];
 const MODES = [["title", "Agent's title"], ["custom", "Custom"], ["off", "None"]];
 
-const modeOf = (labels) => (labels?.[DESC]?.trim() ? "custom" : (labels?.[MODE] || pref("description")) === "off" ? "off" : "title");
-
-function describe(a, labels) {
-  const mode = modeOf(labels);
-  return mode === "custom" ? labels[DESC].trim() : mode === "title" ? telling(a) : null;
-}
-
-const describeDialog = (address) => openOverlay({ mod: "jj-agents", kind: "dialog", width: 420, height: 164, props: { describe: address } });
-const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
-// A sub-agent without a pane isn't in agents(): its raw word, error counting as
-// blocked. It's never done: it reports to its parent, and the parent's done is the news.
-const kidStatus = (k, listed) => {
-  const s = listed.get(k.address) ?? k.status;
-  return s === "error" ? "blocked" : s === "done" ? "idle" : s;
-};
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
@@ -91,23 +64,6 @@ const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
 // Folder colors, as the jj-spaces sidebar draws them.
 const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
-
-// An agent's right-click menu (jj-menu): pin, description, link, Waiting. A popup is as tall as its items.
-const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 196, props: { tab: "agent", target: { terminal: a.address } } });
-
-function duration(ms) {
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return "<1m";
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
-}
-
-// The agent's icon from the app's program table: a one-color glyph or a picture.
-function icon(p, size, color) {
-  if (!p?.icon) return null;
-  return p.tint ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
-}
 
 // The PRs an agent's Claude session opened, with their issues and Trello cards, as
 // jj-spaces finds them (shared("github")), drawn as jj-spaces/github.js draws them:
@@ -188,38 +144,30 @@ export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
     if (props()?.describe) return this.initDescribe(cx);
-    cx.spawn(async () => {
-      for (;;) {
-        if ((await nextCommand()) !== "describe") continue;
-        const f = focused();
-        const a = agents().find((x) => x.address === (f?.agent ?? f?.shown ?? f?.terminal)) ?? agents().find((x) => x.focused && x.space === f?.space);
-        if (a) describeDialog(a.address);
-      }
-    });
     this.folded = new Set();
-    // Each agent's last state and when it changed (ms), kept across restarts.
-    this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
+    // shared("agents.changed") outlives a restart here. What was stamped before this copy
+    // started (by the spaces tree) keeps its older time where the state is the same.
+    this.saved = localStorage.getItem("changed") ?? "{}";
+    const stored = JSON.parse(this.saved);
+    const now = shared("agents.changed") ?? {};
+    const merged = { ...stored };
+    for (const [k, c] of Object.entries(now)) if (stored[k]?.s !== c.s) merged[k] = c;
+    setShared("agents.changed", merged);
     this.pendingPins = JSON.parse(localStorage.getItem("pins") ?? "[]");
     if (!this.pendingPins.length) localStorage.removeItem("pins");
     this.migratingPins = new Set();
-    cx.timer.every(30000, (cx) => cx.notify());
+    cx.timer.every(30000, (cx) => {
+      this.save();
+      cx.notify();
+    });
   }
 
-  // Stamps agents whose state changed. Done and idle count as one: looking at a
-  // finished agent turns done into idle, and looking isn't the agent doing anything.
-  track(list, now) {
-    let dirty = false;
-    for (const a of list) {
-      const s = a.status === "done" ? "idle" : a.status;
-      if (this.changed[a.address]?.s === s) continue;
-      this.changed[a.address] = { s, at: now };
-      dirty = true;
-    }
-    if (!dirty) return;
-    // Gone and old: the list alone is empty right after a start.
-    const listed = new Set(list.map((a) => a.address));
-    for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
-    localStorage.setItem("changed", JSON.stringify(this.changed));
+  // A timer's, too: a hidden copy (the spaces tree shown instead) may not render.
+  save() {
+    const text = JSON.stringify(shared("agents.changed") ?? {});
+    if (text === this.saved) return;
+    this.saved = text;
+    localStorage.setItem("changed", text);
   }
 
   // Keep offline pins until their terminal returns, and keep each pending until
@@ -243,7 +191,7 @@ export default class Agents extends View {
   }
 
   since(a) {
-    return this.changed[a.address]?.at ?? 0;
+    return since(a);
   }
 
   rank(a) {
@@ -288,7 +236,7 @@ export default class Agents extends View {
         .text_color(priority ? t.dim : t.foreground)
         .when(!priority, (el) => el.hover((el) => el.bg(t.hover)).on_click(() => setShared("agents.needs-first", !first)))
         .when(priority, (el) => el.tooltip("Priority always puts them first"))
-        .child(this.status(t, { status: "blocked" }, true))
+        .child(statusMark(t, { status: "blocked" }, true))
         .child(div().flex_1().child("Needs you on top"))
         .when(first || priority, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(priority ? t.dim : t.foreground))))
       .child(h_flex()
@@ -378,76 +326,6 @@ export default class Agents extends View {
         .child("tab choose · ↵ save · esc close"));
   }
 
-  peek(addr) {
-    run("terminal.peek", { terminal: addr });
-  }
-
-  // Live sub-agents of `addr`, depth first, each with the tree lines in front of it.
-  tree(all, addr, lead = []) {
-    const kids = all.filter((k) => k.parent === addr && k.state === "live");
-    return kids.flatMap((k, i) => {
-      const last = i === kids.length - 1;
-      return [
-        { t: k, lines: [...lead, last ? "└" : "├"] },
-        ...this.tree(all, k.address, [...lead, last ? "" : "│"]),
-      ];
-    });
-  }
-
-  subRow(t, s, shown, compact) {
-    const k = s.t;
-    const st = kidStatus(k, this.listed);
-    const bare = pref("icon") === "hidden";
-    const pic = bare ? null : icon(k.program, 14, t.foreground);
-    const on = k.address === shown;
-    return h_flex()
-      .id(`sub-${k.address}`)
-      .pl(bare ? 14 : 39)
-      .pr(8)
-      .rounded(8)
-      .h(26)
-      .flex_none()
-      .gap(0)
-      .items_center()
-      .text_size(12.5)
-      .when(on, (el) => el.bg(t.raised))
-      .hover((s) => s.bg(t.hover))
-      .on_click(() => (this.listed.has(k.address) ? run("pane.focus", { terminal: k.address }) : this.peek(k.address)))
-      .children(s.lines.map(l => div().self_start().mt(-4).w(9).h(17).mr(4).flex_none()
-        .when(Boolean(l), el => el.border_l(1.5).border_color(t.input))
-        .when(l === "└" || l === "├", el => el.border_b(1.5).rounded_bl(6))))
-      .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
-      .child(div().flex_1().truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
-      .child(this.status(t, { status: st }, compact));
-  }
-
-  // What a Claude agent runs now, as claude/.claude/hooks/herdr-activity.sh in dots labels
-  // its terminal: subagents and shells, in the working color while it works.
-  activity(t, a, labels) {
-    const subagents = Number(labels?.["claude.subagents"]) || 0;
-    const shells = Number(labels?.["claude.shells"]) || 0;
-    if (!subagents && !shells) return null;
-    const color = a.status === "working" ? t.working : t.dim;
-    const item = (kind, icon, n, what) => h_flex().id(`act-${kind}-${a.address}`).flex_none().gap(2).items_center().text_size(11).text_color(color)
-      .tooltip(`${n} ${what}${n === 1 ? "" : "s"} running`)
-      .child(svg(icon).size(12))
-      .when(n > 1, (el) => el.child(String(n)));
-    return h_flex().flex_none().gap(6).items_center()
-      .when(subagents > 0, (el) => el.child(item("sub", "mods/jj-agents/bot.svg", subagents, "subagent")))
-      .when(shells > 0, (el) => el.child(item("sh", "mods/workspace-chrome/terminal.svg", shells, "shell")));
-  }
-
-  // compact: a ! for blocked where a header already says "Needs you".
-  status(t, a, compact = false) {
-    const color = t[a.status] ?? t.dim;
-    if (a.status === "working") return svg("mods/workspace-chrome/spinner.svg").size(12).mx(1).flex_none().text_color(t.working).spin(900);
-    if (a.status === "blocked" && compact) return div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!");
-    if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center().child("Needs you");
-    // Idle: a ring; done: a dot.
-    if (a.status === "idle") return div().size(7).mx(3).flex_none().rounded(4).border(1.5).border_color(t.idle ?? t.dim);
-    return div().size(7).mx(3).flex_none().rounded(4).bg(a.status === "done" ? color : t.dim + "00");
-  }
-
   render(cx) {
     const t = theme();
     if (props()?.sortMenu) return this.sortMenu(t);
@@ -463,16 +341,17 @@ export default class Agents extends View {
     this.migratePins(all);
     const shown = focused()?.agent;
     const now = Date.now();
-    this.track(list, now);
+    trackChanges(list, now);
+    this.save();
     // A kept sub-agent (one with a pane) is in agents() too: where a tree shows
     // it, it gets no row of its own, unless it's pinned.
-    const nested = new Set(collapsed ? [] : list.flatMap((a) => this.tree(all, a.address).map((s) => s.t.address)));
+    const nested = new Set(collapsed ? [] : list.flatMap((a) => subTree(all, a.address).map((s) => s.t.address)));
     list = list.filter((a) => a.pinned || !nested.has(a.address));
     const tabCounts = new Map();
     for (const a of list) tabCounts.set(a.tab, (tabCounts.get(a.tab) ?? 0) + 1);
     const byPriority = sort.id === "priority";
     const byFolder = sort.id === "folders";
-    const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
+    const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...subTree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
     else {
@@ -500,14 +379,17 @@ export default class Agents extends View {
     const rest = list.filter((a) => !a.pinned && !urgent.has(a.address));
     list = [...needs, ...pinned, ...rest];
     const order = [...list, ...(waitingOpen ? waiting : [])].map((a) => a.address);
-    setAgentOrder(order);
-    if (JSON.stringify(order) !== JSON.stringify(shared("agents.order") ?? [])) setShared("agents.order", order);
+    // In the spaces tree (not on the rail), jj-spaces sets the order.
+    if (shared("jj-spaces")?.agents !== "tree" || collapsed) {
+      setAgentOrder(order);
+      if (JSON.stringify(order) !== JSON.stringify(shared("agents.order") ?? [])) setShared("agents.order", order);
+    }
 
     const withKids = (a, i) => {
-      const subs = collapsed ? [] : this.tree(all, a.address);
+      const subs = collapsed ? [] : subTree(all, a.address);
       const r = row(a, i, subs);
       if (this.folded.has(a.address)) return [r];
-      return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
+      return [r, ...subs.map((s) => subRow(t, s, { shown, compact: byPriority, listed: this.listed, pl: pref("icon") === "hidden" ? 14 : 39 }))];
     };
 
     // The fold chevron; folded, the count too, colored by the most urgent one.
@@ -575,13 +457,13 @@ export default class Agents extends View {
           .on_click(() => run("pane.focus", { pane: a.pane }))
           .on_mouse_down("right", () => menu(a))
           .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(t.muted).child(String(i + 1)))
-          .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true)));
+          .child(h_flex().w(14).flex_none().items_center().justify_center().child(statusMark(t, a, true)));
       }
       const when = this.since(a);
       const idle = a.status === "idle" && !a.focused;
       const off = shared("github.hidden")?.[a.space] ?? [];
       const prs = gh.shown ? (gh.shown.agents?.[a.address] ?? []) : (gh.agents?.[a.address] ?? []).filter((u) => !off.includes(u));
-      const act = this.activity(t, a, term?.labels);
+      const act = activity(t, a, term?.labels);
       const isPinned = a.pinned;
       // Under a space header the space goes without saying; an automatic tab number says nothing.
       // Without a space header above (priority, folders, pinned, needs you) the row names its space.
@@ -628,14 +510,14 @@ export default class Agents extends View {
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(prs.length > 0, el => el.child(prBadges()))
           .when(Boolean(act), el => el.child(act)))
-          .child(this.status(t, a, compact));
+          .child(statusMark(t, a, compact));
       }
       return frame.py(4).items_start()
         .child(v_flex().flex_1().min_w(0)
           .child(ago(h_flex().h(20).gap(9).items_center()
             .child(text)
             .when(subs.length > 0, el => el.child(fold(a, subs))))
-            .child(this.status(t, a, compact)))
+            .child(statusMark(t, a, compact)))
           .child(h_flex().h(16).gap(8).items_center().text_size(11.5).text_color(t.dim)
             .child(div().flex_1().min_w(0).truncate().child(under))
             .when(Boolean(machine), el => el.child(machineTag))
@@ -689,7 +571,7 @@ export default class Agents extends View {
         .when(byPriority || !open || Boolean(g.waiting) || Boolean(g.count), (el) => el.child(div().text_color(g.waiting && !open && top && top !== "idle" ? t[top] : t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
-          .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
+          .when(!byPriority && top && top !== "idle", (el) => el.child(statusMark(t, { status: top }, true)))
           .child(svg("mods/workspace-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim)));
     };
     const rows = collapsed

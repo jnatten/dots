@@ -16,7 +16,10 @@
 // its spaces' repos are (shared("board.places")), and, once Trello is connected, the Trello
 // boards there are (shared("trello.boards")), for the board (ctrl-a T, board.js) and the
 // spacing dialog's Board tab; and links the sessions the board starts to their item.
-// ctrl-a t opens and closes the tasks list (jj-sessions' tasks.js) from here.
+// ctrl-a t opens and closes the tasks list (jj-sessions' tasks.js) from here, and ctrl-a d
+// an agent's Description dialog (jj-agents').
+// Its Agents pref "tree" puts each space's agents under it (agent-tree.js) and hides the
+// agents list's block, except on the rail.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -30,6 +33,8 @@ import { folderInit, folderRender } from "./folder-dialog.js";
 import { boardInit, boardRender } from "./board.js";
 import { previewInit, previewRender } from "./preview.js";
 import { discoverRepos } from "./board-data.js";
+import { agentRows, publishOrder, treeContext } from "./agent-tree.js";
+import { describeDialog } from "./agent-parts.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -84,7 +89,7 @@ const BACKFILL = 15 * 60000;
 const BOARD_REPOS = 10 * 60000;
 const BOARD_LIST = 30 * 60000;
 // jj-spacing's Sidebar tab keeps what differs from these.
-const PREF_DEFAULTS = { icon: "shown", branch: "hidden" };
+const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list" };
 const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
@@ -185,6 +190,7 @@ export default class Spaces extends View {
     this.reposOf = null; // shared("space-folders") they were looked for in
     this.boardsAt = 0;
     this.boardsAsked = this.connected;
+    this.agentFolded = new Set(); // agents whose sub-agents the tree folds
     // The open board (shared("board.open"), which ctrl-a T closes) from a previous run is gone;
     // one still open through a reload says so again (board.js).
     setShared("board.open", null);
@@ -201,6 +207,12 @@ export default class Spaces extends View {
           const open = shared("board.open");
           if (open) closeOverlay(open);
           else openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
+        }
+        // ctrl-a d: here, not in jj-agents, whose block the tree hides (a hidden copy gets no commands).
+        if (command === "describe") {
+          const f = focused();
+          const a = agents().find((x) => x.address === (f?.agent ?? f?.shown ?? f?.terminal)) ?? agents().find((x) => x.focused && x.space === f?.space);
+          if (a) describeDialog(a.address);
         }
         if (command === "tasks") {
           const open = shared("tasks.open");
@@ -230,6 +242,17 @@ export default class Spaces extends View {
     this.backfillDue(now, cx);
     this.foldersDue(now, cx);
     this.boardDue(now, cx);
+    this.treeDue();
+  }
+
+  // The agents list's block hidden while the tree shows its agents, and back on the rail.
+  treeDue() {
+    const want = pref("agents") === "tree" && !narrow();
+    const node = find(layout(), "agents");
+    if (!node || Boolean(node.hidden) === want) return void (this.treeAsked = null);
+    if (this.treeAsked === want) return;
+    this.treeAsked = want;
+    run(want ? "layout.hide" : "layout.show", { id: "agents" });
   }
 
   close() {
@@ -1062,15 +1085,16 @@ export default class Spaces extends View {
   // the folder each filed space is in (shared("spaces.folder"), for jj-agents).
   grouped(t, collapsed) {
     const sp = spaces();
-    const tree = this.tree(sp, panes());
-    this.rowsById = new Map([...tree.inside.values(), tree.other, tree.waiting].flat().map((r) => [r.w.id, r]));
-    this.filed = tree.list.length > 0;
+    const filing = this.tree(sp, panes());
+    this.rowsById = new Map([...filing.inside.values(), filing.other, filing.waiting].flat().map((r) => [r.w.id, r]));
+    this.filed = filing.list.length > 0;
     const folded = new Set(shared("space-folders.folded") ?? []);
     const out = [];
     const order = [];
     const listed = [];
     const hidden = new Set();
-    const draw = (r) => (collapsed ? this.compact(r, t) : this.row(r, t));
+    const tree = !collapsed && pref("agents") === "tree" ? treeContext() : null;
+    const draw = (r) => (collapsed ? [this.compact(r, t)] : [this.row(r, t), ...(tree ? agentRows(this, r.w, t, tree) : [])]);
     const rows = (members, shut) => {
       for (const r of members) {
         listed.push(r.w.id);
@@ -1079,30 +1103,31 @@ export default class Spaces extends View {
           continue;
         }
         r.n = order.push(r.w.id);
-        out.push(draw(r));
+        out.push(...draw(r));
       }
     };
-    for (const f of tree.list) {
-      const members = tree.inside.get(f.id);
+    for (const f of filing.list) {
+      const members = filing.inside.get(f.id);
       const color = f.color ? (MARK[f.color] ?? t[f.color]) : t.dim;
-      out.push(collapsed ? this.railHead(f.id, f.name, color, folded.has(f.id), members, t) : this.folderHead(f, color, members, folded.has(f.id), t, tree.list));
+      out.push(collapsed ? this.railHead(f.id, f.name, color, folded.has(f.id), members, t) : this.folderHead(f, color, members, folded.has(f.id), t, filing.list));
       rows(members, folded.has(f.id));
     }
     const dragging = this.pressed !== null && Boolean(this.rowsById.get(this.pressed)?.folder);
-    if (this.filed && (tree.other.length || dragging)) {
-      out.push(collapsed ? this.railHead("other", "Other", t.border, folded.has("other"), tree.other, t) : this.otherHead(tree.other, folded.has("other"), t));
-      rows(tree.other, folded.has("other"));
-    } else rows(tree.other, false);
+    if (this.filed && (filing.other.length || dragging)) {
+      out.push(collapsed ? this.railHead("other", "Other", t.border, folded.has("other"), filing.other, t) : this.otherHead(filing.other, folded.has("other"), t));
+      rows(filing.other, folded.has("other"));
+    } else rows(filing.other, false);
     if (!sp.length) out.push(machines().find((m) => m.name === null)?.layout === "loading" ? this.loadingRow(t, collapsed) : this.emptyRow(t, collapsed));
     out.push(...this.machineRows(t, collapsed));
     const open = Boolean(shared("waiting.open"));
-    for (const r of tree.waiting) {
+    for (const r of filing.waiting) {
       listed.push(r.w.id);
       if (open) r.n = order.push(r.w.id);
     }
-    out.push(...this.waitingSection(t, collapsed, tree.waiting, draw));
+    out.push(...this.waitingSection(t, collapsed, filing.waiting, draw));
     this.hidden = hidden;
-    const filed = Object.fromEntries(tree.list.flatMap((f) => tree.inside.get(f.id).map((r) => [r.w.id, f.id])));
+    if (tree) publishOrder(tree);
+    const filed = Object.fromEntries(filing.list.flatMap((f) => filing.inside.get(f.id).map((r) => [r.w.id, f.id])));
     for (const [key, value] of [["spaces.order", order], ["spaces.listed", listed]]) if (JSON.stringify(value) !== JSON.stringify(shared(key) ?? [])) setShared(key, value);
     if (JSON.stringify(filed) !== JSON.stringify(shared("spaces.folder") ?? {})) setShared("spaces.folder", filed);
     return out;
@@ -1227,7 +1252,7 @@ export default class Spaces extends View {
       .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
       .when(!collapsed, (el) => el.child(div().flex_1().child("Waiting")))
       .child(div().flex_none().text_color(!open && top ? t[top] : t.dim).child(String(waiting.length)));
-    return [collapsed ? railCell(head) : head, ...(open ? waiting.map(draw) : [])];
+    return [collapsed ? railCell(head) : head, ...(open ? waiting.flatMap(draw) : [])];
   }
 
   // A row per machine that needs you: asleep, a login (with the command to Copy),

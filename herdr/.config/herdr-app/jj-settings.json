@@ -18,7 +18,8 @@
     "icon": "hidden"
   },
   "jj-spaces": {
-    "icon": "hidden"
+    "icon": "hidden",
+    "agents": "tree"
   },
   "jj-board": {
     "repos": [

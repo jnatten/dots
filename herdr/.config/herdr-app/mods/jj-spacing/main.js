@@ -6,7 +6,8 @@
 // an issue's PRs, Trello cards) and where 1Password keeps the Trello key and token,
 // kept as shared("jj-links"); Connect asks 1Password again (shared("jj-links.connect")).
 // Its Board tab picks the board's (ctrl-a T) repos and Trello boards (board-tab.js).
-// Its Sidebar tab picks whether space rows (jj-spaces) show their icon and branch, kept as
+// Its Sidebar tab picks whether space rows (jj-spaces) show their icon and branch and whether
+// their agents go under them as a tree instead of in a list of their own, kept as
 // shared("jj-spaces"), and whether the agents list (jj-agents) shows each agent's icon and
 // what it says of it: its own title or nothing, and under it its space and tab, its latest
 // update or nothing, kept as shared("jj-agents").
@@ -44,11 +45,12 @@ const FIELDS = [
 const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
 
 // jj-spaces' and jj-agents' PREF_DEFAULTS.
-const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden" }, "jj-agents": { icon: "shown", description: "title", line: "space" } };
+const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden", agents: "list" }, "jj-agents": { icon: "shown", description: "title", line: "space" } };
 const SHOWN = [["shown", "Shown"], ["hidden", "Hidden"]];
 const SIDEBAR_ROWS = [
   { store: "jj-spaces", key: "icon", label: "Icon", options: SHOWN },
   { store: "jj-spaces", key: "branch", label: "Branch", options: SHOWN },
+  { store: "jj-spaces", key: "agents", label: "Agents", options: [["list", "Own list"], ["tree", "Under their space"]] },
   { store: "jj-agents", key: "icon", label: "Icon", options: SHOWN },
   { store: "jj-agents", key: "description", label: "Description", options: [["title", "Agent's title"], ["off", "Off"]] },
   { store: "jj-agents", key: "line", label: "Second line", options: [["space", "Space \u00b7 tab"], ["update", "Latest update"], ["off", "Off"]] },
@@ -378,7 +380,7 @@ export default class Spacing extends View {
       body: v_flex().flex_1().min_h(0).gap(4)
         .children(SIDEBAR_ROWS.flatMap((r, i) => [...(SIDEBAR_ROWS[i - 1]?.store !== r.store ? [section(r.store)] : []), row(r, i)]))
         .child(div().px(8).pt(10).text_size(11.5).text_color(t.dim)
-          .child("The agent's title is Claude's /rename or AI title, or the title another agent sets. The latest update is Claude's summary of its last turn. Right-click an agent to give it a description of its own or hide its description.")),
+          .child("The agent's title is Claude's /rename or AI title, or the title another agent sets. The latest update is Claude's summary of its last turn. Right-click an agent to give it a description of its own or hide its description. Under their space, the agents list shows only on the narrow rail.")),
       reset: Object.keys(PREFS).some((store) => Object.keys(shared(store) ?? {}).length) ? () => { for (const store of Object.keys(PREFS)) setShared(store, {}); } : null,
       resetLabel: "Reset to defaults",
       hint: "↑↓ choose · ←→ change · tab spacing · esc close",

@@ -71,7 +71,7 @@
     "ctrl-a f": "jj-tabs.fingers",
     "ctrl-a e": "jj-tabs.capture",
     "ctrl-a shift-e": "jj-tabs.capture-colors",
-    "ctrl-a d": "jj-agents.describe",
+    "ctrl-a d": "jj-spaces.describe",
     "ctrl-a g": "jj-spaces.link",
     "ctrl-a h": "jj-tabs.waiting",
     "ctrl-a shift-h": "jj-tabs.wait",

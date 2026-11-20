@@ -25,7 +25,7 @@ const DESCRIBE = {
   "mod.open:jj-sessions": [CLAUDE, "Search sessions: running, spaces, Waiting and history"],
   "jj-spaces.tasks": [CLAUDE, "Tasks: every PR, issue and card Claude sessions had, with those sessions"],
   "jj-spaces.board": [CLAUDE, "Board: PRs, issues and Trello boards, with their sessions and links"],
-  "jj-agents.describe": [CLAUDE, "Describe the focused agent"],
+  "jj-spaces.describe": [CLAUDE, "Describe the focused agent"],
   "jj-spaces.link": [CLAUDE, "Link a PR, issue or card to the focused agent"],
   "jj-spaces.link-space": [CLAUDE, "Link a PR, issue or card to the space"],
   "jj-tabs.agent-next": [CLAUDE, "Next agent, in the agents list's order"],

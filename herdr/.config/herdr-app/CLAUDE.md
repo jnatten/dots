@@ -61,6 +61,13 @@ The keybind list (prefix+? and cmd-/, `mods/jj-help`, a clone of Herdr's `help`)
 each binding in `keys.json` does from its `DESCRIBE` table: when adding or changing a key, give
 it a line there too (one it doesn't know falls back to Herdr's words for the command).
 
+The spacing dialog's Sidebar tab can put the agents under their spaces (`jj-spaces`' Agents
+pref "tree", `mods/jj-spaces/agent-tree.js`): the spaces sidebar draws them, hides the agents
+list's block (`layout.hide`, back on the narrow rail) and sets the agent order. Both draw an agent
+with `mods/jj-agents/parts.js`; `mods/jj-spaces/agent-parts.js` is a copy, since Herdr won't load
+a module from outside a mod's folder, symlinked or not: change `parts.js`, then copy it over.
+ctrl-a d is `jj-spaces.describe` so it works with the agents block hidden.
+
 An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
 the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every
 screen sees them and they end with the terminal. The defaults are in `jj-settings.json`.
