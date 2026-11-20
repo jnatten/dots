@@ -16,6 +16,7 @@
 // its spaces' repos are (shared("board.places")), and, once Trello is connected, the Trello
 // boards there are (shared("trello.boards")), for the board (ctrl-a T, board.js) and the
 // spacing dialog's Board tab; and links the sessions the board starts to their item.
+// ctrl-a t opens and closes the tasks list (jj-sessions' tasks.js) from here.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -187,6 +188,7 @@ export default class Spaces extends View {
     // The open board (shared("board.open"), which ctrl-a T closes) from a previous run is gone;
     // one still open through a reload says so again (board.js).
     setShared("board.open", null);
+    setShared("tasks.open", null);
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
@@ -199,6 +201,11 @@ export default class Spaces extends View {
           const open = shared("board.open");
           if (open) closeOverlay(open);
           else openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
+        }
+        if (command === "tasks") {
+          const open = shared("tasks.open");
+          if (open) closeOverlay(open);
+          else openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 0.7, props: { tasks: true } });
         }
         if (command !== "link" && command !== "link-space") continue;
         const space = focused()?.space ?? spaces().find((s) => s.active)?.id;

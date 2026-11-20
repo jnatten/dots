@@ -22,9 +22,8 @@ const ORDER = [CLAUDE, SPACES, TABS, PANES, TERMINAL, FIND, APP, IN_TERMINAL, IN
 const DESCRIBE = {
   '{"command":"tab.new","args":{"name":"Claude","argv":["claude"]}}': [CLAUDE, "New tab with a Claude session"],
   '{"command":"tab.new","args":{"name":"Claude","argv":["claude","--worktree"]}}': [CLAUDE, "New tab with a Claude session in a worktree of its own"],
-  "mod.open:jj-sessions": [CLAUDE, "Search sessions: running, spaces, Waiting, archived and history"],
-  "jj-sessions.archive": [CLAUDE, "Archive the focused Claude session (or the session search's pick)"],
-  "jj-sessions.tasks": [CLAUDE, "Tasks: every PR, issue and card Claude sessions had, with those sessions"],
+  "mod.open:jj-sessions": [CLAUDE, "Search sessions: running, spaces, Waiting and history"],
+  "jj-spaces.tasks": [CLAUDE, "Tasks: every PR, issue and card Claude sessions had, with those sessions"],
   "jj-spaces.board": [CLAUDE, "Board: PRs, issues and Trello boards, with their sessions and links"],
   "jj-agents.describe": [CLAUDE, "Describe the focused agent"],
   "jj-spaces.link": [CLAUDE, "Link a PR, issue or card to the focused agent"],
