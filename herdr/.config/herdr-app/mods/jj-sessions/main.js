@@ -1,11 +1,11 @@
 // Claude Code sessions: the sidebar's Archived block, the session search (as
 // the overlay, mod.open; spaces in Waiting and their sessions in a section of their
-// own), the archive confirmation ({ action: "archive", terminals? | space? }) and the
+// own; running ones by their description, as the agents list has it), the archive confirmation ({ action: "archive", terminals? | space? }) and the
 // tasks list ({ tasks: true }, or one task's sessions with { url }, tasks.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
-import { agents, spaces, panes, layout, focused, theme, shared, setShared, props, run, exec, hc, home, appHome, readTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
+import { agents, terminals, spaces, panes, layout, focused, theme, shared, setShared, props, run, exec, hc, home, appHome, readTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
 import { ARCHIVE, archived, forget, base, ago, worktree, label, place, missing, resume } from "./sessions.js";
 import { taskInit, taskRender } from "./tasks.js";
 
@@ -32,6 +32,19 @@ async function sessionOf(pid) {
   return s?.sessionId ? s : null;
 }
 
+// A running session as the agents list (jj-agents) leads its row: the words given in its
+// Description dialog (ctrl-a d, desc), else the agent's own title (own: Claude's /rename or
+// AI title), else what the terminal or the session calls itself (raw).
+function described(s) {
+  const a = agents().find((a) => a.address === s.address);
+  const text = a?.title ?? "";
+  const live = text.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+  const path = /^[~/]/.test(text.replace(/^[^\p{L}\p{N}~/]+/u, ""));
+  const own = live && live !== a?.program?.name && !path && !live.includes("@") && live.toLowerCase() !== a?.program?.key ? live : null;
+  const desc = terminals().find((t) => t.address === s.address)?.labels?.["jj.description"]?.trim() || null;
+  return { ...s, desc, own, title: desc || own || s.raw };
+}
+
 // The Claude sessions running here: ~/.claude/sessions/<pid>.json describes
 // the terminal's foreground process, or its child when a shell launched it.
 async function live() {
@@ -44,7 +57,7 @@ async function live() {
           if (!pid) return null;
           let s = await sessionOf(pid);
           for (const kid of s ? [] : (await exec("pgrep", ["-P", String(pid)])).stdout.split(/\s+/).filter(Boolean)) s ??= await sessionOf(kid);
-          return s ? { address: a.address, pane: a.pane, tab: a.tab, space: a.space, id: s.sessionId, cwd: s.cwd, title: a.title || s.name || "Claude", status: a.status } : null;
+          return s ? described({ address: a.address, pane: a.pane, tab: a.tab, space: a.space, id: s.sessionId, cwd: s.cwd, raw: a.title || s.name || "Claude", status: a.status }) : null;
         } catch {
           return null;
         }
@@ -208,7 +221,7 @@ export default class Sessions extends View {
 
   sections() {
     const f = this.text.trim().toLowerCase();
-    const match = (s) => !f || `${s.title} ${label(s.cwd)} ${s.cwd} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f);
+    const match = (s) => !f || `${s.title} ${s.desc ?? ""} ${s.own ?? ""} ${label(s.cwd)} ${s.cwd} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f);
     const ps = panes();
     const colors = shared("space.colors") ?? {};
     const all = spaces().map((w) => ({
@@ -224,7 +237,7 @@ export default class Sessions extends View {
     // Spaces in Waiting (jj-spaces' shared("spaces.waiting")) and their open sessions
     // have a section of their own: each space, then its sessions.
     const parked = new Set(shared("spaces.waiting") ?? []);
-    const open = this.open ?? [];
+    const open = (this.open ?? []).map(described);
     const waiting = all.filter((w) => parked.has(w.id)).flatMap((w) => {
       const mine = open.filter((s) => s.space === w.id && match(s)).map((s) => ({ ...s, kind: "open" }));
       return match(w) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
@@ -436,7 +449,9 @@ export default class Sessions extends View {
         .when(!on, (el) => el.hover((st) => st.bg(t.hover)))
         .on_click((e, cx) => this.go({ kind, s }, cx, e.modifiers.shift))
         .child(h_flex().w(14).flex_none().justify_center().child(icon))
-        .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(s.title))
+        .child(h_flex().flex_1().min_w(0).gap(6).items_center()
+          .child(div().min_w(0).truncate().text_color(t.foreground).child(s.title))
+          .when(kind === "open" && Boolean(s.desc && s.own && s.own !== s.desc), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.own))))
         .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.gone[s.cwd] && kind !== "open" ? " · gone" : ""}`))
         .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : ago(s.at)));
     };
