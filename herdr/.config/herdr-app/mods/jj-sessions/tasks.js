@@ -80,6 +80,15 @@ function sessionsNow() {
 }
 
 export function taskInit(view, cx) {
+  // The ctrl-a t list is the open one, for ctrl-a t to close (in shared(): copies of another
+  // build of this mod don't share its module).
+  if (!props()?.url) {
+    const me = props()?.overlay ?? null;
+    setShared("tasks.open", me);
+    cx.timer.every(150, () => {
+      if (shared("tasks.open") !== me) setShared("tasks.open", me);
+    });
+  }
   view.text = "";
   view.at = 0;
   view.childOf = [];
