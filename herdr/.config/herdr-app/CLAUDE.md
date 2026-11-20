@@ -51,6 +51,10 @@ sidebar's) has it checked out: in the checkout or a new worktree (the WorktreeCr
 `claude --worktree`), on a PR's branch. The sidebar links the new session to the item once it
 runs (`shared("board.link.ask")`).
 
+The keybind list (prefix+? and cmd-/, `mods/jj-help`, a clone of Herdr's `help`) says what
+each binding in `keys.json` does from its `DESCRIBE` table: when adding or changing a key, give
+it a line there too (one it doesn't know falls back to Herdr's words for the command).
+
 An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
 the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every
 screen sees them and they end with the terminal. The defaults are in `jj-settings.json`.
