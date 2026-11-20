@@ -1,6 +1,8 @@
 // Agents grouped by space or by folder (as jj-spaces files spaces, shared("spaces.folder")),
 // or in priority sections; parents take their most urgent sub-agent's place. Grouped, the
 // ones that need you can go first in a group of their own (shared("agents.needs-first")).
+// By folder, each folder's agents can go by their latest activity (shared("agents.recent-first")):
+// when their state last changed, newest first.
 // Agents of spaces in Waiting are in a group of their own at the end, folded at first.
 // A row leads with the agent's description: words given in its Description dialog
 // ({ describe: address }, ctrl-a d), else its own title. They're kept as jj.description
@@ -251,6 +253,7 @@ export default class Agents extends View {
   sortMenu(t) {
     const on = sortOf().id;
     const first = Boolean(shared("agents.needs-first"));
+    const recent = Boolean(shared("agents.recent-first"));
     const priority = on === "priority";
     return v_flex()
       .w_full()
@@ -287,7 +290,20 @@ export default class Agents extends View {
         .when(priority, (el) => el.tooltip("Priority always puts them first"))
         .child(this.status(t, { status: "blocked" }, true))
         .child(div().flex_1().child("Needs you on top"))
-        .when(first || priority, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(priority ? t.dim : t.foreground))));
+        .when(first || priority, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(priority ? t.dim : t.foreground))))
+      .child(h_flex()
+        .id("sort-recent-first")
+        .h(31)
+        .px(8)
+        .gap(9)
+        .rounded(7)
+        .items_center()
+        .text_color(on === "folders" ? t.foreground : t.dim)
+        .when(on === "folders", (el) => el.hover((el) => el.bg(t.hover)).on_click(() => setShared("agents.recent-first", !recent)))
+        .when(on !== "folders", (el) => el.tooltip("When grouped by folder"))
+        .child(svg("mods/workspace-chrome/clock.svg").size(14).flex_none().text_color(t.muted))
+        .child(div().flex_1().child("Latest activity first"))
+        .when(recent, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(on === "folders" ? t.foreground : t.dim))));
   }
 
   initDescribe(cx) {
@@ -463,7 +479,14 @@ export default class Agents extends View {
       // Spaces in the sidebar's order (its folders), each one's agents together.
       const at = new Map((shared("spaces.listed") ?? []).map((id, i) => [id, i]));
       const of = (a) => at.get(a.space) ?? Number.MAX_SAFE_INTEGER;
-      list = [...list].sort((x, y) => of(x) - of(y));
+      if (byFolder && shared("agents.recent-first")) {
+        // Folders where their first space is, each one's agents newest activity first.
+        const filed = shared("spaces.folder") ?? {};
+        const folderAt = new Map();
+        for (const [id, i] of at) if (!folderAt.has(filed[id] ?? "")) folderAt.set(filed[id] ?? "", i);
+        const fo = (a) => folderAt.get(filed[a.space] ?? "") ?? Number.MAX_SAFE_INTEGER;
+        list = [...list].sort((x, y) => fo(x) - fo(y) || this.since(y) - this.since(x) || y.seq - x.seq);
+      } else list = [...list].sort((x, y) => of(x) - of(y));
     }
     // Agents of spaces in Waiting go to its group at the end, and into the order
     // next/prev (jj-tabs) go by only while it's open.
@@ -697,7 +720,7 @@ export default class Agents extends View {
                 .text_size(11)
                 .text_color(t.dim)
                 .hover((s) => s.text_color(t.foreground))
-                .on_click(() => openOverlay({ mod: "jj-agents", kind: "popup", width: 200, height: 190, props: { sortMenu: true } }))
+                .on_click(() => openOverlay({ mod: "jj-agents", kind: "popup", width: 200, height: 222, props: { sortMenu: true } }))
                 .tooltip(`Sort agents: ${sort.label}`)
                 .child(svg(`mods/workspace-chrome/${sort.icon}.svg`).size(14)),
             ),
