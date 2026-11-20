@@ -28,7 +28,7 @@ const DESCRIBE = {
   "jj-spaces.describe": [CLAUDE, "Describe the focused agent"],
   "jj-spaces.link": [CLAUDE, "Link a PR, issue or card to the focused agent"],
   "jj-spaces.link-space": [CLAUDE, "Link a PR, issue or card to the space"],
-  "jj-tabs.agent-next": [CLAUDE, "Next agent, in the agents list's order"],
+  "jj-tabs.agent-next": [CLAUDE, "Next agent, as the sidebar lists them"],
   "jj-tabs.agent-prev": [CLAUDE, "Previous agent"],
   "jj-tabs.waiting": [CLAUDE, "Show or hide the Waiting section"],
   "jj-tabs.wait": [CLAUDE, "Move the space into or out of Waiting"],

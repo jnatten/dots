@@ -39,6 +39,8 @@
     "alt-p": "tab.prev",
     "alt-shift-n": "jj-tabs.space-next",
     "alt-shift-p": "jj-tabs.space-prev",
+    "ctrl-alt-n": "jj-tabs.agent-next",
+    "ctrl-alt-p": "jj-tabs.agent-prev",
     "alt-h": "pane.go:left",
     "alt-j": "pane.go:down",
     "alt-k": "pane.go:up",
