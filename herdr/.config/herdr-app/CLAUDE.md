@@ -22,7 +22,7 @@ mods and layouts (`mod.clone`, `layout.clone`) rather than editing them.
 More windows onto the same spaces (cmd-shift-n) are more Herdr apps, each with a home
 of its own: `new-window.sh` makes `~/.config/herdr-app-2`, `-3`, … with this setup's
 files linked from `~/.config/herdr-app`, and opens it. `jj-state.json` there is this
-Mac's state the windows share (space colors, archived sessions, folded folders), not in dots.
+Mac's state the windows share (space colors, folded folders), not in dots.
 `HERDR_APP_HOME=~/.config/herdr-app-2 herdr-app status` (or `do`, `ls`, `shot`) asks
 that window.
 

@@ -4,7 +4,7 @@
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, spaces, panes, exec, home, readTextFile, shared } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, spaces, panes, exec, home, readTextFile } from "herdr";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s, all = panes()) {
@@ -306,7 +306,6 @@ export default class JjWorkspace extends View {
               : `${s?.id ? "Closes the space and deletes" : "Deletes"} ${tilde(r.top, this.userHome)}. Its working copy is snapshotted first, so its changes stay in jj log.`
             : `A new space on a workspace in ${tilde(r.main, this.userHome)}/.claude/worktrees/, made by Claude Code's WorktreeCreate hook like \`claude --worktree\`. A name already in use opens that workspace.`;
     const blocked = !r || (remove && !r.linked);
-    const archived = remove && r?.linked ? (shared("jj-sessions.archived") ?? []).filter((a) => a.cwd === r.top || a.cwd.startsWith(`${r.top}/`)).length : 0;
     return v_flex()
       .id("workspace")
       .track_focus(this.handle)
@@ -318,7 +317,6 @@ export default class JjWorkspace extends View {
       .text_size(13)
       .child(div().font_semibold().text_color(t.foreground).child(title))
       .child(div().text_color(t.muted).child(detail))
-      .when(archived > 0, (el) => el.child(div().text_color(t.muted).child(`${archived === 1 ? "An archived Claude session lives" : `${archived} archived Claude sessions live`} here. Resuming ${archived === 1 ? "it" : "one"} later makes the workspace again.`)))
       .when(!remove && !blocked, (el) =>
         el.child(
           Input.new(this.input)

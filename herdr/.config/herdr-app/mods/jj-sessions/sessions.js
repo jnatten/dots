@@ -5,10 +5,6 @@
 
 import { spaces, panes, terminals, shared, setShared, run, exec, home } from "herdr";
 
-export const ARCHIVE = "jj-sessions.archived";
-export const archived = () => shared(ARCHIVE) ?? [];
-export const forget = (id) => setShared(ARCHIVE, archived().filter((r) => r.id !== id));
-
 export const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
 export const base = (path) => path.replace(/\/+$/, "").split("/").pop();
 export const tilde = (path) => (path.startsWith(home()) ? `~${path.slice(home().length)}` : path);
@@ -124,7 +120,6 @@ export async function resume(rec, here = false) {
     run("space.select", { id: s.id });
     run("tab.new", { space: s.id, folder: cwd, argv });
   } else run("space.new", { folder: cwd, machine: on ?? "", argv });
-  forget(rec.id);
   return "";
 }
 
