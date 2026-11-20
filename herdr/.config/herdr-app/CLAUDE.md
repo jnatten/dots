@@ -68,6 +68,13 @@ with `mods/jj-agents/parts.js`; `mods/jj-spaces/agent-parts.js` is a copy, since
 a module from outside a mod's folder, symlinked or not: change `parts.js`, then copy it over.
 ctrl-a d is `jj-spaces.describe` so it works with the agents block hidden.
 
+ctrl-a m (or an agent's menu) moves a Claude session to another machine: jj-sessions' move
+dialog (`mods/jj-sessions/move.js`) maps its folder there through the sidebar folders' paths
+(`mapPath` in `sessions.js`), copies its transcript, subagents', rewind checkpoints and todos
+through `hc exec -i`, closes it here (not mid-turn) and resumes it there. Code isn't moved. The
+spaces sidebar moves its jj-tasks entry and gives the new terminal the old one's hand links and
+description (`shared("sessions.move.ask")`). The tasks list's ⌘↵ (bring) is the same move to here.
+
 An agent's own description and whether it shows (its Description dialog, ctrl-a d) are
 the `jj.description` and `jj.description.mode` labels on its herdr-core terminal, so every
 screen sees them and they end with the terminal. The defaults are in `jj-settings.json`.

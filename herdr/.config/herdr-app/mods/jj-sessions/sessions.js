@@ -1,9 +1,10 @@
 // Claude sessions by folder, and resuming one: on the machine it ran on, in its space
-// or one for its folder there, the folder made again when it's gone; or brought from
-// another machine to this one (bring) and resumed here. And starting a new one in a repo,
+// or one for its folder there, the folder made again when it's gone; or moved to another
+// machine (move: its transcript copied there and resumed there, the running one here
+// closed; bring: one from another machine to this one). And starting a new one in a repo,
 // in a worktree or not, on a PR's branch (startNew).
 
-import { spaces, panes, terminals, shared, setShared, run, exec, home } from "herdr";
+import { spaces, panes, terminals, agents, shared, setShared, run, exec, home } from "herdr";
 
 export const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
 export const base = (path) => path.replace(/\/+$/, "").split("/").pop();
@@ -114,13 +115,18 @@ export async function resume(rec, here = false) {
     }
     if (!cwd) return `${tilde(rec.cwd)} no longer exists${on ? ` on ${on}` : ""}.`;
   }
-  const argv = ["claude", "--resume", rec.id];
-  const s = spaces().find((s) => s.id === rec.space) ?? (await spaceFor(cwd, on));
+  await resumeAt(rec.id, cwd, on, rec.space);
+  return "";
+}
+
+// claude --resume id in cwd on machine on: in that space, else one for its folder there, else a new one.
+async function resumeAt(id, cwd, on, space = null) {
+  const argv = ["claude", "--resume", id];
+  const s = spaces().find((s) => s.id === space) ?? (await spaceFor(cwd, on));
   if (s) {
     run("space.select", { id: s.id });
     run("tab.new", { space: s.id, folder: cwd, argv });
   } else run("space.new", { folder: cwd, machine: on ?? "", argv });
-  return "";
 }
 
 // A new Claude session in the repo at `path` on `machine` (null: this computer), in the
@@ -162,55 +168,93 @@ export async function startNew({ path, machine, worktree: own, name, branch, url
   return "";
 }
 
-// Where a path on machine `from` is here: the same place under a space folder's path
-// here (the one named the same, else in the same place) as under its path there, else
-// under this home as under that machine's.
-function localPath(path, from) {
+// Where a path on machine `from` is on machine `to` (null: this computer): the same place
+// under a space folder's path there (the one named the same, else in the same place) as
+// under its path on `from`, else under that machine's home as under this one's. null: nowhere.
+export function mapPath(path, from, to) {
+  const a = from ?? "";
+  const b = to ?? "";
+  if (a === b) return path;
   const sf = shared("space-folders") ?? {};
   let best = null;
   for (const f of sf.folders ?? []) {
-    const theirs = f.paths?.[from]?.paths ?? [];
-    const mine = f.paths?.[""]?.paths ?? [];
+    const theirs = f.paths?.[a]?.paths ?? [];
+    const mine = f.paths?.[b]?.paths ?? [];
     const at = theirs.findIndex((d) => inside(path, d));
     if (at === -1 || !mine.length || theirs[at].length <= (best?.dir.length ?? -1)) continue;
     const dir = theirs[at];
     best = { dir, to: mine.find((d) => base(d) === base(dir)) ?? mine[at] ?? mine[0] };
   }
   if (best) return best.to + path.slice(best.dir.length);
-  const theirs = sf.homes?.[from];
-  return theirs && inside(path, theirs) ? home() + path.slice(theirs.length) : null;
+  const [fromHome, toHome] = [sf.homes?.[a] ?? (a ? null : home()), sf.homes?.[b] ?? (b ? null : home())];
+  return fromHome && toHome && inside(path, fromHome) ? toHome + path.slice(fromHome.length) : null;
 }
 
-const stamp = 'f=$(ls -t "$HOME"/.claude/projects/*/"$1".jsonl 2>/dev/null | head -n 1); [ -n "$f" ] && printf "%s\\t%s" "$(date -r "$f" +%s)" "$f"';
-const pack = 'cd "$(dirname "$1")" && tar czf - "$2.jsonl" $(test -d "$2" && echo "$2") | base64';
-const unpack = 'PATH="$HOME/.local/bin:$PATH"; mkdir -p "$3" && hc exec --on "$1" --timeout 600 -- sh -c "$4" sh "$2" "$5" | base64 -d | tar xzf - -C "$3"';
+const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+// A script run here, or on machine `on` through herdr-core (stdin: what's piped in goes to it).
+const via = (on, script, args, stdin = false) => `${on ? `hc exec${stdin ? " -i" : ""} --on ${q(on)} --timeout 600 -- ` : ""}sh -c ${q(script)} sh ${args.map(q).join(" ")}`;
+const pipe = (src, dst) => exec("sh", ["-c", `PATH="$HOME/.local/bin:$PATH"; ${src} | ${dst}`], { timeout: 600_000 });
+const sh = (script, args, on) => exec("sh", ["-c", script, "sh", ...args], { on, timeout: 60_000 });
 
-// A session from another machine copied here (its transcript and subagents', unless
-// this one's is as new) into the folder its own maps to here, its workspace made here
-// when only the other machine has it (here: its repo instead), and resumed here. "" or
-// what went wrong.
-export async function bring(rec, here = false) {
-  const from = rec.machine;
-  if (!from) return resume(rec, here);
-  const mapped = localPath(rec.cwd, from);
-  if (!mapped) return `No folder here for ${rec.cwd} on ${from}.`;
+const STAMP = 'f=$(ls -t "$HOME"/.claude/projects/*/"$1".jsonl 2>/dev/null | head -n 1); [ -n "$f" ] && printf "%s\\t%s" "$(date -r "$f" +%s)" "$f"';
+const PACK = 'cd "$(dirname "$1")" && tar czf - "$2.jsonl" $(test -d "$2" && echo "$2") | base64';
+const UNPACK = 'mkdir -p "$HOME/$1" && base64 -d | tar xzf - -C "$HOME/$1"';
+// Its rewind checkpoints and todos, when it has any.
+const EXTRAS = 'cd "$HOME/.claude" 2>/dev/null && set -- $(ls -d "file-history/$1" todos/"$1"* 2>/dev/null); if [ $# -gt 0 ]; then tar czf - "$@" | base64; fi';
+const UNEXTRAS = 'd=$(cat); if [ -n "$d" ]; then mkdir -p "$HOME/.claude" && printf %s "$d" | base64 -d | tar xzf - -C "$HOME/.claude"; fi';
+
+// A session's transcript and its subagents' from machine `from` to machine `to`, under the
+// Claude project folder of cwd there (unless that one's is as new), and its rewind
+// checkpoints and todos. "" or what went wrong.
+async function copySession(id, from, to, cwd) {
+  const rel = `.claude/projects/${cwd.replace(/[^A-Za-z0-9]/g, "-")}`;
+  const [there, mine] = await Promise.all([sh(STAMP, [id], from), sh('date -r "$HOME/$1/$2.jsonl" +%s 2>/dev/null', [rel, id], to)]);
+  const [at, path] = there.stdout.split("\t");
+  if (!path) return `${from ?? "This computer"} no longer has this session.`;
+  if (Number(mine.stdout.trim()) >= Number(at)) return "";
+  const r = await pipe(via(from, PACK, [path, id]), via(to, UNPACK, [rel], true));
+  if (r.code !== 0 || (await sh('test -f "$HOME/$1/$2.jsonl"', [rel, id], to)).code !== 0) return `Couldn't copy it to ${to ?? "this computer"}: ${(r.stderr || "").trim().split("\n").pop() || `exit ${r.code}`}`;
+  await pipe(via(from, EXTRAS, [id]), via(to, UNEXTRAS, [], true)).catch(() => null);
+  return "";
+}
+
+// Moves { id, cwd, machine? } to machine `to` (null: this computer): into the folder its own
+// maps to there, made there when it's a worktree only `from` has (here: the nearest folder
+// instead); its transcript copied, its running Claude here closed (not mid-turn), and resumed
+// there. The spaces sidebar moves what jj-tasks knows of it and gives the new terminal its
+// hand links and description (shared("sessions.move.ask")). Code isn't moved. "" or what went wrong.
+export async function move(rec, to = null, here = false) {
+  const from = rec.machine ?? null;
+  if ((from ?? "") === (to ?? "")) return resume(rec, here);
+  const where = to ?? "this computer";
+  const t = runningIn(rec.id);
+  const status = t && agents().find((a) => a.address === t.address)?.status;
+  if (status === "working") return "Claude is working: move it once its turn is done.";
+  if (status === "blocked") return "Claude is waiting for you: answer it first.";
+  const mapped = mapPath(rec.cwd, from, to);
+  if (!mapped) return `No folder on ${where} for ${rec.cwd}: give its sidebar folder a path there.`;
   let cwd = mapped;
-  if ((await missing([mapped])).size) {
+  if ((await missing([mapped], to)).size) {
     try {
-      cwd = (!here && (await revive(mapped, null))) || (await nearest(mapped, null));
+      cwd = (!here && (await revive(mapped, to))) || (await nearest(mapped, to));
     } catch (error) {
       return error.message;
     }
+    if (!cwd) return `${mapped} isn't on ${where}.`;
   }
-  if (!cwd) return `${tilde(mapped)} isn't here.`;
-  const dest = `${home()}/.claude/projects/${cwd.replace(/[^A-Za-z0-9]/g, "-")}`;
-  const file = `${dest}/${rec.id}.jsonl`;
-  const [there, mine] = await Promise.all([exec("sh", ["-c", stamp, "sh", rec.id], { on: from }), exec("sh", ["-c", 'date -r "$1" +%s 2>/dev/null', "sh", file])]);
-  const [at, path] = there.stdout.split("\t");
-  if (!path) return `${from} no longer has this session.`;
-  if (!(Number(mine.stdout.trim()) >= Number(at))) {
-    const r = await exec("sh", ["-c", unpack, "sh", from, path, dest, pack, rec.id], { timeout: 600_000 });
-    if (r.code !== 0 || (await exec("test", ["-f", file])).code !== 0) return `Couldn't copy it from ${from}: ${(r.stderr || "").trim().split("\n").pop() || `exit ${r.code}`}`;
+  const error = await copySession(rec.id, from, to, cwd);
+  if (error) return error;
+  const ask = { id: rec.id, from, to, links: t ? (shared("github.agent-links")?.[t.address] ?? []) : [], desc: t?.labels?.["jj.description"] ?? "", at: Date.now() };
+  setShared("sessions.move.ask", [...(shared("sessions.move.ask") ?? []), ask]);
+  if (t) {
+    const pane = panes().find((p) => p.terminal === t.address);
+    if (!pane) run("terminal.kill", { terminal: t.address });
+    else if (panes().filter((p) => p.tab === pane.tab).length > 1) run("pane.close", { pane: pane.pane });
+    else run("tab.close", { id: pane.tab, confirmed: true });
   }
-  return resume({ id: rec.id, cwd, machine: null });
+  await resumeAt(rec.id, cwd, to);
+  return "";
 }
+
+// A session from another machine, resumed here (see move).
+export const bring = (rec, here = false) => move(rec, null, here);

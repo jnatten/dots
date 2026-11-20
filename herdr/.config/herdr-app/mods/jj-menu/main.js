@@ -2,7 +2,8 @@
 // props { tab: "pane" | "agent" | "tab" | "space" | "folder" | "new" | "global", target }.
 // ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
 // a command "worktree", "jj-workspace", "jj-panes", "jj-copy", "jj-spaces" (its link dialog) or
-// "jj-agents" (an agent's description) opens that mod instead,
+// "jj-agents" (an agent's description) or "jj-sessions" (moving a Claude session to another
+// machine) opens that mod instead,
 // "folder-dialog" the folder dialog and "folder-op" asks jj-spaces for a folder change.
 
 import { View, div, svg } from "gpui-kit";
@@ -53,6 +54,8 @@ const folderDialog = (folder) => {
 };
 const connected = () => (shared("space-folders")?.machines ?? []).filter((m) => m.state === "connected").map((m) => m.name);
 
+
+const isClaude = (a) => a.app === "claude-code" || a.program?.key === "claude";
 
 function items(p, git) {
   p = p ?? {};
@@ -107,6 +110,7 @@ function items(p, git) {
             [a.pinned ? "Unpin" : "Pin to the top", "terminal.pin", { terminal: a.address, pinned: !a.pinned }],
             ["Description\u2026", "jj-agents", { describe: a.address }],
             ["Link PR or issue\u2026", "jj-spaces", { link: a.space, agent: a.address }],
+            ...(isClaude(a) ? [["Move session to\u2026", "jj-sessions", { move: a.address }]] : []),
             waitingItem(a.space, "its space "),
           ]
         : [];
@@ -168,6 +172,7 @@ function items(p, git) {
 
 function menuIcon(command, args) {
   if (command === "jj-spaces") return "mods/jj-spaces/git-pull-request.svg";
+  if (command === "jj-sessions") return "mods/workspace-chrome/server.svg";
   if (command === "folder-dialog") return `mods/workspace-chrome/${args?.id ? "folder" : "folder-plus"}.svg`;
   if (command === "folder-op") return `mods/workspace-chrome/${args?.op === "delete" ? "x" : "folder"}.svg`;
   const name = command === "terminal.pin" ? "pin" : command === "waiting" ? "clock" : command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" || command === "jj-workspace" ? "git-branch" : command === "jj-panes" ? "layers" : command === "jj-copy" ? "file-text" : command === "jj-agents" ? "square-pen" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
@@ -209,6 +214,7 @@ export default class Menu extends View {
     else if (it[1] === "folder-op") askFolders(it[2]);
     else if (it[1] === "jj-agents") openOverlay({ mod: "jj-agents", kind: "dialog", width: 420, height: 164, props: it[2] });
     else if (it[1] === "jj-spaces") openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: it[2] });
+    else if (it[1] === "jj-sessions") openOverlay({ mod: "jj-sessions", kind: "dialog", width: 520, height: 300, props: it[2] });
     else if (it[1] === "jj-copy" && it[2].action === "copy") openOverlay({ mod: "jj-copy", kind: "dialog", width: 0.92, height: 0.88, props: it[2] });
     else if (it[1] === "jj-copy") openOverlay({ mod: "jj-copy", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: it[2] });
     else if (it[1] === "jj-panes" && it[2].action === "space") openOverlay({ mod: "jj-panes", kind: "dialog", width: 420, height: 360, props: it[2] });

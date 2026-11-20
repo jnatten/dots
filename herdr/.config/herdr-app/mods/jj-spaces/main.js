@@ -209,6 +209,12 @@ export default class Spaces extends View {
           else openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
         }
         // ctrl-a d: here, not in jj-agents, whose block the tree hides (a hidden copy gets no commands).
+        // A Claude session to another machine (jj-sessions' move dialog), the focused agent's.
+        if (command === "move") {
+          const f = focused();
+          const a = agents().find((x) => x.address === (f?.agent ?? f?.shown ?? f?.terminal)) ?? agents().find((x) => x.focused && x.space === f?.space);
+          if (a) openOverlay({ mod: "jj-sessions", kind: "dialog", width: 520, height: 300, props: { move: a.address } });
+        }
         if (command === "describe") {
           const f = focused();
           const a = agents().find((x) => x.address === (f?.agent ?? f?.shown ?? f?.terminal)) ?? agents().find((x) => x.focused && x.space === f?.space);
@@ -289,6 +295,7 @@ export default class Spaces extends View {
       this.publishPlaces();
     }
     this.linkAsksDue();
+    this.moveAsksDue(cx);
     const pressed = shared("jj-links.connect") ?? 0;
     if (this.listing || this.trello.state !== "ok" || (now < this.boardsAt && pressed === this.boardsAsked)) return;
     this.listing = true;
@@ -339,6 +346,55 @@ export default class Spaces extends View {
       return false;
     });
     if (left.length !== asks.length) setShared("board.link.ask", left);
+  }
+
+  // shared("sessions.move.ask"): [{ id, from, to, links, desc, at }], Claude sessions moved to
+  // another machine (jj-sessions' move). What jj-tasks knows of it moves from its machine to
+  // the new one (left behind without links, so its transcript there doesn't bring them back),
+  // and once it runs there, its terminal gets the hand links and description the old one had.
+  moveAsksDue(cx) {
+    const asks = shared("sessions.move.ask") ?? [];
+    if (!asks.length) return;
+    this.moving ??= new Set();
+    for (const a of asks) {
+      const key = `${a.id}@${a.at}`;
+      if (this.moving.has(key)) continue;
+      this.moving.add(key);
+      cx.spawn(async () => {
+        let kept = null;
+        try {
+          await updateHistory(a.from, (doc) => {
+            const e = doc.sessions[a.id];
+            if (!e?.links?.length) return doc;
+            kept = e;
+            doc.sessions[a.id] = { ...e, links: [], off: [...new Set([...(e.off ?? []), ...e.links])] };
+            return doc;
+          });
+          if (kept) await updateHistory(a.to, (doc) => {
+            const was = doc.sessions[a.id];
+            const { space: _s, terminal: _t, off: _o, ...rest } = kept;
+            doc.sessions[a.id] = { ...rest, ...(was ?? {}), links: [...new Set([...(was?.links ?? []), ...kept.links])], at: Math.floor(Date.now() / 1000) };
+            return doc;
+          });
+        } catch {}
+        this.linksAt = 0;
+      });
+    }
+    const now = Date.now();
+    const live = terminals().filter((t) => t.state === "live" && t.labels?.["claude.session"]);
+    const left = asks.filter((a) => {
+      const t = live.find((t) => t.labels["claude.session"] === a.id && (split(t.address)[0] ?? null) === (a.to ?? null));
+      if (!t) return now - a.at < 30 * 60000;
+      if (a.links?.length) {
+        const kept = shared("github.agent-links") ?? {};
+        const mine = kept[t.address] ?? [];
+        setShared("github.agent-links", { ...kept, [t.address]: [...new Set([...mine, ...a.links])] });
+        editLinks({ agent: t.address }, (e) => ({ ...e, links: [...new Set([...e.links, ...a.links])] })).catch(() => null);
+      }
+      if (a.desc && !t.labels["jj.description"]) hc(["label", t.address, `jj.description=${a.desc}`]).catch(() => null);
+      return false;
+    });
+    if (left.length !== asks.length) setShared("sessions.move.ask", left);
   }
 
   // Spaces moved in or out of Waiting by the other mods (jj-menu, jj-tabs), which show it

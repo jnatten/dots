@@ -40,7 +40,7 @@ export const kidStatus = (k, listed) => {
 };
 
 // An agent's right-click menu (jj-menu): pin, description, link, Waiting. A popup is as tall as its items.
-export const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 196, props: { tab: "agent", target: { terminal: a.address } } });
+export const menu = (a) => openOverlay({ mod: "jj-menu", kind: "popup", width: 220, height: 228, props: { tab: "agent", target: { terminal: a.address } } });
 
 export function duration(ms) {
   const m = Math.floor(ms / 60000);
