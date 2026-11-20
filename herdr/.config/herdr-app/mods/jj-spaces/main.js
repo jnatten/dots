@@ -122,9 +122,6 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
-// The open board, which ctrl-a T closes again.
-let boardOverlay = null;
-
 // The link dialog for a space, or for one of its agents.
 function openLinks(id, agent) {
   if (id) openOverlay({ mod: "jj-spaces", kind: "dialog", width: 560, height: 0.7, props: { link: id, ...(agent && { agent }) } });
@@ -185,6 +182,9 @@ export default class Spaces extends View {
     this.reposOf = null; // shared("space-folders") they were looked for in
     this.boardsAt = 0;
     this.boardsAsked = this.connected;
+    // The open board (shared("board.open"), which ctrl-a T closes) from a previous run is gone;
+    // one still open through a reload says so again (board.js).
+    setShared("board.open", null);
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // Refresh only when the refs could have changed (see `due`).
@@ -193,7 +193,11 @@ export default class Spaces extends View {
       for (;;) {
         // "link": the focused agent's, else the space's; "link-space": the space's.
         const command = await nextCommand();
-        if (command === "board") boardOverlay = boardOverlay ? closeOverlay(boardOverlay) : openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
+        if (command === "board") {
+          const open = shared("board.open");
+          if (open) closeOverlay(open);
+          else openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
+        }
         if (command !== "link" && command !== "link-space") continue;
         const space = focused()?.space ?? spaces().find((s) => s.active)?.id;
         openLinks(space, command === "link" ? agents().find((a) => a.focused && a.space === space)?.address : null);
@@ -220,7 +224,7 @@ export default class Spaces extends View {
   }
 
   close() {
-    if (props()?.board) boardOverlay = null;
+    if (props()?.board && shared("board.open") === props().overlay) setShared("board.open", null);
   }
 
   // The GitHub repos in the sidebar folders on every machine that answers (one that doesn't
