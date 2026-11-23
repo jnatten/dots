@@ -75,6 +75,7 @@
     "ctrl-a shift-e": "jj-tabs.capture-colors",
     "ctrl-a d": "jj-spaces.describe",
     "ctrl-a m": "jj-spaces.move",
+    "ctrl-a r": "jj-spaces.review",
     "ctrl-a g": "jj-spaces.link",
     "ctrl-a h": "jj-tabs.waiting",
     "ctrl-a shift-h": "jj-tabs.wait",

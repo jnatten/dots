@@ -209,6 +209,11 @@ export default class Spaces extends View {
           else openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.92, height: 0.88, props: { board: true } });
         }
         // ctrl-a d: here, not in jj-agents, whose block the tree hides (a hidden copy gets no commands).
+        // A review in a space of its own (jj-sessions' review dialog), by default in the shown space's repo.
+        if (command === "review") {
+          const s = spaces().find((x) => x.id === focused()?.space) ?? spaces().find((x) => x.active);
+          openOverlay({ mod: "jj-sessions", kind: "dialog", width: 560, height: 200, props: { review: true, folder: s ? place(s, panes()) : null, machine: s?.machine ?? null } });
+        }
         // A Claude session to another machine (jj-sessions' move dialog), the focused agent's.
         if (command === "move") {
           const f = focused();

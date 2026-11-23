@@ -132,9 +132,9 @@ async function resumeAt(id, cwd, on, space = null) {
 // A new Claude session in the repo at `path` on `machine` (null: this computer), in the
 // checkout itself or in a worktree of its own named `name`: made by the WorktreeCreate hook
 // first, then taken over by Claude with --worktree. Moved to `branch` (a PR's) first when
-// there's one. The spaces sidebar links it to `url` once it runs (shared("board.link.ask")).
-// "" or what went wrong.
-export async function startNew({ path, machine, worktree: own, name, branch, url }) {
+// there's one, `task` its first message. The spaces sidebar links it to `url` once it runs
+// (shared("board.link.ask")). "" or what went wrong.
+export async function startNew({ path, machine, worktree: own, name, branch, url, task }) {
   const on = machine ?? null;
   if ((await missing([path], on)).size) return `${tilde(path)} isn't there${on ? ` on ${on}` : ""}.`;
   const why = (r) => (r.stderr || r.stdout || "").trim().split("\n").pop() || `exit ${r.code}`;
@@ -162,8 +162,8 @@ export async function startNew({ path, machine, worktree: own, name, branch, url
   const s = own ? null : await spaceFor(path, on);
   if (s) {
     run("space.select", { id: s.id });
-    run("tab.new", { space: s.id, folder: path, argv });
-  } else run("space.new", { folder: path, machine: on ?? "", argv });
+    run("tab.new", { space: s.id, folder: path, argv, ...(task && { task }) });
+  } else run("space.new", { folder: path, machine: on ?? "", argv, ...(task && { task }) });
   if (url) setShared("board.link.ask", [...(shared("board.link.ask") ?? []), { url, cwd, machine: on, known, at: Date.now() }]);
   return "";
 }

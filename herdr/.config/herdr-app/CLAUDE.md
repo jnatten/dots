@@ -68,6 +68,11 @@ with `mods/jj-agents/parts.js`; `mods/jj-spaces/agent-parts.js` is a copy, since
 a module from outside a mod's folder, symlinked or not: change `parts.js`, then copy it over.
 ctrl-a d is `jj-spaces.describe` so it works with the agents block hidden.
 
+ctrl-a r opens jj-sessions' review dialog (`mods/jj-sessions/review.js`): paste a PR URL or name a
+branch or revision, and Claude starts in a new worktree and space with `/jj-review <that>` first
+(sessions.js' `startNew`, with `task`). A GitHub URL goes to that repo's checkout
+(`shared("board.places")`), a PR's on its branch; anything else to the shown space's repo.
+
 ctrl-a m (or an agent's menu) moves a Claude session to another machine: jj-sessions' move
 dialog (`mods/jj-sessions/move.js`) maps its folder there through the sidebar folders' paths
 (`mapPath` in `sessions.js`), copies its transcript, subagents', rewind checkpoints and todos

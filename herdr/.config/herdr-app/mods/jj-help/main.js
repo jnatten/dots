@@ -26,6 +26,7 @@ const DESCRIBE = {
   "jj-spaces.tasks": [CLAUDE, "Tasks: every PR, issue and card Claude sessions had, with those sessions"],
   "jj-spaces.board": [CLAUDE, "Board: PRs, issues and Trello boards, with their sessions and links"],
   "jj-spaces.describe": [CLAUDE, "Describe the focused agent"],
+  "jj-spaces.review": [CLAUDE, "Review a PR, branch or revision: /jj-review in a new worktree and space"],
   "jj-spaces.move": [CLAUDE, "Move the focused Claude session to another machine (its conversation, not its code)"],
   "jj-spaces.link": [CLAUDE, "Link a PR, issue or card to the focused agent"],
   "jj-spaces.link-space": [CLAUDE, "Link a PR, issue or card to the space"],

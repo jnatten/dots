@@ -2,7 +2,8 @@
 // their sessions in a section of their own; running ones by what they need and by their
 // description, as the agents list has them; ended ones in History) and the tasks list
 // ({ tasks: true }, or one task's sessions with { url }, tasks.js), and moving a session to
-// another machine ({ move: terminalAddress }, move.js).
+// another machine ({ move: terminalAddress }, move.js), and starting a review in a space of its
+// own ({ review: true, folder, machine }, review.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -10,6 +11,7 @@ import { agents, terminals, spaces, panes, theme, shared, setShared, props, run,
 import { base, ago, worktree, label, place, missing, resume } from "./sessions.js";
 import { taskInit, taskRender } from "./tasks.js";
 import { moveInit, moveRender } from "./move.js";
+import { reviewInit, reviewRender } from "./review.js";
 
 const LIST = 440;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
@@ -70,12 +72,13 @@ async function history() {
 export default class Sessions extends View {
   init(_props, cx) {
     const p = props() ?? {};
-    this.mode = p.tasks ? "tasks" : p.move ? "move" : "search";
+    this.mode = p.tasks ? "tasks" : p.move ? "move" : p.review ? "review" : "search";
     this.error = "";
     this.handle = cx.focus_handle();
     this.handle.focus();
     if (this.mode === "tasks") return taskInit(this, cx);
     if (this.mode === "move") return moveInit(this, cx);
+    if (this.mode === "review") return reviewInit(this, cx);
     this.initSearch(cx);
   }
 
@@ -194,6 +197,7 @@ export default class Sessions extends View {
     const t = theme();
     if (this.mode === "tasks") return taskRender(this, t);
     if (this.mode === "move") return moveRender(this, t);
+    if (this.mode === "review") return reviewRender(this, t);
     return this.renderSearch(t);
   }
 
