@@ -1,13 +1,15 @@
-// A review in a space of its own (ctrl-a r): paste a PR URL, or name a branch or revision, and
-// Claude starts in a new worktree with `/jj-review <that>` as its first message. A GitHub URL
-// reviews in that repo's checkout (shared("board.places"), the spaces sidebar's), a PR's on
-// its branch, so the skill's trunk()..@ is the PR; anything else in the shown space's repo.
+// A review in a space of its own (ctrl-a r): paste a PR URL, or name a PR (#123), branch or
+// revision, and Claude starts in a new worktree on it, with `/jj-review` as its first message,
+// so the skill's trunk()..@ is what was named and its checks run on that code. A GitHub URL
+// reviews in that repo's checkout (shared("board.places"), the spaces sidebar's), the rest in
+// the shown space's repo. A fork's PR comes by GitHub's pull/<n>/head ref. What can't be
+// found is handed to the skill as it was typed, on the repo as it is.
 // A jj-sessions overlay with props { review: true, folder, machine } (the shown space's).
 
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { shared, props, closeOverlay, exec } from "herdr";
-import { startNew } from "./sessions.js";
+import { resolveRev, startNew } from "./sessions.js";
 
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
 const slug = (text) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "") || "change";
@@ -26,7 +28,8 @@ function targetOf(text) {
   }
   const folder = props()?.folder;
   if (!folder) return { error: "No space is shown to review in: paste a PR URL instead." };
-  return { text: s, place: { machine: props()?.machine ?? null, path: folder } };
+  const number = s.match(/^#?(\d+)$/)?.[1];
+  return { text: s, number: number ? Number(number) : null, place: { machine: props()?.machine ?? null, path: folder } };
 }
 
 const where = (p) => `${p.machine ? `${p.machine} · ` : ""}${p.path.replace(/^\/(?:Users|home)\/[^/]+/, "~")}`;
@@ -34,7 +37,7 @@ const where = (p) => `${p.machine ? `${p.machine} · ` : ""}${p.path.replace(/^\
 export function reviewInit(view) {
   view.busy = false;
   view.error = "";
-  view.input = InputState.new({ placeholder: "PR URL, branch or revision" });
+  view.input = InputState.new({ placeholder: "PR URL, #123, branch or revision" });
   view.input.on("change", (_e, cx) => { view.error = ""; cx.notify(); });
   view.input.on("submit", (_e, cx) => go(view, cx));
   view.input.focus();
@@ -49,26 +52,40 @@ function go(view, cx) {
   cx.notify();
   cx.spawn(async (cx) => {
     try {
-      let branch = null;
-      if (t.pr) {
-        const r = await exec("gh", ["pr", "view", t.text, "--json", "headRefName,isCrossRepository"], { timeout: 30000 });
-        const pr = r.code === 0 ? JSON.parse(r.stdout) : null;
-        if (!pr) throw new Error(`gh couldn't see ${t.repo}#${t.pr}: ${(r.stderr || "").trim().split("\n").pop()}`);
-        if (!pr.isCrossRepository) branch = pr.headRefName;
+      // A PR: its URL as typed, or #n in the shown repo's GitHub repo.
+      let pr = null;
+      if (t.pr || t.number) {
+        let repo = t.repo;
+        if (!repo) {
+          const o = await exec("git", ["remote", "get-url", "origin"], { cwd: t.place.path, on: t.place.machine });
+          repo = (o.stdout ?? "").trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/)?.[1];
+          if (!repo) throw new Error("The shown space's repo isn't on GitHub: paste the PR's URL.");
+        }
+        const n = t.pr ?? t.number;
+        const r = await exec("gh", ["pr", "view", String(n), "-R", repo, "--json", "number,url,headRefName,isCrossRepository"], { timeout: 30000 });
+        pr = r.code === 0 ? JSON.parse(r.stdout) : null;
+        if (!pr) throw new Error(`gh couldn't see ${repo}#${n}: ${(r.stderr || "").trim().split("\n").pop()}`);
       }
+      view.status = pr ? `fetching #${pr.number}…` : `finding ${t.text}…`;
+      cx.notify();
+      const at = pr ? (pr.isCrossRepository ? { pull: pr.number } : { branch: pr.headRefName }) : await resolveRev(t.place.path, t.place.machine, t.text);
+      view.status = "making the worktree and starting Claude…";
+      cx.notify();
       view.error = await startNew({
         path: t.place.path,
         machine: t.place.machine,
         worktree: true,
-        name: t.pr ? `review-${t.pr}` : `review-${slug(t.text)}`,
-        branch,
-        url: t.pr ? t.text : null,
-        task: `/jj-review ${t.text}`,
+        name: pr ? `review-${pr.number}` : `review-${slug(t.text)}`,
+        ...(at ?? {}),
+        url: pr?.url ?? null,
+        // On it: the skill reviews trunk()..@ (and links the PR); else what was typed, as typed.
+        task: pr ? `/jj-review ${pr.url}` : at ? `/jj-review trunk()..@ (this workspace is on ${t.text})` : `/jj-review ${t.text}`,
       });
     } catch (e) {
       view.error = String(e?.message ?? e);
     }
     view.busy = false;
+    view.status = "";
     if (!view.error) closeOverlay(props().overlay);
     cx.notify();
   });
@@ -78,7 +95,7 @@ export function reviewRender(view, t) {
   const target = targetOf(view.input.value());
   const about = !target
     ? props()?.folder ? `Without a URL: in ${where({ machine: props()?.machine ?? null, path: props().folder })}` : "Paste a PR URL."
-    : target.error ?? `In a new worktree of ${where(target.place)}${target.pr ? `, on PR #${target.pr}'s branch` : ""}`;
+    : target.error ?? `In a new worktree of ${where(target.place)}, on ${target.pr ? `PR #${target.pr}` : target.number ? `PR #${target.number}` : `${target.text}, if it's a branch or revision there`}`;
   return v_flex()
     .id("review")
     .track_focus(view.handle)
@@ -98,5 +115,5 @@ export function reviewRender(view, t) {
     .when(Boolean(view.error), (el) => el.child(div().flex_none().text_color(t.blocked).child(view.error)))
     .child(div().flex_1())
     .child(h_flex().flex_none().justify_end().text_size(11).text_color(t.dim)
-      .child(view.busy ? "making the worktree and starting Claude…" : "↵ start /jj-review in a new space · esc cancel"));
+      .child(view.busy ? view.status || "starting…" : "↵ start /jj-review in a new space · esc cancel"));
 }
