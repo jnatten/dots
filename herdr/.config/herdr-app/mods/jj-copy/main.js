@@ -6,7 +6,7 @@
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { props, theme, settings, terminals, run, exec, hc, appHome, home, notify, closeOverlay, shared, setShared, readTextFile } from "herdr";
+import { props, theme, settings, terminals, panes, run, exec, hc, appHome, home, notify, openOverlay, closeOverlay, shared, setShared, readTextFile } from "herdr";
 import * as vim from "./vim.js";
 
 const HISTORY = "100000";
@@ -81,24 +81,36 @@ async function openable({ text, kind }, cwd, on) {
   return { target: path };
 }
 
-// Hint mode on a pane: the helper reads its screen, is shown in its place until a
-// hint is typed or Esc, then the pane gets its own terminal back. Pressed again
-// while one runs, it ends that one.
+// Hint mode on a pane: the helper reads what the pane shows and runs until a hint is
+// typed or Esc. A fullscreen program (Claude Code: it scrolls itself) has the helper
+// shown in its place, then gets its pane back as it was. A plain terminal has it over the
+// whole window instead (a dialog of its terminal, so every line fits): swapping its view out
+// would cost Herdr's view its history, and with that where it was scrolled to; scrolled up,
+// the hints go on the lines shown.
+// Pressed again while one runs, it ends that one.
 async function fingers(cx, { terminal, pane, cwd }) {
   const running = shared(RUNNING);
   if (running && terminals().some((x) => x.address === running && x.state === "live")) {
     run("terminal.kill", { terminal: running });
     return;
   }
-  const dir = await exec("sh", ["-c", 'd=$(mktemp -d "${TMPDIR:-/tmp}/herdr-fingers.XXXXXX") && hc read "$1" --json >"$d/screen.json" && printf %s "$d"', "sh", terminal]);
+  const view = panes().find((p) => p.pane === pane)?.scroll;
+  const up = view?.from_bottom ?? 0;
+  const dir = await exec("sh", ["-c", 'd=$(mktemp -d "${TMPDIR:-/tmp}/herdr-fingers.XXXXXX") && hc read "$1" --lines "$2" --json >"$d/screen.json" && printf %s "$d"', "sh", terminal, String(up)]);
   const tmp = (dir.stdout ?? "").trim();
   if (dir.code !== 0 || !tmp) throw new Error((dir.stderr || "couldn't read the pane").trim());
   try {
     const size = JSON.parse((await hc(["get", terminal, "--json"])).stdout);
+    if (up > 0) {
+      // The lines the view shows: `up` lines of history above the screen, then the screen's top.
+      const read = JSON.parse((await readTextFile(`${tmp}/screen.json`)) ?? "{}");
+      const shown = (read.text ?? "").split("\n").slice(0, view.len).join("\n");
+      await exec("sh", ["-c", 'printf %s "$2" >"$1"', "sh", `${tmp}/screen.json`, JSON.stringify({ ...read, text: shown })]);
+    }
     const every = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
     const chosen = shared("jj-copy.hints") ?? {};
     const ids = every.filter((p) => chosen[p.id] ?? p.on).map((p) => p.id);
-    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await nodejs(), `${appHome()}/mods/jj-copy/fingers.mjs`, `${tmp}/screen.json`, `${tmp}/result.json`, JSON.stringify(ids), String(size.cols), String(size.rows)]);
+    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await nodejs(), `${appHome()}/mods/jj-copy/fingers.mjs`, `${tmp}/screen.json`, `${tmp}/result.json`, JSON.stringify(ids), String(size.cols), String(view?.len ?? size.rows)]);
     let address = null;
     try {
       address = r.code === 0 ? JSON.parse(r.stdout).address : null;
@@ -107,10 +119,11 @@ async function fingers(cx, { terminal, pane, cwd }) {
     setShared(RUNNING, address);
     const live = () => terminals().some((x) => x.address === address && x.state === "live");
     for (let waited = 0; waited < 3000 && !live(); waited += 25) await sleep(cx, 25);
-    if (live()) run("terminal.show", { terminal: address, pane });
+    if (live() && view) openOverlay({ kind: "dialog", frame: "none", width: 1, height: 1, layout: { type: "block", content: { terminal: address } } });
+    else if (live()) run("terminal.show", { terminal: address, pane });
     for (let waited = 0; waited < 600000 && live(); waited += 50) await sleep(cx, 50);
     if (live()) run("terminal.kill", { terminal: address });
-    run("terminal.show", { pane });
+    if (!view) run("terminal.show", { pane });
     if (shared(RUNNING) === address) setShared(RUNNING, null);
     const result = JSON.parse((await readTextFile(`${tmp}/result.json`).catch(() => null)) ?? "null");
     if (!result) return;

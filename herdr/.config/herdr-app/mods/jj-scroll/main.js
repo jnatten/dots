@@ -3,10 +3,12 @@
 // so it gets the keys it scrolls on through `hc keys`; its line keys are
 // shift+pageup/pagedown, which ~/.claude/keybindings.json binds to
 // scroll:lineUp/lineDown. Other terminals scroll Herdr's view of their history.
+// f starts hint mode (jj-copy's fingers) on what's shown, and leaves it there; so does
+// ctrl-a f, which closes this popup (shared("jj-scroll.keep"), set by jj-tabs).
 
 import { View, div } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { props, focused, terminals, theme, run, hc, closeOverlay } from "herdr";
+import { props, focused, terminals, theme, run, hc, closeOverlay, shared } from "herdr";
 
 // Each move: [the keys Claude gets, terminal.scroll's args for the rest].
 const MOVES = {
@@ -49,8 +51,11 @@ export default class Scroll extends View {
     });
   }
 
-  async close() {
-    if (!this.terminal || !this.moved) return;
+  async close(cx) {
+    if (!this.terminal || !this.moved || this.keep) return;
+    // Closed by ctrl-a f, which may only arrive after this popup has gone: hints go on what's shown.
+    await new Promise((resolve) => cx.timer.after(150, () => resolve()));
+    if (Date.now() - (shared("jj-scroll.keep") ?? 0) < 1500) return;
     if (this.claude) await hc(["keys", this.terminal, ...MOVES.bottom[0]]).catch(() => null);
     else run("terminal.scroll", { terminal: this.terminal, ...MOVES.bottom[1] });
   }
@@ -64,6 +69,11 @@ export default class Scroll extends View {
         const m = e.modifiers;
         if (m.platform || m.alt) return;
         if (e.key === "escape" || (e.key === "q" && !m.control)) return closeOverlay(props().overlay);
+        if (e.key === "f" && !m.control && !m.shift) {
+          this.keep = true;
+          closeOverlay(props().overlay);
+          return run("jj-tabs.fingers");
+        }
         const name = moveOf(e.key, m.control && !m.shift, m.shift);
         if (!name) return;
         this.go(name, cx);
@@ -80,6 +90,6 @@ export default class Scroll extends View {
       .text_size(12)
       .child(div().flex_none().px(6).rounded(4).bg(t.accent).text_size(11).font_semibold().text_color(t.accent_foreground).child("SCROLL"))
       .child(div().flex_1().min_w(0).truncate().text_color(t.muted)
-        .child(this.terminal ? "j/k line · ^U/^D half page · ^B/^F page · g/G top/bottom · q quit" : "No terminal in focus · q quit"));
+        .child(this.terminal ? "j/k line · ^U/^D half page · ^B/^F page · g/G top/bottom · f hints · q quit" : "No terminal in focus · q quit"));
   }
 }
