@@ -9,7 +9,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { shared, props, closeOverlay, exec } from "herdr";
-import { resolveRev, startNew } from "./sessions.js";
+import { startNew } from "./sessions.js";
 
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
 const slug = (text) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "") || "change";
@@ -66,26 +66,22 @@ function go(view, cx) {
         pr = r.code === 0 ? JSON.parse(r.stdout) : null;
         if (!pr) throw new Error(`gh couldn't see ${repo}#${n}: ${(r.stderr || "").trim().split("\n").pop()}`);
       }
-      view.status = pr ? `fetching #${pr.number}…` : `finding ${t.text}…`;
-      cx.notify();
-      const at = pr ? (pr.isCrossRepository ? { pull: pr.number } : { branch: pr.headRefName }) : await resolveRev(t.place.path, t.place.machine, t.text);
-      view.status = "making the worktree and starting Claude…";
-      cx.notify();
+      // The new space does the rest (fetching, the worktree, moving it there) as it starts.
       view.error = await startNew({
         path: t.place.path,
         machine: t.place.machine,
         worktree: true,
         name: pr ? `review-${pr.number}` : `review-${slug(t.text)}`,
-        ...(at ?? {}),
+        ...(pr ? (pr.isCrossRepository ? { pull: pr.number } : { branch: pr.headRefName }) : { text: t.text }),
         url: pr?.url ?? null,
-        // On it: the skill reviews trunk()..@ (and links the PR); else what was typed, as typed.
-        task: pr ? `/jj-review ${pr.url}` : at ? `/jj-review trunk()..@ (this workspace is on ${t.text})` : `/jj-review ${t.text}`,
+        // On it: the skill reviews trunk()..@ (and links the PR); not found, what was typed, as typed.
+        task: pr ? `/jj-review ${pr.url}` : `/jj-review trunk()..@ (this workspace is on ${t.text})`,
+        taskRaw: pr ? undefined : `/jj-review ${t.text}`,
       });
     } catch (e) {
       view.error = String(e?.message ?? e);
     }
     view.busy = false;
-    view.status = "";
     if (!view.error) closeOverlay(props().overlay);
     cx.notify();
   });
@@ -115,5 +111,5 @@ export function reviewRender(view, t) {
     .when(Boolean(view.error), (el) => el.child(div().flex_none().text_color(t.blocked).child(view.error)))
     .child(div().flex_1())
     .child(h_flex().flex_none().justify_end().text_size(11).text_color(t.dim)
-      .child(view.busy ? view.status || "starting…" : "↵ start /jj-review in a new space · esc cancel"));
+      .child(view.busy ? (target?.pr || target?.number ? "asking GitHub…" : "starting…") : "↵ start /jj-review in a new space · esc cancel"));
 }

@@ -129,93 +129,93 @@ async function resumeAt(id, cwd, on, space = null) {
   } else run("space.new", { folder: cwd, machine: on ?? "", argv });
 }
 
+// Starting Claude in a new worktree, run as the new space's terminal so the space shows at
+// once: fetches what it's started on, makes the worktree with the WorktreeCreate hook, moves
+// it there, then becomes Claude (--worktree takes the worktree over). A text (a branch name or
+// revision) is looked for as a local bookmark, one on origin, then a revision (a revset's
+// head); not found, Claude gets the raw prompt instead. Failing, it says so and waits.
+// args: repo name branch pull rev text prompt raw-prompt
+const BOOT = String.raw`repo=$1 name=$2 branch=$3 pull=$4 rev=$5 text=$6 task=$7 raw=$8
+dim() { printf '\033[2m%s\033[0m\n' "$*"; }
+fail() { printf '\033[31m%s\033[0m\nPress enter to close. ' "$*"; read -r _; exit 1; }
+count() { printf '%s' "$1" | grep -c .; }
+cd "$repo" || fail "$repo isn't there."
+jjr=; [ -e .jj ] && jjr=1
+gb=
+if [ -n "$branch" ]; then
+  dim "Fetching $branch""…"
+  if [ -n "$jjr" ]; then jj git fetch -b "$branch" || fail "Couldn't fetch $branch."; rev="\"$branch\"@origin"
+  else git fetch -q origin "$branch" || fail "Couldn't fetch $branch."; git branch -q --track "$branch" "origin/$branch" 2>/dev/null; gb=$branch; fi
+elif [ -n "$pull" ]; then
+  dim "Fetching PR #$pull""…"
+  if [ -n "$jjr" ]; then { git fetch -q origin "+refs/pull/$pull/head:refs/remotes/origin/pr/$pull" && jj git import; } || fail "Couldn't fetch PR #$pull."; rev="\"pr/$pull\"@origin"
+  else git fetch -q origin "+refs/pull/$pull/head:refs/heads/pr/$pull" || fail "Couldn't fetch PR #$pull."; gb="pr/$pull"; fi
+elif [ -z "$rev" ] && [ -n "$text" ]; then
+  dim "Finding $text""…"
+  if [ -n "$jjr" ]; then
+    one() { jj --ignore-working-copy log --no-graph -r "$1" -T 'change_id ++ "\n"' 2>/dev/null; }
+    q=$(printf '%s' "$text" | sed 's/["\\]/\\&/g')
+    ids=$(one "bookmarks(exact:\"$q\")")
+    if [ "$(count "$ids")" != 1 ]; then jj git fetch -b "$text" >/dev/null 2>&1; ids=$(one "remote_bookmarks(exact:\"$q\", exact:\"origin\")"); fi
+    if [ "$(count "$ids")" != 1 ]; then ids=$(one "$text"); [ "$(count "$ids")" -gt 1 ] && ids=$(one "heads($text)"); fi
+    [ "$(count "$ids")" = 1 ] && rev=$ids
+  elif git rev-parse -q --verify "refs/heads/$text^{commit}" >/dev/null; then rev=$text
+  else
+    git fetch -q origin "$text" 2>/dev/null
+    if git rev-parse -q --verify "refs/remotes/origin/$text^{commit}" >/dev/null; then rev="origin/$text"
+    elif git rev-parse -q --verify "$text^{commit}" >/dev/null; then rev=$text; fi
+  fi
+  [ -n "$rev" ] || { dim "No branch or revision $text here: starting on the repo as it is."; task=$raw; }
+fi
+dim "Making the worktree…"
+hn=$name; [ -n "$gb" ] && hn=$gb
+dir=$(printf '{"hook_event_name":"WorktreeCreate","cwd":"%s","name":"%s"}' "$repo" "$hn" | "$HOME/.claude/hooks/jj-workspace.sh" | tail -n 1)
+[ -n "$dir" ] && [ -d "$dir" ] || fail "Couldn't make the worktree."
+if [ -n "$rev" ]; then
+  what=$branch; [ -n "$what" ] || what=$text; [ -n "$what" ] || what="PR #$pull"
+  dim "Moving it to $what""…"
+  if [ -n "$jjr" ]; then (cd "$dir" && jj new "$rev") || fail "Couldn't move to $what."
+  else git -C "$dir" checkout -q --detach "$rev" || fail "Couldn't move to $what."; fi
+fi
+cd "$dir" || fail "$dir isn't there."
+if [ -n "$task" ]; then exec claude --worktree "$(basename "$dir")" "$task"; fi
+exec claude --worktree "$(basename "$dir")"`;
+
 // A new Claude session in the repo at `path` on `machine` (null: this computer), in the
-// checkout itself or in a worktree of its own named `name`: made by the WorktreeCreate hook
-// first, then taken over by Claude with --worktree. Started on `branch` (on origin, fetched
-// first), `pull` (a fork's PR, by GitHub's pull/<n>/head ref) or `rev` (a revision the repo
-// has) when there's one; `task` its first message. The spaces sidebar links it to `url` once
-// it runs (shared("board.link.ask")). "" or what went wrong.
-export async function startNew({ path, machine, worktree: own, name, branch, pull, rev, url, task }) {
+// checkout itself or in a worktree of its own named `name`. Started on `branch` (on origin,
+// fetched first), `pull` (a fork's PR, by GitHub's pull/<n>/head ref), `rev` (a revision the
+// repo has) or `text` (a branch name or revision to look for; `taskRaw` the prompt when it
+// isn't found); `task` its first message. In a worktree it's all done by its new space's
+// terminal (BOOT), so the space shows at once; in the checkout, before Claude starts. The
+// spaces sidebar links it to `url` once it runs (shared("board.link.ask")). "" or what went wrong.
+export async function startNew({ path, machine, worktree: own, name, branch, pull, rev, text, url, task, taskRaw }) {
   const on = machine ?? null;
   if ((await missing([path], on)).size) return `${tilde(path)} isn't there${on ? ` on ${on}` : ""}.`;
+  const known = terminals().map((t) => t.address);
+  const ask = (cwd) => url && setShared("board.link.ask", [...(shared("board.link.ask") ?? []), { url, cwd, machine: on, known, at: Date.now() }]);
+  if (own) {
+    const args = [path, name, branch ?? "", pull ? String(pull) : "", rev ?? "", text ?? "", task ?? "", taskRaw ?? task ?? ""];
+    run("space.new", { folder: path, machine: on ?? "", argv: ["sh", "-c", BOOT, "sh", ...args] });
+    // The hook's folder: <repo>/.claude/worktrees/<name, / as ->, git's named after its branch.
+    ask(`${path}/.claude/worktrees`);
+    return "";
+  }
   const why = (r) => (r.stderr || r.stdout || "").trim().split("\n").pop() || `exit ${r.code}`;
-  const git = (args, cwd = path) => exec("git", args, { cwd, on, timeout: 600_000 });
+  const git = (args) => exec("git", args, { cwd: path, on, timeout: 600_000 });
   const isJj = (await exec("test", ["-e", `${path}/.jj`], { on })).code === 0;
-  // What it starts on: a revision for jj; for git a branch to make the worktree on (or switch
-  // to) or a commit to detach at.
-  let jjRev = null, gitBranch = null, gitCommit = null;
-  const what = branch ?? (pull ? `PR #${pull}` : rev);
   if (branch) {
     const r = isJj ? await jj(path, ["git", "fetch", "-b", branch], on) : await git(["fetch", "origin", branch]);
     if (r.code !== 0) return `Couldn't fetch ${branch}: ${why(r)}`;
-    if (isJj) jjRev = `${JSON.stringify(branch)}@origin`;
-    else {
-      gitBranch = branch;
-      if (own) await git(["branch", "--track", branch, `origin/${branch}`]);
-    }
-  } else if (pull) {
-    // jj (colocated) gets it as the remote bookmark pr/<n>@origin, git as the branch pr/<n>.
-    const r = await git(["fetch", "origin", `+refs/pull/${pull}/head:${isJj ? "refs/remotes/origin" : "refs/heads"}/pr/${pull}`]);
-    if (r.code !== 0) return `Couldn't fetch PR #${pull}: ${why(r)}`;
-    if (isJj) {
-      const i = await jj(path, ["git", "import"], on);
-      if (i.code !== 0) return `Couldn't fetch PR #${pull}: ${why(i)}`;
-      jjRev = `"pr/${pull}"@origin`;
-    } else gitBranch = `pr/${pull}`;
-  } else if (rev) {
-    if (isJj) jjRev = rev;
-    else gitCommit = rev;
+    const m = isJj ? await jj(path, ["new", `${JSON.stringify(branch)}@origin`], on) : await git(["switch", branch]);
+    if (m.code !== 0) return `Couldn't move to ${branch}: ${why(m)}`;
   }
-  let cwd = path;
-  if (own) {
-    // A plain git worktree is made on the branch it's named after.
-    const input = JSON.stringify({ hook_event_name: "WorktreeCreate", cwd: path, name: gitBranch ?? name });
-    const r = await exec("sh", ["-c", 'printf %s "$1" | "$HOME/.claude/hooks/jj-workspace.sh"', "sh", input], { cwd: path, on, timeout: 600_000 });
-    cwd = (r.stdout ?? "").trim().split("\n").pop();
-    if (r.code !== 0 || !cwd) return `Couldn't make the worktree: ${why(r)}`;
-  }
-  const moved = jjRev ? await jj(cwd, ["new", jjRev], on) : gitBranch && !own ? await git(["switch", gitBranch]) : gitCommit ? await git(["checkout", "--detach", gitCommit], cwd) : null;
-  if (moved && moved.code !== 0) return `Couldn't move to ${what}: ${why(moved)}`;
-  const known = terminals().map((t) => t.address);
-  const argv = own ? ["claude", "--worktree", base(cwd)] : ["claude"];
-  const s = own ? null : await spaceFor(path, on);
+  const s = await spaceFor(path, on);
   if (s) {
     run("space.select", { id: s.id });
-    run("tab.new", { space: s.id, folder: path, argv, ...(task && { task }) });
-  } else run("space.new", { folder: path, machine: on ?? "", argv, ...(task && { task }) });
-  if (url) setShared("board.link.ask", [...(shared("board.link.ask") ?? []), { url, cwd, machine: on, known, at: Date.now() }]);
+    run("tab.new", { space: s.id, folder: path, argv: ["claude"], ...(task && { task }) });
+  } else run("space.new", { folder: path, machine: on ?? "", argv: ["claude"], ...(task && { task }) });
+  ask(path);
   return "";
-}
-
-// What a branch name or revision typed for a review is in the repo at `path` on `on`: { rev }
-// (a local bookmark; one on origin, fetched first; or a single revision, a revset's head),
-// or null when it's none of these.
-export async function resolveRev(path, on, text) {
-  const isJj = (await exec("test", ["-e", `${path}/.jj`], { on })).code === 0;
-  if (isJj) {
-    const ids = async (revset) => {
-      const r = await jj(path, ["--ignore-working-copy", "log", "--no-graph", "-r", revset, "-T", 'change_id ++ "\\n"'], on);
-      return r.code === 0 ? r.stdout.split("\n").filter(Boolean) : [];
-    };
-    const name = JSON.stringify(text);
-    const local = await ids(`bookmarks(exact:${name})`);
-    if (local.length === 1) return { rev: local[0] };
-    await jj(path, ["git", "fetch", "-b", text], on);
-    const remote = await ids(`remote_bookmarks(exact:${name}, exact:"origin")`);
-    if (remote.length === 1) return { rev: remote[0] };
-    const any = await ids(text);
-    if (any.length === 1) return { rev: any[0] };
-    const heads = any.length ? await ids(`heads(${text})`) : [];
-    return heads.length === 1 ? { rev: heads[0] } : null;
-  }
-  const git = (args) => exec("git", args, { cwd: path, on, timeout: 600_000 });
-  const commit = async (ref) => {
-    const r = await git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
-    return r.code === 0 ? r.stdout.trim() : null;
-  };
-  if (await commit(`refs/heads/${text}`)) return { rev: text };
-  await git(["fetch", "origin", text]);
-  return (await commit(`refs/remotes/origin/${text}`)) ? { rev: `origin/${text}` } : (await commit(text)) ? { rev: text } : null;
 }
 
 // Where a path on machine `from` is on machine `to` (null: this computer): the same place

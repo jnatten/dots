@@ -69,9 +69,10 @@ a module from outside a mod's folder, symlinked or not: change `parts.js`, then 
 ctrl-a d is `jj-spaces.describe` so it works with the agents block hidden.
 
 ctrl-a r opens jj-sessions' review dialog (`mods/jj-sessions/review.js`): paste a PR URL or name a
-PR (#123), branch or revision, and Claude starts in a new worktree and space on it (sessions.js'
-`startNew` with `branch`, `pull` for a fork's PR, or `rev` from `resolveRev`), with `/jj-review`
-first, so the skill's trunk()..@ and checks are that code. A GitHub URL goes to that repo's
+PR (#123), branch or revision, and Claude starts in a new worktree and space on it, with
+`/jj-review` first, so the skill's trunk()..@ and checks are that code. The space shows at once:
+its terminal fetches, makes the worktree and moves it there before it becomes Claude (sessions.js'
+`startNew` and its `BOOT` script, with `branch`, `pull` for a fork's PR, or `text` to look for). A GitHub URL goes to that repo's
 checkout (`shared("board.places")`), the rest to the shown space's repo.
 
 ctrl-a m (or an agent's menu) moves a Claude session to another machine: jj-sessions' move
