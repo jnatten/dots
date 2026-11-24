@@ -55,20 +55,36 @@ function tabsOf() {
   ];
 }
 
+// The app takes Tab and shift-Tab (the keyboard to the next tab stop, maybe a pane's input
+// behind the board) and Escape (closing the top dialog) before on_key_down sees them; bindings
+// in the board's own key context come first.
+let bound = false;
+
 export function boardInit(view, cx) {
   view.handle = cx.focus_handle();
   view.handle.focus();
+  if (!bound) {
+    try {
+      cx.bind_keys([
+        { keystroke: "tab", action: "jj_board_next", context: "JjBoard" },
+        { keystroke: "shift-tab", action: "jj_board_prev", context: "JjBoard" },
+        { keystroke: "escape", action: "jj_board_escape", context: "JjBoard" },
+      ]);
+      bound = true;
+    } catch {}
+  }
   // It's the open board, for ctrl-a T to close (in shared(): copies of another build of this
-  // mod don't share its module). The session picker over it gives the keyboard back when it
-  // closes (shared("board.focus")).
+  // mod don't share its module). What it opens over itself (view.over: the session picker, a
+  // preview) gives the keyboard back when it closes (shared("board.focus"), shared("preview.closed")).
   const me = props()?.overlay ?? null;
   setShared("board.open", me);
-  const asks = () => `${shared("board.focus")} ${shared("preview.closed")}`;
-  view.focusAsk = asks();
-  cx.timer.every(150, () => {
+  view.over = null;
+  const opened = Date.now();
+  cx.timer.every(50, () => {
     if (shared("board.open") !== me) setShared("board.open", me);
-    if (asks() === view.focusAsk) return;
-    view.focusAsk = asks();
+    const back = view.over ? shared(view.over.key) !== view.over.was : Date.now() - opened < 1000 && !view.handle.is_focused();
+    if (!back) return;
+    view.over = null;
     view.handle.focus();
   });
   view.busy = {};
@@ -208,6 +224,23 @@ function showTab(view, id) {
   view.reveal = true;
 }
 
+function nextTab(view, by) {
+  if (view.picker) return;
+  const tabs = tabsOf();
+  const i = tabs.findIndex((t) => t.id === view.model.tab.id);
+  view.note = "";
+  showTab(view, tabs[(i + by + tabs.length) % tabs.length].id);
+}
+
+function escape(view) {
+  if (view.picker) view.picker = null;
+  else closeOverlay(props().overlay);
+}
+
+function opening(view, key) {
+  view.over = { key, was: shared(key) };
+}
+
 function move(view, dir, by = 1) {
   const md = view.model;
   if (md.tab.list) {
@@ -269,6 +302,7 @@ function startOf(view, it) {
 // repo; picking one closes the board too.
 function sessions(view, it) {
   if (!it) return;
+  opening(view, "board.focus");
   openOverlay({ mod: "jj-sessions", kind: "dialog", width: 680, height: 440, props: { tasks: true, url: it.url, parent: props().overlay, start: startOf(view, it), item: { kind: it.kind, repo: it.repo, list: it.list, number: it.number, title: it.title, state: it.state } } });
 }
 
@@ -295,16 +329,16 @@ function find(url) {
 }
 
 // Space: Quick Look at it (preview.js), over the board.
-export function preview(it) {
+export function preview(view, it) {
   if (!it?.url) return;
+  opening(view, "preview.closed");
   openOverlay({ mod: "jj-spaces", kind: "dialog", width: 0.72, height: 0.88, props: { preview: it.url, item: { kind: it.kind, repo: it.repo, list: it.list, number: it.number, title: it.title, state: it.state } } });
 }
 
 function pickerKey(view, e, cx) {
   const rows = linkedRows(view, view.picker.it.url);
   const m = e.modifiers;
-  if (e.key === "escape") view.picker = null;
-  else if (e.key === "space") preview(rows[view.picker.at]?.it);
+  if (e.key === "space") preview(view, rows[view.picker.at]?.it);
   else if (e.key === "j" || e.key === "down") view.picker.at = Math.min(rows.length - 1, view.picker.at + 1);
   else if (e.key === "k" || e.key === "up") view.picker.at = Math.max(0, view.picker.at - 1);
   else if (e.key === "enter") {
@@ -327,17 +361,12 @@ function key(view, e, cx) {
   const tabs = tabsOf();
   const it = view.model.item;
   view.note = "";
-  if (e.key === "escape") return closeOverlay(props().overlay), true;
-  if (e.key === "space" && !m.control && !m.alt && !m.platform) return preview(it), true;
+  if (e.key === "space" && !m.control && !m.alt && !m.platform) return preview(view, it), true;
   if (e.key === "enter") {
     if (m.control) it && openUrl(it, cx);
     else if (m.alt) linked(view, it);
     else sessions(view, it);
     return true;
-  }
-  if (e.key === "tab") {
-    const i = tabs.findIndex((t) => t.id === view.model.tab.id);
-    return showTab(view, tabs[(i + (m.shift ? tabs.length - 1 : 1)) % tabs.length].id), true;
   }
   if (m.control && !m.alt && !m.platform && view.model.tab.list) {
     const half = Math.max(1, Math.floor((view.listHeight ?? 340) / 2 / 34));
@@ -629,6 +658,10 @@ export function boardRender(view) {
   const hint = view.picker ? "" : ["hjkl move", tab.list && "^D ^U half page", tab.list && "^J ^K 5 rows", "space preview", "↵ sessions", `⌃↵ open on ${site}`, "⌥↵ linked", !tab.list && (boardSettings().hideEmpty ? "e show empty" : "e hide empty"), "tab next", "r refresh", "esc close"].filter(Boolean).join(" · ");
   return v_flex()
     .id("board")
+    .key_context("JjBoard")
+    .on_action("jj_board_next", (_e, cx) => { nextTab(view, 1); cx.notify(); })
+    .on_action("jj_board_prev", (_e, cx) => { nextTab(view, -1); cx.notify(); })
+    .on_action("jj_board_escape", (_e, cx) => { escape(view); cx.notify(); })
     .relative()
     .track_focus(view.handle)
     .on_key_down((e, cx) => {

@@ -103,5 +103,9 @@ ask it through `shared("space-folders.ask")`. Folded folders are this Mac's
   - After editing a mod or `keys.json` in dots, run `touch -h` on its link in
     `~/.config/herdr-app` to reload it.
   - Change the layout with `herdr-app do layout.set`, which writes through the link.
+- **Tab, shift-tab and Escape:** the app takes them before a mod's `on_key_down` (Tab moves
+  the keyboard to the next tab stop, which can be an input behind a dialog; Escape closes the
+  top dialog). A mod that uses them binds its own with `cx.bind_keys` in a `key_context` of its
+  own and handles them with `on_action`, as the board does.
 - **Generated files:** Herdr adds `gpui-kit.d.ts` and `jsconfig.json` to mod folders.
   They're gitignored.
