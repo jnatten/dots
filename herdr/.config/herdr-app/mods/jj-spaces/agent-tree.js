@@ -6,7 +6,7 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { agents, terminals, spaces, focused, run, setAgentOrder, shared, setShared } from "herdr";
-import { activity, clean, describe, duration, icon, menu, pref as agentPref, since, statusMark, subRow, subTree, telling, trackChanges, treeLines } from "./agent-parts.js";
+import { activity, clean, describe, duration, icon, machineIcon, menu, pref as agentPref, since, statusMark, subRow, subTree, telling, trackChanges, treeLines } from "./agent-parts.js";
 
 // What every space's agents are drawn from, read once per render.
 export function treeContext() {
@@ -67,7 +67,7 @@ function agentRow(view, a, line, subs, t, ctx, pl) {
   const when = since(a);
   const act = activity(t, a, term?.labels);
   const folded = view.agentFolded.has(a.address);
-  const machine = a.address.includes("/") ? a.address.split("/")[0] : null;
+  const machine = agentPref("machine") === "name" && a.address.includes("/") ? a.address.split("/")[0] : null;
   const pic = agentPref("icon") === "hidden" ? null : icon(a.program, 14, t.foreground);
   const toggle = (_e, cx) => {
     cx.stop_propagation();
@@ -101,6 +101,7 @@ function agentRow(view, a, line, subs, t, ctx, pl) {
     .when(Boolean(pic), (el) => el.child(h_flex().id(`tree-icon-${a.address}`).flex_none().h(20).mr(8).items_center().when(Boolean(under), (el) => el.self_start())
       .when(subs.length > 0, (el) => el.on_click(toggle))
       .child(pic)))
+    .when(agentPref("machine") === "icon", (el) => el.child(machineIcon(t, a.address).mr(8).when(Boolean(under), (el) => el.self_start())))
     .child(v_flex().flex_1().min_w(0)
       .child(head)
       .when(Boolean(under), (el) => el.child(div().h(16).truncate().text_size(11.5).text_color(t.dim).child(under))));

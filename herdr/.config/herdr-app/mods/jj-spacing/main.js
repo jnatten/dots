@@ -8,9 +8,10 @@
 // Its Board tab picks the board's (ctrl-a T) repos and Trello boards (board-tab.js).
 // Its Sidebar tab picks whether space rows (jj-spaces) show their icon and branch and whether
 // their agents go under them as a tree instead of in a list of their own, kept as
-// shared("jj-spaces"), and whether the agents list (jj-agents) shows each agent's icon and
-// what it says of it: its own title or nothing, and under it its space and tab, its latest
-// update or nothing, kept as shared("jj-agents").
+// shared("jj-spaces"), and whether the agents list (jj-agents) shows each agent's icon,
+// its machine (by name, by an icon before it, or not at all) and what it says of it: its own
+// title or nothing, and under it its space and tab, its latest update or nothing, kept as
+// shared("jj-agents").
 // What isn't in the layout is saved in jj-settings.json by jj-limits.
 
 import { View, div, svg } from "gpui-kit";
@@ -45,13 +46,14 @@ const FIELDS = [
 const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
 
 // jj-spaces' and jj-agents' PREF_DEFAULTS.
-const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden", agents: "list" }, "jj-agents": { icon: "shown", description: "title", line: "space" } };
+const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden", agents: "list" }, "jj-agents": { icon: "shown", description: "title", line: "space", machine: "name" } };
 const SHOWN = [["shown", "Shown"], ["hidden", "Hidden"]];
 const SIDEBAR_ROWS = [
   { store: "jj-spaces", key: "icon", label: "Icon", options: SHOWN },
   { store: "jj-spaces", key: "branch", label: "Branch", options: SHOWN },
   { store: "jj-spaces", key: "agents", label: "Agents", options: [["list", "Own list"], ["tree", "Under their space"]] },
   { store: "jj-agents", key: "icon", label: "Icon", options: SHOWN },
+  { store: "jj-agents", key: "machine", label: "Machine", options: [["name", "Name"], ["icon", "Icon"], ["off", "Off"]] },
   { store: "jj-agents", key: "description", label: "Description", options: [["title", "Agent's title"], ["off", "Off"]] },
   { store: "jj-agents", key: "line", label: "Second line", options: [["space", "Space \u00b7 tab"], ["update", "Latest update"], ["off", "Off"]] },
 ];

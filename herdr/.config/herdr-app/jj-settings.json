@@ -15,11 +15,12 @@
     "position": "top"
   },
   "jj-agents": {
-    "icon": "hidden"
+    "icon": "hidden",
+    "machine": "icon"
   },
   "jj-spaces": {
-    "icon": "hidden",
-    "agents": "tree"
+    "agents": "tree",
+    "icon": "hidden"
   },
   "jj-board": {
     "repos": [

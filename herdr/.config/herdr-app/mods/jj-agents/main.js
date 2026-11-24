@@ -13,7 +13,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { agents, terminals, panes, focused, spaces, run, hc, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, exec, settings } from "herdr";
-import { DESC, MODE, RANK, activity, clean, describe, duration, icon, kidStatus, menu, modeOf, pref, since, statusMark, subRow, subTree, telling, trackChanges } from "./parts.js";
+import { DESC, MODE, RANK, activity, clean, describe, duration, icon, kidStatus, machineIcon, menu, modeOf, pref, since, statusMark, subRow, subTree, telling, trackChanges } from "./parts.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -442,8 +442,8 @@ export default class Agents extends View {
       const more = detail.get(a.address);
       const term = terms.get(a.address);
       const desc = describe(a, term?.labels);
-      // An agent on another machine (`vps/t7`) says which.
-      const machine = a.address.includes("/") ? a.address.split("/")[0] : null;
+      // An agent on another machine (`vps/t7`) says which, by name (the Machine pref's default) or by an icon.
+      const machine = pref("machine") === "name" && a.address.includes("/") ? a.address.split("/")[0] : null;
       if (collapsed) {
         return h_flex()
           .id(`ag-${a.address}`)
@@ -501,7 +501,8 @@ export default class Agents extends View {
             cx.stop_propagation();
             this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
             cx.notify();
-          })).child(pic)));
+          })).child(pic)))
+        .when(pref("machine") === "icon", el => el.child(machineIcon(t, a.address)));
       const ago = (el) => el.when(Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))));
       if (!under) {
         return ago(frame.h(30).items_center()

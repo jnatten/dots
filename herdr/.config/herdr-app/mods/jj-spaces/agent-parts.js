@@ -19,8 +19,15 @@ export function telling(l) {
 export const DESC = "jj.description";
 export const MODE = "jj.description.mode";
 // jj-spacing's Sidebar tab keeps what differs from these.
-export const PREF_DEFAULTS = { icon: "shown", description: "title", line: "space" };
+export const PREF_DEFAULTS = { icon: "shown", description: "title", line: "space", machine: "name" };
 export const pref = (key) => shared("jj-agents")?.[key] ?? PREF_DEFAULTS[key];
+
+// The Machine pref's "icon": a server for an agent on another machine, a monitor for this one's.
+export const machineIcon = (t, address) => {
+  const machine = address.includes("/") ? address.split("/")[0] : null;
+  return h_flex().id(`machine-${address}`).h(20).flex_none().items_center().text_color(t.dim).tooltip(machine ?? "This machine")
+    .child(svg(`mods/workspace-chrome/${machine ? "server" : "monitor"}.svg`).size(12));
+};
 
 export const modeOf = (labels) => (labels?.[DESC]?.trim() ? "custom" : (labels?.[MODE] || pref("description")) === "off" ? "off" : "title");
 
