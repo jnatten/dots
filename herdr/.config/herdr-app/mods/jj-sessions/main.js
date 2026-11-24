@@ -52,7 +52,7 @@ async function live() {
           if (!pid) return null;
           let s = await sessionOf(pid);
           for (const kid of s ? [] : (await exec("pgrep", ["-P", String(pid)])).stdout.split(/\s+/).filter(Boolean)) s ??= await sessionOf(kid);
-          return s ? described({ address: a.address, pane: a.pane, tab: a.tab, space: a.space, id: s.sessionId, cwd: s.cwd, raw: a.title || s.name || "Claude", status: a.status }) : null;
+          return s ? described({ address: a.address, pane: a.pane, tab: a.tab, space: a.space, id: s.sessionId, cwd: s.cwd, raw: a.title || s.name || "Claude", status: a.status, at: Math.floor((s.updatedAt ?? s.startedAt ?? 0) / 1000) }) : null;
         } catch {
           return null;
         }
@@ -145,6 +145,18 @@ export default class Sessions extends View {
   sections() {
     const f = this.text.trim().toLowerCase();
     const match = (s) => !f || `${s.title} ${s.desc ?? ""} ${s.own ?? ""} ${label(s.cwd)} ${s.cwd} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f);
+    // The title's exact, word-start or inner match, then the folder's, then any other field's; ties most recently updated first.
+    const score = (s) => {
+      if (!f) return 0;
+      const title = (s.title ?? "").toLowerCase();
+      const i = title.indexOf(f);
+      if (title === f) return 5;
+      if (i === 0 || (i > 0 && !/[\p{L}\p{N}]/u.test(title[i - 1]))) return 4;
+      if (i > 0) return 3;
+      if (label(s.cwd).toLowerCase().includes(f)) return 2;
+      return `${s.desc ?? ""} ${s.own ?? ""} ${s.cwd ?? ""} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f) ? 1 : 0;
+    };
+    const rank = (list) => list.map((s) => [score(s), s]).sort(([a, x], [b, y]) => b - a || (y.at ?? 0) - (x.at ?? 0)).map(([, s]) => s);
     const ps = panes();
     const colors = shared("space.colors") ?? {};
     const all = spaces().map((w) => ({
@@ -156,13 +168,13 @@ export default class Sessions extends View {
       meta: ["blocked", "done", "working"].includes(w.status) ? w.status : `${w.tabs.length} tab${w.tabs.length === 1 ? "" : "s"}`,
     }));
     const skip = new Set((this.open ?? []).map((s) => s.id));
-    const past = (this.history ?? []).filter((s) => !skip.has(s.id) && match(s));
+    const past = rank((this.history ?? []).filter((s) => !skip.has(s.id) && match(s)));
     // Spaces in Waiting (jj-spaces' shared("spaces.waiting")) and their open sessions
     // have a section of their own: each space, then its sessions.
     const parked = new Set(shared("spaces.waiting") ?? []);
     const open = (this.open ?? []).map(described);
     const waiting = all.filter((w) => parked.has(w.id)).flatMap((w) => {
-      const mine = open.filter((s) => s.space === w.id && match(s)).map((s) => ({ ...s, kind: "open" }));
+      const mine = rank(open.filter((s) => s.space === w.id && match(s))).map((s) => ({ ...s, kind: "open" }));
       return match(w) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
     });
     return [
@@ -171,10 +183,10 @@ export default class Sessions extends View {
         : URGENCY.map(([status, name]) => ({
             name,
             kind: "open",
-            list: open.filter((s) => !parked.has(s.space) && match(s) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status),
+            list: rank(open.filter((s) => !parked.has(s.space) && match(s) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status)),
             loading: false,
           }))),
-      { name: "Spaces", kind: "space", list: all.filter((w) => !parked.has(w.id) && match(w)), loading: false },
+      { name: "Spaces", kind: "space", list: rank(all.filter((w) => !parked.has(w.id) && match(w))), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.history === undefined },
     ];
