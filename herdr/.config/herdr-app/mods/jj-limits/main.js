@@ -1,11 +1,11 @@
-// The shown Claude session's model and effort on a small line above its context
-// (context.js; hover for its breakdown) and Claude Code's plan limits as pies at the
-// bottom of the sidebar, from what the herdr-status Claude Code mod writes
-// (claude/.claude/mods/herdr-status in dots), then the Spacing and Settings buttons. It also keeps the spacing dialog's settings in
+// The shown Claude session's context (context.js; hover for its breakdown) and
+// Claude Code's plan limits as pies at the bottom of the sidebar, from what the
+// herdr-status Claude Code mod writes (claude/.claude/mods/herdr-status in dots), then
+// the Spacing and Settings buttons. It also keeps the spacing dialog's settings in
 // jj-settings.json and what every window shows alike in jj-state.json (settings.js).
 
 import { View, div, svg, PathBuilder } from "gpui-kit";
-import { h_flex, v_flex, HoverCard } from "gpui-base";
+import { h_flex, HoverCard } from "gpui-base";
 import { theme, home, readTextFile, watchFolder, layout, run } from "herdr";
 import { syncSettings } from "./settings.js";
 import { contextPanel, measure, shownSession } from "./context.js";
@@ -87,7 +87,6 @@ export default class Limits extends View {
     const session = shownSession();
     const shown = WINDOWS.map(([key, short, long]) => ({ key, short, long, w: this.limits?.[key] })).filter((x) => x.w);
     const collapsed = narrow();
-    const model = session && [session.labels["claude.model"], session.labels["claude.effort"]].filter(Boolean).join(" · ");
     const button = (id, icon, tip, action) => div().id(id).flex_none().p(3).rounded(5).text_color(t.dim)
       .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip(tip)
       .on_click(action)
@@ -104,15 +103,17 @@ export default class Limits extends View {
         .when(!collapsed, (el) => el.child(div().text_color(s.context >= 60 ? fill : t.muted).child(`ctx ${Math.round(s.context)}%`)));
       return HoverCard.new("context-card").anchor("bottom_left").open_delay(200).trigger(trigger).content(contextPanel(t, s));
     };
-    const row = h_flex()
-      .w_full()
-      .h(25)
-      .flex_none()
+    return h_flex()
+      .size_full()
       .px(collapsed ? 0 : 12)
       .gap(collapsed ? 8 : 10)
       .items_center()
       .when(collapsed, (el) => el.justify_center())
+      .bg(t.chrome)
+      .border_t(1)
+      .border_color(t.border)
       .text_size(11.8)
+      .text_color(t.muted)
       .when(Boolean(session), (el) => el.child(context(session)))
       .children(
         shown.map(({ key, short, long, w }) => {
@@ -132,22 +133,5 @@ export default class Limits extends View {
         .child(button("spacing", "mods/jj-spacing/sliders.svg", "Spacing, hints, links and sidebar", () => run("mod.open", { name: "jj-spacing" })))
         .child(settings)))
       .when(collapsed, (el) => el.child(settings));
-    return v_flex()
-      .size_full()
-      .bg(t.chrome)
-      .border_t(1)
-      .border_color(t.border)
-      .text_color(t.muted)
-      .child(
-        h_flex()
-          .flex_1()
-          .min_h(0)
-          .px(12)
-          .items_end()
-          .text_size(10.5)
-          .text_color(t.dim)
-          .when(Boolean(model) && !collapsed, (el) => el.child(div().min_w(0).truncate().child(model))),
-      )
-      .child(row);
   }
 }
