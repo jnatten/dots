@@ -1,8 +1,11 @@
 // Hands Herdr what a status line would, without Claude Code drawing a status line row: the
 // plan's rate limits as ~/.cache/herdr-claude/limits.json, and this session's model, effort,
-// context use, id and folder as labels on its herdr-core terminal. Loaded in every session
-// through CLAUDE_CODE_PLUGIN_DIRS in settings.json.
+// context use, id and folder as labels on its herdr-core terminal. It also keeps the session's
+// title saying what the session is about (title.ts), until the person renames it themselves.
+// Loaded in every session through CLAUDE_CODE_PLUGIN_DIRS in settings.json.
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
+
+import { renamed, retitle } from './title'
 
 let interactive = false
 let context: SessionContextUsage | undefined
@@ -13,7 +16,8 @@ let labelled = ''
 
 function named(model: string) {
   const m = model.match(/^claude-([a-z]+)-(\d+(?:-\d+)?)(?:-\d{8})?(?:\[.*\])?$/)
-  return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2].replace('-', '.')}` : model
+  if (!m?.[1] || !m[2]) return model
+  return `${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2].replace('-', '.')}`
 }
 
 async function chosen($: EngineInterface, args: string) {
@@ -88,12 +92,23 @@ export const register: Register = on => {
 
   on('command.run', async ($, e, next) => {
     const ran = await next(e)
-    if (interactive && (e.command === 'effort' || e.command === 'model')) {
+    if (!interactive) return ran
+    if (e.command === 'rename') {
+      if (e.origin.kind === 'plugin' && e.origin.name === $.plugin.name) return { ...ran, text: undefined }
+      await renamed($)
+    }
+    if (e.command === 'effort' || e.command === 'model') {
       effort = await chosen($, e.command === 'effort' ? e.args : '')
       await sync($)
     }
     return ran
   }).catch(($, e, next) => next(e))
+
+  on('turn.complete', async ($, e, next) => {
+    const done = await next(e)
+    if (interactive && e.agentId === undefined && e.reason === 'answer') $.clock.after(0, () => retitle($))
+    return done
+  })
 
   on('turn.step', async function* ($, e, next) {
     const level = e.effort === undefined ? '' : String(e.effort)
