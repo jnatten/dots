@@ -16,6 +16,14 @@ function named(model: string) {
   return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2].replace('-', '.')}` : model
 }
 
+async function chosen($: EngineInterface, args: string) {
+  const level = args.trim().toLowerCase()
+  if (['low', 'medium', 'high', 'xhigh', 'max'].includes(level)) return level
+  const [settings, model] = await Promise.all([$.settings.read(), $.session.model()])
+  const models = (settings as { modelSettings?: Record<string, { effortLevel?: string }> }).modelSettings
+  return models?.[model.replace(/\[.*\]$/, '')]?.effortLevel ?? effort
+}
+
 async function sync($: EngineInterface) {
   const [home, cache, terminal, model, session, cwd] = await Promise.all([
     $.env.get('HOME'),
@@ -77,6 +85,15 @@ export const register: Register = on => {
     }
     return next(e)
   })
+
+  on('command.run', async ($, e, next) => {
+    const ran = await next(e)
+    if (interactive && (e.command === 'effort' || e.command === 'model')) {
+      effort = await chosen($, e.command === 'effort' ? e.args : '')
+      await sync($)
+    }
+    return ran
+  }).catch(($, e, next) => next(e))
 
   on('turn.step', async function* ($, e, next) {
     const level = e.effort === undefined ? '' : String(e.effort)
