@@ -1377,7 +1377,7 @@ export default class Spaces extends View {
       .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
   }
 
-  // A server icon names another machine's space. Dropped on a space of the same
+  // A server icon before the name names another machine's space, a monitor this one's. Dropped on a space of the same
   // machine, a space moves next to it (into its folder); on another machine's, into its folder.
   row(r, t) {
     const { w, i, g } = r;
@@ -1444,9 +1444,10 @@ export default class Spaces extends View {
           .gap(9)
           .items_center()
           .when(pref("icon") !== "hidden", (el) => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?")))
+          .child(div().id(`space-machine-${w.id}`).flex_none().flex().items_center().text_color(t.dim).tooltip(w.machine ?? "This machine")
+            .when(pref("icon") === "hidden", (el) => el.pl(3).mr(-3))
+            .child(svg(`mods/workspace-chrome/${w.machine ? "server" : "monitor"}.svg`).size(12)))
           .child(div().flex_shrink(1).min_w(48).when(pref("branch") !== "hidden", (el) => el.max_w(150)).truncate().text_color(t.foreground).child(w.name))
-          .when(Boolean(w.machine), (el) => el.child(div().id(`space-machine-${w.id}`).flex_none().text_color(t.dim).tooltip(w.machine)
-            .child(svg("mods/workspace-chrome/server.svg").size(11))))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
           .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id)))),
       );
