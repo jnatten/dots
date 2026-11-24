@@ -1,7 +1,8 @@
 // Hands Herdr what a status line would, without Claude Code drawing a status line row: the
 // plan's rate limits as ~/.cache/herdr-claude/limits.json, and this session's model, effort,
 // context use, id and folder as labels on its herdr-core terminal. It also keeps the session's
-// title saying what the session is about (title.ts), until the person renames it themselves.
+// title saying what the session is about (title.ts), until the person renames it themselves,
+// and shows the model and effort among the footer's mode labels, beside the permission mode.
 // Loaded in every session through CLAUDE_CODE_PLUGIN_DIRS in settings.json.
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
@@ -13,6 +14,7 @@ let limits: SessionRateLimit[] = []
 let effort = ''
 let written = ''
 let labelled = ''
+let footer = ''
 
 function named(model: string) {
   const m = model.match(/^claude-([a-z]+)-(\d+(?:-\d+)?)(?:-\d{8})?(?:\[.*\])?$/)
@@ -20,12 +22,11 @@ function named(model: string) {
   return `${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2].replace('-', '.')}`
 }
 
-async function chosen($: EngineInterface, args: string) {
-  const level = args.trim().toLowerCase()
-  if (['low', 'medium', 'high', 'xhigh', 'max'].includes(level)) return level
+// The effort saved as the model's default, until a request says what this session uses.
+async function saved($: EngineInterface) {
   const [settings, model] = await Promise.all([$.settings.read(), $.session.model()])
-  const models = (settings as { modelSettings?: Record<string, { effortLevel?: string }> }).modelSettings
-  return models?.[model.replace(/\[.*\]$/, '')]?.effortLevel ?? effort
+  const s = settings as { effortLevel?: string; modelSettings?: Record<string, { effortLevel?: string }> }
+  return s.modelSettings?.[model.replace(/\[.*\]$/, '')]?.effortLevel ?? s.effortLevel ?? ''
 }
 
 async function sync($: EngineInterface) {
@@ -37,6 +38,12 @@ async function sync($: EngineInterface) {
     $.session.id(),
     $.session.cwd(),
   ])
+
+  const label = [named(model), effort].filter(Boolean).join(' · ')
+  if (label !== footer) {
+    footer = label
+    $.ui.invalidate('ui.render')
+  }
 
   if (limits.length > 0) {
     const text = JSON.stringify(
@@ -76,6 +83,7 @@ export const register: Register = on => {
       const usage = await $.session.usage()
       context = usage.context
       limits = usage.rateLimits
+      effort = await saved($)
       await sync($)
     }
     return started
@@ -90,6 +98,8 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // /effort with a typed level shows at once. Its slider and /model's picker answer before a pick
+  // is made, and a session-only pick is in no setting: those show with the next request (turn.step).
   on('command.run', async ($, e, next) => {
     const ran = await next(e)
     if (!interactive) return ran
@@ -97,12 +107,17 @@ export const register: Register = on => {
       if (e.origin.kind === 'plugin' && e.origin.name === $.plugin.name) return { ...ran, text: undefined }
       await renamed($)
     }
-    if (e.command === 'effort' || e.command === 'model') {
-      effort = await chosen($, e.command === 'effort' ? e.args : '')
+    const level = e.command === 'effort' ? e.args.trim().toLowerCase() : ''
+    if (['low', 'medium', 'high', 'xhigh', 'max', 'auto'].includes(level)) {
+      effort = level === 'auto' ? '' : level
       await sync($)
     }
     return ran
   }).catch(($, e, next) => next(e))
+
+  on('ui.render', { component: 'SessionMode' }, ($, e, next) =>
+    interactive && footer ? next({ ...e, props: { ...e.props, modes: [...e.props.modes, footer] } }) : next(e),
+  )
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
