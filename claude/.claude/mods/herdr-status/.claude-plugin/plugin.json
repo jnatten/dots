@@ -1,0 +1,5 @@
+{
+  "name": "herdr-status",
+  "version": "0.1.0",
+  "description": "Hands Herdr the session's model, effort, context use and plan limits, in place of a status line"
+}

@@ -1,5 +1,5 @@
-// The shown Claude session's context, from the labels its status line sets on its
-// terminal (claude/.claude/hooks/statusline.sh in dots), and its breakdown by
+// The shown Claude session's context, from the labels the herdr-status Claude Code mod sets
+// on its terminal (claude/.claude/mods/herdr-status in dots), and its breakdown by
 // category from Claude's own /context, run on a throwaway fork of the session.
 
 import { div } from "gpui-kit";

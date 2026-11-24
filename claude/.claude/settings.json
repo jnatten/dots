@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/herdr-status"
+  },
   "model": "opus",
   "skillOverrides": {
     "code-review": "user-invocable-only"
@@ -114,10 +117,6 @@
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "\"$HOME/.claude/hooks/statusline.sh\""
   },
   "enabledPlugins": {
     "egm@egm": true
