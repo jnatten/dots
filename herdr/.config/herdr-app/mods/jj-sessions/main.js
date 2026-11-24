@@ -1,14 +1,15 @@
 // Claude Code sessions: the session search (the overlay, mod.open; spaces in Waiting and
-// their sessions in a section of their own; running ones by what they need and by their
-// description, as the agents list has them; ended ones in History) and the tasks list
+// their sessions in a section of their own; running ones on every machine by what they need
+// and by their description, as the agents list has them; ended ones on every machine in
+// History, ⌘↵ bringing one from another machine here) and the tasks list
 // ({ tasks: true }, or one task's sessions with { url }, tasks.js), and moving a session to
 // another machine ({ move: terminalAddress }, move.js), and starting a review in a space of its
 // own ({ review: true, folder, machine }, review.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
-import { agents, terminals, spaces, panes, theme, shared, setShared, props, run, exec, hc, home, appHome, readTextFile, closeOverlay } from "herdr";
-import { base, ago, worktree, label, place, missing, resume } from "./sessions.js";
+import { agents, terminals, spaces, panes, machines, theme, shared, setShared, props, run, exec, hc, home, appHome, readTextFile, closeOverlay } from "herdr";
+import { base, ago, worktree, label, place, missing, resume, bring } from "./sessions.js";
 import { taskInit, taskRender } from "./tasks.js";
 import { moveInit, moveRender } from "./move.js";
 import { reviewInit, reviewRender } from "./review.js";
@@ -20,10 +21,14 @@ const URGENCY = [["blocked", "Needs you"], ["done", "Done"], ["working", "Workin
 // Space avatar colors, as the jj-spaces sidebar draws them.
 const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
 
-const claude = (a) => !a.address.includes("/") && (a.app === "claude-code" || a.program?.key === "claude");
+const claude = (a) => a.app === "claude-code" || a.program?.key === "claude";
+const machineOf = (address) => (address.includes("/") ? address.split("/")[0] : null);
 
-async function sessionOf(pid) {
-  const s = JSON.parse((await readTextFile(`${home()}/.claude/sessions/${pid}.json`).catch(() => null)) ?? "null");
+async function sessionOf(pid, on) {
+  const text = on
+    ? (await exec("sh", ["-c", 'cat "$HOME/.claude/sessions/$1.json" 2>/dev/null', "sh", String(pid)], { on }).catch(() => null))?.stdout
+    : await readTextFile(`${home()}/.claude/sessions/${pid}.json`).catch(() => null);
+  const s = JSON.parse(text || "null");
   return s?.sessionId ? s : null;
 }
 
@@ -40,19 +45,22 @@ function described(s) {
   return { ...s, desc, own, title: desc || own || s.raw, status: a?.status ?? s.status };
 }
 
-// The Claude sessions running here: ~/.claude/sessions/<pid>.json describes
-// the terminal's foreground process, or its child when a shell launched it.
+// The Claude sessions running on every machine: ~/.claude/sessions/<pid>.json there describes
+// the terminal's foreground process, or its child when a shell launched it; else the
+// terminal's claude.session and claude.cwd labels (the herdr-status mod's) do.
 async function live() {
   const found = await Promise.all(
     agents()
       .filter(claude)
       .map(async (a) => {
+        const on = machineOf(a.address);
+        const labels = terminals().find((t) => t.address === a.address)?.labels ?? {};
         try {
           const pid = JSON.parse((await hc(["get", a.address, "--json"])).stdout).foreground?.pid;
-          if (!pid) return null;
-          let s = await sessionOf(pid);
-          for (const kid of s ? [] : (await exec("pgrep", ["-P", String(pid)])).stdout.split(/\s+/).filter(Boolean)) s ??= await sessionOf(kid);
-          return s ? described({ address: a.address, pane: a.pane, tab: a.tab, space: a.space, id: s.sessionId, cwd: s.cwd, raw: a.title || s.name || "Claude", status: a.status, at: Math.floor((s.updatedAt ?? s.startedAt ?? 0) / 1000) }) : null;
+          let s = pid ? await sessionOf(pid, on) : null;
+          for (const kid of s || !pid ? [] : (await exec("pgrep", ["-P", String(pid)], { on })).stdout.split(/\s+/).filter(Boolean)) s ??= await sessionOf(kid, on);
+          const id = s?.sessionId ?? labels["claude.session"];
+          return id ? described({ address: a.address, pane: a.pane, tab: a.tab, space: a.space, machine: on, id, cwd: s?.cwd ?? labels["claude.cwd"] ?? "", raw: a.title || s?.name || "Claude", status: a.status, at: Math.floor((s?.updatedAt ?? s?.startedAt ?? 0) / 1000) }) : null;
         } catch {
           return null;
         }
@@ -64,9 +72,13 @@ async function live() {
 let node = null;
 const nodejs = async () => (node ??= (await exec("sh", ["-lc", "command -v node"])).stdout.trim() || "node");
 
-async function history() {
-  const r = await exec(await nodejs(), [`${appHome()}/mods/jj-sessions/scan.mjs`], { timeout: 60000 });
-  return r.code === 0 ? JSON.parse(r.stdout) : [];
+// The ended sessions on machine `on` (null: this computer), scan.mjs run there.
+async function history(on) {
+  const scan = `${appHome()}/mods/jj-sessions/scan.mjs`;
+  const r = on
+    ? await exec("sh", ["-lc", 'exec node --input-type=module -e "$1"', "sh", await readTextFile(scan)], { on, timeout: 60000 })
+    : await exec(await nodejs(), [scan], { timeout: 60000 });
+  return r.code === 0 ? JSON.parse(r.stdout).map((s) => ({ ...s, machine: on })) : [];
 }
 
 export default class Sessions extends View {
@@ -92,14 +104,15 @@ export default class Sessions extends View {
     if (this.mode === "tasks" && props()?.parent) setShared("board.focus", Date.now());
   }
 
-  // Resumes a session, its folder made again or (here) its repo used when it's gone.
-  start(s, here, cx, done) {
+  // Resumes a session where it ran, or (bringIt) one from another machine here, its folder
+  // made again or (here) its repo used when it's gone.
+  start(s, here, cx, done, bringIt = false) {
     if (this.busy) return;
     this.busy = s.id;
     this.error = "";
     cx.notify();
     cx.spawn(async (cx) => {
-      this.error = await resume(s, here);
+      this.error = await (bringIt && s.machine ? bring(s, here) : resume(s, here)).catch((e) => String(e?.message ?? e));
       this.busy = null;
       if (!this.error) done?.();
       cx.notify();
@@ -110,6 +123,10 @@ export default class Sessions extends View {
   goneHint(s, enter, shift) {
     const w = worktree(s.cwd);
     return w ? `${enter} recreate workspace · ${shift} resume in ${base(w.repo)}` : `${enter} resume in a parent folder`;
+  }
+
+  goneOf(s) {
+    return this.gone[`${s.machine ?? ""}\0${s.cwd}`];
   }
 
   initSearch(cx) {
@@ -127,19 +144,26 @@ export default class Sessions extends View {
       this.error = "";
       cx.notify();
     });
-    this.input.on("submit", (e, cx) => this.go(this.items()[this.at], cx, Boolean(e?.shift)));
+    this.input.on("submit", (e, cx) => this.go(this.items()[this.at], cx, Boolean(e?.shift), Boolean(e?.secondary)));
     this.input.focus();
     cx.spawn(async (cx) => {
       this.open = await live();
       cx.notify();
     });
-    cx.spawn(async (cx) => {
-      this.history = await history().catch(() => []);
-      cx.notify();
-      const gone = await missing([...new Set(this.history.map((s) => s.cwd).filter(Boolean))]).catch(() => new Set());
-      this.gone = Object.fromEntries([...gone].map((c) => [c, true]));
-      cx.notify();
-    });
+    const where = [null, ...machines().filter((m) => m.name && m.layout !== "unavailable").map((m) => m.name)];
+    this.history = [];
+    this.scanning = where.length;
+    for (const on of where) {
+      cx.spawn(async (cx) => {
+        const found = await history(on).catch(() => []);
+        this.history = [...this.history, ...found];
+        this.scanning--;
+        cx.notify();
+        const gone = await missing([...new Set(found.map((s) => s.cwd).filter(Boolean))], on).catch(() => new Set());
+        for (const c of gone) this.gone[`${on ?? ""}\0${c}`] = true;
+        cx.notify();
+      });
+    }
   }
 
   sections() {
@@ -167,8 +191,11 @@ export default class Sessions extends View {
       color: colors[w.id] ?? "ansi6",
       meta: ["blocked", "done", "working"].includes(w.status) ? w.status : `${w.tabs.length} tab${w.tabs.length === 1 ? "" : "s"}`,
     }));
+    // A session on more than one machine (moved) is the one there most recently updated.
     const skip = new Set((this.open ?? []).map((s) => s.id));
-    const past = rank((this.history ?? []).filter((s) => !skip.has(s.id) && match(s)));
+    const newest = new Map();
+    for (const s of this.history) if (!skip.has(s.id) && !(newest.get(s.id)?.at >= s.at)) newest.set(s.id, s);
+    const past = rank([...newest.values()].filter(match));
     // Spaces in Waiting (jj-spaces' shared("spaces.waiting")) and their open sessions
     // have a section of their own: each space, then its sessions.
     const parked = new Set(shared("spaces.waiting") ?? []);
@@ -188,7 +215,7 @@ export default class Sessions extends View {
           }))),
       { name: "Spaces", kind: "space", list: rank(all.filter((w) => !parked.has(w.id) && match(w))), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
-      { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.history === undefined },
+      { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.scanning > 0 },
     ];
   }
 
@@ -196,13 +223,13 @@ export default class Sessions extends View {
     return this.sections().flatMap(({ kind, list }) => list.map((s) => ({ kind: kind === "waiting" ? s.kind : kind, s })));
   }
 
-  go(it, cx, here = false) {
+  go(it, cx, here = false, bringIt = false) {
     if (!it) return;
     if (it.kind === "open" || it.kind === "space") {
       this.hide();
       return it.kind === "open" ? run("pane.focus", { pane: it.s.pane }) : run("space.select", { id: it.s.id });
     }
-    this.start(it.s, here, cx, () => this.hide());
+    this.start(it.s, here, cx, () => this.hide(), bringIt);
   }
 
   render() {
@@ -237,12 +264,12 @@ export default class Sessions extends View {
         .cursor_pointer()
         .when(on, (el) => el.bg(t.selected))
         .when(!on, (el) => el.hover((st) => st.bg(t.hover)))
-        .on_click((e, cx) => this.go({ kind, s }, cx, e.modifiers.shift))
+        .on_click((e, cx) => this.go({ kind, s }, cx, e.modifiers.shift, e.modifiers.platform))
         .child(h_flex().w(14).flex_none().justify_center().child(icon))
         .child(h_flex().flex_1().min_w(0).gap(6).items_center()
           .child(div().min_w(0).truncate().text_color(t.foreground).child(s.title))
           .when(kind === "open" && Boolean(s.desc && s.own && s.own !== s.desc), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.own))))
-        .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.gone[s.cwd] && kind !== "open" ? " · gone" : ""}`))
+        .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.goneOf(s) && kind !== "open" ? " · gone" : ""}`))
         .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : ago(s.at)));
     };
     const children = [];
@@ -258,7 +285,8 @@ export default class Sessions extends View {
     }
     const empty = items.length === 0 && !sections.some((s) => s.loading);
     const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
-    const resuming = selected && this.gone[selected.s.cwd] ? this.goneHint(selected.s, "↵", "⇧↵") : "↵ resume";
+    const past = selected?.s;
+    const resuming = past && [this.goneOf(past) ? this.goneHint(past, "↵", "⇧↵") : `↵ resume${past.machine ? ` on ${past.machine}` : ""}`, past.machine && "⌘↵ bring here"].filter(Boolean).join(" · ");
     const hint = this.busy ? "resuming…" : ({ open: "↵ go to", space: "↵ go to", history: resuming }[selected?.kind] ?? "");
     return v_flex()
       .id("sessions")
