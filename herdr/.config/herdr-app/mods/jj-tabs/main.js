@@ -65,9 +65,14 @@ export default class Tabs extends View {
     this.scroll = ScrollHandle.new();
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
     // Pane keys (keys.json "jj-tabs.<command>") act on the focused terminal through jj-panes and jj-copy.
-    cx.spawn(async () => {
+    cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
+        const go = command.match(/^go-(left|right|up|down)$/);
+        if (go) {
+          await this.goOrHop(go[1], cx);
+          continue;
+        }
         if (/^(space|agent)-(next|prev)$/.test(command)) {
           navigate(command);
           continue;
@@ -106,6 +111,22 @@ export default class Tabs extends View {
         else if (command === "capture" || command === "capture-colors") openOverlay({ mod: "jj-copy", kind: "window", frame: "none", width: 1, height: 1, at: { x: 0, y: 0 }, props: { action: "nvim", terminal, cwd: focused()?.cwd, colors: command === "capture-colors" } });
       }
     });
+  }
+
+  // opt+h/j/k/l: the pane that way, or at the window's edge the Herdr window beside this
+  // one (window-go.sh, in the main app home). A key held through a hop doesn't start another.
+  async goOrHop(direction, cx) {
+    if (this.hopping) return;
+    const before = focused()?.pane;
+    run("pane.go", { direction });
+    await cx.sleep(30);
+    if (!before || focused()?.pane !== before) return;
+    this.hopping = true;
+    const failed = (body) => notify({ title: "Couldn't move to the window there", body, level: "error" });
+    exec("sh", [`${home()}/.config/herdr-app/window-go.sh`, direction])
+      .then((r) => r.code === 0 || failed((r.stderr || r.stdout).trim()))
+      .catch((e) => failed(String(e?.message ?? e)))
+      .finally(() => { this.hopping = false; });
   }
 
   // The side panel is remembered per space: switching shows that space's choice

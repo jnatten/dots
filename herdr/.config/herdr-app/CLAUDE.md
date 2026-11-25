@@ -26,6 +26,11 @@ Mac's state the windows share (space colors, folded folders), not in dots.
 `HERDR_APP_HOME=~/.config/herdr-app-2 herdr-app status` (or `do`, `ls`, `shot`) asks
 that window.
 
+opt+h/j/k/l (`jj-tabs.go-*`) cross between those windows: where `pane.go` finds no pane
+further that way, `window-go.sh` (in the main home) asks macOS for the on-screen Herdr
+window on that side, brings it to the front through System Events (macOS asks Herdr for
+that once) and walks its focus to the pane nearest the edge it came in by.
+
 Links added by hand in the link dialog (ctrl-a g for the focused agent, ctrl-a G for
 the space) and the Waiting mark (ctrl-a H) aren't in any file: they live in the
 `jj-links` herdr-core document on the machine each space and agent is on
