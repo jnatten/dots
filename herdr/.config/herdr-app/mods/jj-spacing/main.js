@@ -1,5 +1,5 @@
-// Spacing dialog: the gap between panes (and around them), the terminals' padding
-// and the panes' title bars, written into the shown layout with layout.set as they change.
+// Spacing dialog: the gap between panes (and around them), the panes' corner radius, the
+// terminals' padding and the panes' title bars, written into the shown layout with layout.set as they change.
 // ↑/↓ pick a row, ←/→ or the buttons change it. Its Hints tab picks what hint
 // mode (ctrl-a f, jj-copy/patterns.json) highlights, kept as shared("jj-copy.hints").
 // Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
@@ -19,9 +19,10 @@ import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { layout, run, theme, props, closeOverlay, appHome, readTextFile, shared, setShared } from "herdr";
 import { boardTab, boardTabInit, boardKey } from "./board-tab.js";
 
-const DEFAULT = { gap: 6, padX: 14, padY: 12 };
+const DEFAULT = { gap: 6, radius: 8, padX: 14, padY: 12 };
 const ROWS = [
   { key: "gap", label: "Pane gap", max: 16 },
+  { key: "radius", label: "Pane corner radius", max: 24 },
   { key: "padX", label: "Terminal padding, sides", max: 32 },
   { key: "padY", label: "Terminal padding, top and bottom", max: 32 },
 ];
@@ -106,7 +107,7 @@ function current() {
   const root = layout();
   const [padX, padY] = root?.terminal_padding ?? [DEFAULT.padX, DEFAULT.padY];
   const header = frameOf(root)?.header;
-  return { gap: frameOf(root)?.gap ?? DEFAULT.gap, padX, padY, bars: !header ? "none" : header.reveal === "hover" ? "hover" : "always" };
+  return { gap: frameOf(root)?.gap ?? DEFAULT.gap, radius: frameOf(root)?.radius ?? DEFAULT.radius, padX, padY, bars: !header ? "none" : header.reveal === "hover" ? "hover" : "always" };
 }
 
 function edit(change) {
@@ -120,7 +121,7 @@ function spacing(root, values) {
   const area = areaOf(root);
   if (frame) {
     frame.gap = values.gap;
-    frame.radius = values.gap > 0 ? 8 : 0;
+    frame.radius = values.radius;
   }
   if (area) {
     area.padding = values.gap;

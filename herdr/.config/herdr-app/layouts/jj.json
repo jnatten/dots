@@ -91,7 +91,7 @@
                     "width": 1,
                     "color": "accent"
                   },
-                  "radius": 0,
+                  "radius": 18,
                   "gap": 0,
                   "lone": true
                 }
