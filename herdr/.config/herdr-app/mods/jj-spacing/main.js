@@ -44,6 +44,9 @@ const FIELDS = [
   { key: "token", label: "Trello token" },
 ];
 const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
+// Tab and shift-tab: its own bindings, ahead of the app's (which moves the keyboard to the next
+// tab stop, such as a Links field, before on_key_down sees it).
+let bound = false;
 
 // jj-spaces' and jj-agents' PREF_DEFAULTS.
 const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden", agents: "list" }, "jj-agents": { icon: "shown", description: "title", line: "space", machine: "name" } };
@@ -155,6 +158,15 @@ export default class Spacing extends View {
     this.patterns = null;
     this.handle = cx.focus_handle();
     this.handle.focus();
+    if (!bound) {
+      try {
+        cx.bind_keys([
+          { keystroke: "tab", action: "jj_spacing_next", context: "JjSpacing" },
+          { keystroke: "shift-tab", action: "jj_spacing_prev", context: "JjSpacing" },
+        ]);
+        bound = true;
+      } catch {}
+    }
     // Saved on ↵ or leaving the field: each save may have the sidebar ask 1Password.
     this.editing = null;
     this.fields = {};
@@ -194,9 +206,17 @@ export default class Spacing extends View {
     localStorage.setItem("tab", tab);
   }
 
+  // In a Links field, to the next or previous one, past the ends (or out of the Board tab's)
+  // back to the dialog; otherwise to the next or previous tab.
+  tabKey(by) {
+    if (!this.editing) return this.show(TABS[(TABS.findIndex(([id]) => id === this.tab) + by + TABS.length) % TABS.length][0]);
+    const at = FIELDS.findIndex((f) => f.key === this.editing);
+    const next = at >= 0 && FIELDS[at + by];
+    (next ? this.fields[next.key] : this.handle).focus();
+  }
+
   key(e) {
     if (this.editing) return false;
-    if (e.key === "tab") return this.show(TABS[(TABS.findIndex(([id]) => id === this.tab) + 1) % TABS.length][0]), true;
     const up = e.key === "up" || e.key === "k";
     const down = e.key === "down" || e.key === "j";
     const step = e.key === "left" || e.key === "h" || e.key === "-" ? -1 : e.key === "right" || e.key === "l" || e.key === "+" || e.key === "=" ? 1 : 0;
@@ -360,7 +380,7 @@ export default class Spacing extends View {
         for (const f of FIELDS) this.fields[f.key].set_value(LINK_DEFAULTS[f.key]);
       } : null,
       resetLabel: "Reset to defaults",
-      hint: this.editing ? "↵ save · esc close" : "↑↓ choose · space toggle · tab board · esc close",
+      hint: this.editing ? "tab next field · ↵ save · esc close" : "↑↓ choose · space toggle · tab board · esc close",
     };
   }
 
@@ -400,6 +420,9 @@ export default class Spacing extends View {
       .child(label);
     return v_flex()
       .id("spacing")
+      .key_context("JjSpacing")
+      .on_action("jj_spacing_next", (_e, cx) => { this.tabKey(1); cx.notify(); })
+      .on_action("jj_spacing_prev", (_e, cx) => { this.tabKey(-1); cx.notify(); })
       .track_focus(this.handle)
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);

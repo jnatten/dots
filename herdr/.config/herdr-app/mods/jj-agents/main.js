@@ -53,6 +53,9 @@ function title(tab, l) {
 }
 
 const MODES = [["title", "Agent's title"], ["custom", "Custom"], ["off", "None"]];
+// The describe dialog's tab and shift-tab: its own bindings, ahead of the app's (which moves the
+// keyboard to the next tab stop, maybe one behind the dialog, before on_key_down sees it).
+let bound = false;
 
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
@@ -269,6 +272,14 @@ export default class Agents extends View {
     this.handle = cx.focus_handle();
     this.handle.focus();
     this.input.focus();
+    if (bound) return;
+    try {
+      cx.bind_keys([
+        { keystroke: "tab", action: "jj_describe_next", context: "JjDescribe" },
+        { keystroke: "shift-tab", action: "jj_describe_prev", context: "JjDescribe" },
+      ]);
+      bound = true;
+    } catch {}
   }
 
   // Only what the default doesn't already give is kept: custom words, or a mode unlike it.
@@ -291,8 +302,9 @@ export default class Agents extends View {
     const where = a ? [a.space_name, tab?.named ? tab.name : null].filter(Boolean).join(" · ") : "This agent is gone";
     const pick = (mode) => {
       this.mode = mode;
-      if (mode === "custom") this.input.focus();
+      this.input.focus();
     };
+    const cycle = (by) => pick(MODES[(MODES.findIndex(([m]) => m === this.mode) + by + MODES.length) % MODES.length][0]);
     const choice = ([mode, label]) => div().id(`mode-${mode}`).px(8).py(3).rounded(5).cursor_pointer()
       .text_color(this.mode === mode ? t.foreground : t.muted)
       .when(this.mode === mode, (el) => el.bg(t.hover))
@@ -301,13 +313,12 @@ export default class Agents extends View {
       .child(label);
     return v_flex()
       .id("describe")
+      .key_context("JjDescribe")
+      .on_action("jj_describe_next", (_e, cx) => { cycle(1); cx.notify(); })
+      .on_action("jj_describe_prev", (_e, cx) => { cycle(-1); cx.notify(); })
       .track_focus(this.handle)
-      .on_key_down((e, cx) => {
-        if (e.key === "escape") return closeOverlay(props().overlay);
-        if (e.key !== "tab") return;
-        pick(MODES[(MODES.findIndex(([m]) => m === this.mode) + 1) % MODES.length][0]);
-        cx.stop_propagation();
-        cx.notify();
+      .on_key_down((e) => {
+        if (e.key === "escape") closeOverlay(props().overlay);
       })
       .size_full()
       .p(16)
