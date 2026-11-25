@@ -17,7 +17,7 @@ import { ago, base, bring, label, missing, resume, startNew, worktree } from "./
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
 // jj-spaces/github.js's: GitHub's colors, [light, dark], and Trello's blue.
 const GREEN = ["#1a7f37", "#3fb950"], PURPLE = ["#8250df", "#a371f7"], GRAY = ["#59636e", "#9198a1"], BLUE = ["#0c66e4", "#579dff"];
-const GH = {
+export const GH = {
   open: { icon: "mods/jj-spaces/git-pull-request.svg", color: GREEN, label: "Open" },
   draft: { icon: "mods/jj-spaces/git-pull-request-draft.svg", color: GRAY, label: "Draft" },
   queued: { icon: "mods/jj-spaces/git-pull-request.svg", color: ["#9a6700", "#d29922"], label: "Merge queued" },

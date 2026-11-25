@@ -4,15 +4,18 @@
 // History, ⌘↵ bringing one from another machine here) and the tasks list
 // ({ tasks: true }, or one task's sessions with { url }, tasks.js), and moving a session to
 // another machine ({ move: terminalAddress }, move.js), and starting a review in a space of its
-// own ({ review: true, folder, machine }, review.js).
+// own ({ review: true, folder, machine }, review.js). The search also finds a session by its
+// branches, PRs and issues (scan.mjs', and its links in shared("tasks.sessions")), and ⌃space
+// previews one ({ peek }, peek.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
-import { agents, terminals, spaces, panes, machines, theme, shared, setShared, props, run, exec, hc, home, appHome, readTextFile, closeOverlay } from "herdr";
-import { base, ago, worktree, label, place, missing, resume, bring } from "./sessions.js";
+import { agents, terminals, spaces, panes, machines, theme, shared, setShared, props, run, exec, hc, home, readTextFile, closeOverlay, openOverlay } from "herdr";
+import { base, ago, worktree, label, place, missing, resume, bring, facts, script } from "./sessions.js";
 import { taskInit, taskRender } from "./tasks.js";
 import { moveInit, moveRender } from "./move.js";
 import { reviewInit, reviewRender } from "./review.js";
+import { peekInit, peekRender } from "./peek.js";
 
 const LIST = 440;
 const ICON = (name) => `mods/workspace-chrome/${name}.svg`;
@@ -69,25 +72,20 @@ async function live() {
   return found.filter(Boolean);
 }
 
-let node = null;
-const nodejs = async () => (node ??= (await exec("sh", ["-lc", "command -v node"])).stdout.trim() || "node");
-
 // The ended sessions on machine `on` (null: this computer), scan.mjs run there.
 async function history(on) {
-  const scan = `${appHome()}/mods/jj-sessions/scan.mjs`;
-  const r = on
-    ? await exec("sh", ["-lc", 'exec node --input-type=module -e "$1"', "sh", await readTextFile(scan)], { on, timeout: 60000 })
-    : await exec(await nodejs(), [scan], { timeout: 60000 });
+  const r = await script("scan.mjs", [], on);
   return r.code === 0 ? JSON.parse(r.stdout).map((s) => ({ ...s, machine: on })) : [];
 }
 
 export default class Sessions extends View {
   init(_props, cx) {
     const p = props() ?? {};
-    this.mode = p.tasks ? "tasks" : p.move ? "move" : p.review ? "review" : "search";
+    this.mode = p.peek ? "peek" : p.tasks ? "tasks" : p.move ? "move" : p.review ? "review" : "search";
     this.error = "";
     this.handle = cx.focus_handle();
     this.handle.focus();
+    if (this.mode === "peek") return peekInit(this, cx);
     if (this.mode === "tasks") return taskInit(this, cx);
     if (this.mode === "move") return moveInit(this, cx);
     if (this.mode === "review") return reviewInit(this, cx);
@@ -99,6 +97,8 @@ export default class Sessions extends View {
   }
 
   close() {
+    // The search it was opened over takes the keyboard back.
+    if (this.mode === "peek") setShared("preview.closed", Date.now());
     if (this.mode === "tasks" && !props()?.url && shared("tasks.open") === props()?.overlay) setShared("tasks.open", null);
     // The board it was opened over takes the keyboard back.
     if (this.mode === "tasks" && props()?.parent) setShared("board.focus", Date.now());
@@ -146,6 +146,12 @@ export default class Sessions extends View {
     });
     this.input.on("submit", (e, cx) => this.go(this.items()[this.at], cx, Boolean(e?.shift), Boolean(e?.secondary)));
     this.input.focus();
+    this.previewed = shared("preview.closed");
+    cx.timer.every(150, () => {
+      if (shared("preview.closed") === this.previewed) return;
+      this.previewed = shared("preview.closed");
+      this.input.focus();
+    });
     cx.spawn(async (cx) => {
       this.open = await live();
       cx.notify();
@@ -168,17 +174,32 @@ export default class Sessions extends View {
 
   sections() {
     const f = this.text.trim().toLowerCase();
-    const match = (s) => !f || `${s.title} ${s.desc ?? ""} ${s.own ?? ""} ${label(s.cwd)} ${s.cwd} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f);
-    // The title's exact, word-start or inner match, then the folder's, then any other field's; ties most recently updated first.
+    const words = f.split(/\s+/).filter(Boolean);
+    const items = shared("github")?.items ?? {};
+    const tasks = shared("tasks.sessions") ?? {};
+    // Every word is in one of its fields; a session also gets `hit`, the branch, PR or issue
+    // that has a word its title and folder don't, shown beside its title.
+    const look = (s, session = true) => {
+      if (!words.length) return s;
+      const plain = `${s.title} ${s.desc ?? ""} ${s.own ?? ""} ${label(s.cwd)} ${s.cwd} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase();
+      const more = session ? facts(s, items, tasks) : [];
+      const all = `${plain} ${more.map((m) => m.search).join(" ")}`;
+      if (!words.every((w) => all.includes(w))) return null;
+      const hit = more.find((m) => words.some((w) => !plain.includes(w) && m.search.includes(w)));
+      return hit ? { ...s, hit } : s;
+    };
+    const pick = (list, session = true) => list.map((s) => look(s, session)).filter(Boolean);
+    // The title's exact, word-start or inner match, then the folder's or a branch's, PR's or
+    // issue's, then any other field's; ties most recently updated first.
     const score = (s) => {
       if (!f) return 0;
       const title = (s.title ?? "").toLowerCase();
       const i = title.indexOf(f);
       if (title === f) return 5;
       if (i === 0 || (i > 0 && !/[\p{L}\p{N}]/u.test(title[i - 1]))) return 4;
-      if (i > 0) return 3;
-      if (label(s.cwd).toLowerCase().includes(f)) return 2;
-      return `${s.desc ?? ""} ${s.own ?? ""} ${s.cwd ?? ""} ${s.machine ?? ""} ${s.prompt ?? ""}`.toLowerCase().includes(f) ? 1 : 0;
+      if (i > 0 || words.every((w) => title.includes(w))) return 3;
+      if (label(s.cwd).toLowerCase().includes(f) || s.hit) return 2;
+      return 1;
     };
     const rank = (list) => list.map((s) => [score(s), s]).sort(([a, x], [b, y]) => b - a || (y.at ?? 0) - (x.at ?? 0)).map(([, s]) => s);
     const ps = panes();
@@ -192,17 +213,21 @@ export default class Sessions extends View {
       meta: ["blocked", "done", "working"].includes(w.status) ? w.status : `${w.tabs.length} tab${w.tabs.length === 1 ? "" : "s"}`,
     }));
     // A session on more than one machine (moved) is the one there most recently updated.
-    const skip = new Set((this.open ?? []).map((s) => s.id));
     const newest = new Map();
-    for (const s of this.history) if (!skip.has(s.id) && !(newest.get(s.id)?.at >= s.at)) newest.set(s.id, s);
-    const past = rank([...newest.values()].filter(match));
+    for (const s of this.history) if (!(newest.get(s.id)?.at >= s.at)) newest.set(s.id, s);
+    const skip = new Set((this.open ?? []).map((s) => s.id));
+    const past = rank(pick([...newest.values()].filter((s) => !skip.has(s.id))));
     // Spaces in Waiting (jj-spaces' shared("spaces.waiting")) and their open sessions
-    // have a section of their own: each space, then its sessions.
+    // have a section of their own: each space, then its sessions. A running session's
+    // branches, PRs and issues are what the scan found in its transcript so far.
     const parked = new Set(shared("spaces.waiting") ?? []);
-    const open = (this.open ?? []).map(described);
+    const open = (this.open ?? []).map((s) => {
+      const seen = newest.get(s.id);
+      return described(seen ? { ...s, branches: seen.branches, prs: seen.prs, refs: seen.refs } : s);
+    });
     const waiting = all.filter((w) => parked.has(w.id)).flatMap((w) => {
-      const mine = rank(open.filter((s) => s.space === w.id && match(s))).map((s) => ({ ...s, kind: "open" }));
-      return match(w) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
+      const mine = rank(pick(open.filter((s) => s.space === w.id))).map((s) => ({ ...s, kind: "open" }));
+      return look(w, false) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
     });
     return [
       ...(this.open === undefined
@@ -210,10 +235,10 @@ export default class Sessions extends View {
         : URGENCY.map(([status, name]) => ({
             name,
             kind: "open",
-            list: rank(open.filter((s) => !parked.has(s.space) && match(s) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status)),
+            list: rank(pick(open.filter((s) => !parked.has(s.space) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status))),
             loading: false,
           }))),
-      { name: "Spaces", kind: "space", list: rank(all.filter((w) => !parked.has(w.id) && match(w))), loading: false },
+      { name: "Spaces", kind: "space", list: rank(pick(all.filter((w) => !parked.has(w.id)), false)), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.scanning > 0 },
     ];
@@ -232,8 +257,17 @@ export default class Sessions extends View {
     this.start(it.s, here, cx, () => this.hide(), bringIt);
   }
 
+  // ⌃space: Quick Look at a running or ended session, over this search.
+  peek(it) {
+    if (it?.kind !== "open" && it?.kind !== "history") return;
+    const { id, machine, cwd, title, own, at, pane, status, branches, prs, refs } = it.s;
+    const peek = { kind: it.kind, id, machine, cwd, title, own, at, pane, status, branches, prs, refs, gone: Boolean(this.goneOf(it.s)) };
+    openOverlay({ mod: "jj-sessions", kind: "dialog", width: 0.72, height: 0.88, props: { peek, query: this.text.trim(), parent: props()?.overlay } });
+  }
+
   render() {
     const t = theme();
+    if (this.mode === "peek") return peekRender(this, t);
     if (this.mode === "tasks") return taskRender(this, t);
     if (this.mode === "move") return moveRender(this, t);
     if (this.mode === "review") return reviewRender(this, t);
@@ -268,7 +302,8 @@ export default class Sessions extends View {
         .child(h_flex().w(14).flex_none().justify_center().child(icon))
         .child(h_flex().flex_1().min_w(0).gap(6).items_center()
           .child(div().min_w(0).truncate().text_color(t.foreground).child(s.title))
-          .when(kind === "open" && Boolean(s.desc && s.own && s.own !== s.desc), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.own))))
+          .when(kind === "open" && Boolean(s.desc && s.own && s.own !== s.desc), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.own)))
+          .when(Boolean(s.hit), (el) => el.child(h_flex().flex_1().min_w(0).gap(4).items_center().text_size(11.5).text_color(t.dim).child(svg(s.hit?.icon ?? "").flex_none().size(11).text_color(t.dim)).child(div().min_w(0).truncate().child(s.hit?.text ?? "")))))
         .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.goneOf(s) && kind !== "open" ? " · gone" : ""}`))
         .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : ago(s.at)));
     };
@@ -287,7 +322,7 @@ export default class Sessions extends View {
     const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
     const past = selected?.s;
     const resuming = past && [this.goneOf(past) ? this.goneHint(past, "↵", "⇧↵") : `↵ resume${past.machine ? ` on ${past.machine}` : ""}`, past.machine && "⌘↵ bring here"].filter(Boolean).join(" · ");
-    const hint = this.busy ? "resuming…" : ({ open: "↵ go to", space: "↵ go to", history: resuming }[selected?.kind] ?? "");
+    const hint = this.busy ? "resuming…" : [{ open: "↵ go to", space: "↵ go to", history: resuming }[selected?.kind], (selected?.kind === "open" || selected?.kind === "history") && "⌃space preview"].filter(Boolean).join(" · ");
     return v_flex()
       .id("sessions")
       .track_focus(this.handle)
@@ -297,6 +332,10 @@ export default class Sessions extends View {
         const down = e.key === "down" || (ctrl && (e.key === "j" || e.key === "n"));
         const up = e.key === "up" || (ctrl && (e.key === "k" || e.key === "p"));
         if (e.key === "escape") return this.hide();
+        if (ctrl && e.key === "space") {
+          this.peek(selected);
+          return cx.stop_propagation();
+        }
         if (down && count) this.at = (this.at + 1) % count;
         else if (up && count) this.at = (this.at + count - 1) % count;
         else return;

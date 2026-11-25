@@ -44,6 +44,15 @@ tasks list (ctrl-a t, `mods/jj-sessions/tasks.js`) shows them by task, and resum
 session where it ran or (⌘↵) copies it from another machine and resumes it here
 (`mods/jj-sessions/sessions.js`).
 
+The session search (cmd-k, ctrl-a w, `mods/jj-sessions/main.js`) also finds a session by its
+branches, PRs and issues. `scan.mjs` reads each transcript once in full and then only what was
+added (cached in `~/.cache/herdr-jj-sessions.json` on each machine): branches from the jj bookmarks
+Claude pushed or set (`gitBranch` is `HEAD` in a jj repo), PRs, issues and Trello cards from the
+links in your prompts, Claude's replies and its tool calls (not tool output). The session's links in
+`shared("tasks.sessions")` count too, with their titles from `shared("github")`. ⌃space previews the
+selected session: `peek.js`, a jj-sessions dialog `{ peek, query, parent }` over the search, fed by
+`peek.mjs` run on the machine the session ran on.
+
 The board (ctrl-a T, `mods/jj-spaces/board.js`, a jj-spaces overlay) shows every open PR in
 its repos and those involving you, their open issues, and a tab per Trello board, each item
 with how many sessions, PRs, issues and cards it's linked to. Its repos are those the sidebar

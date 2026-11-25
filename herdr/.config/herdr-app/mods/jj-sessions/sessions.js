@@ -4,7 +4,7 @@
 // closed; bring: one from another machine to this one). And starting a new one in a repo,
 // in a worktree or not, on a PR's branch (startNew).
 
-import { spaces, panes, terminals, agents, shared, setShared, run, exec, home } from "herdr";
+import { spaces, panes, terminals, agents, shared, setShared, run, exec, home, appHome, readTextFile } from "herdr";
 
 export const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
 export const base = (path) => path.replace(/\/+$/, "").split("/").pop();
@@ -32,6 +32,36 @@ export function label(cwd) {
 export function place(s, ps) {
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
   return ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
+}
+
+let node = null;
+const nodejs = async () => (node ??= (await exec("sh", ["-lc", "command -v node"])).stdout.trim() || "node");
+
+// Runs one of this mod's node scripts (scan.mjs, peek.mjs) with args, here or on machine `on`,
+// which is sent its source.
+export async function script(name, args = [], on = null) {
+  const path = `${appHome()}/mods/jj-sessions/${name}`;
+  return on
+    ? exec("sh", ["-lc", 'src=$1; shift; exec node --input-type=module -e "$src" "$@"', "sh", await readTextFile(path), ...args], { on, timeout: 60000 })
+    : exec(await nodejs(), [path, ...args], { timeout: 60000 });
+}
+
+export const keyOf = (s) => (s.machine ? `${s.machine}/${s.id}` : s.id);
+
+// What a session is about beyond its title and folder, as { text, icon, search }: its branches,
+// and the PRs, issues and cards it named or was linked to, with their titles where jj-spaces knows them.
+export function facts(s, items, tasks) {
+  const urls = [...new Set([...(s.prs ?? []).map((p) => p.url), ...(s.refs ?? []), ...(tasks[keyOf(s)]?.links ?? [])])];
+  return [
+    ...(s.branches ?? []).map((b) => ({ text: b, icon: "mods/workspace-chrome/git-branch.svg", search: b.toLowerCase() })),
+    ...urls.map((url) => {
+      const it = items[url];
+      const m = url.match(/github\.com\/[^/]+\/([^/]+)\/(pull|issues)\/(\d+)/);
+      const text = [m ? `${m[1]}#${m[3]}` : it?.repo || "Trello card", it?.title].filter(Boolean).join(" ");
+      const icon = !m ? "mods/jj-spaces/trello.svg" : m[2] === "pull" ? "mods/jj-spaces/git-pull-request.svg" : "mods/jj-spaces/circle-dot.svg";
+      return { text, icon, url, state: it?.state, search: `${text} ${m ? `#${m[3]}` : ""} ${url}`.toLowerCase() };
+    }),
+  ];
 }
 
 async function root(dir, on) {
