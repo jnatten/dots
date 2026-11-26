@@ -8,8 +8,9 @@
 // branches, PRs and issues (scan.mjs', and its links in shared("tasks.sessions")), and ⌃space
 // previews one ({ peek }, peek.js). Commands running in a terminal (jj-spaces'
 // shared("commands.running")) have a section after Working, and those that finished in a pane
-// you haven't focused since (shared("commands.done")) one after Done, and the other terminals
-// (no agent in them) one above Spaces; ↵ focuses the pane.
+// you haven't focused since (shared("commands.done")) one after Done; the other terminals (no
+// agent in them) go above Spaces, those with a program open (one not counted as a command, such
+// as nvim) apart from those at their prompt. ↵ focuses the pane.
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -265,7 +266,8 @@ export default class Sessions extends View {
     }
     return [
       ...opened,
-      { name: "Idle terminals", kind: "terminal", list: rank(pick(idle, false)), loading: false },
+      { name: "Open programs", kind: "terminal", list: rank(pick(idle.filter((s) => s.program && !s.program.shell), false)), loading: false },
+      { name: "Idle terminals", kind: "terminal", list: rank(pick(idle.filter((s) => !s.program || s.program.shell), false)), loading: false },
       { name: "Spaces", kind: "space", list: rank(pick(all.filter((w) => !parked.has(w.id)), false)), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.scanning > 0 },
