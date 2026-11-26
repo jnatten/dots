@@ -8,9 +8,10 @@
 // branches, PRs and issues (scan.mjs', and its links in shared("tasks.sessions")), and ⌃space
 // previews one ({ peek }, peek.js). Commands running in a terminal (jj-spaces'
 // shared("commands.running")) have a section after Working, and those that finished in a pane
-// you haven't focused since (shared("commands.done")) one after Done; ↵ focuses the pane.
+// you haven't focused since (shared("commands.done")) one after Done, and the other terminals
+// (no agent in them) one above Spaces; ↵ focuses the pane.
 
-import { View, div, svg } from "gpui-kit";
+import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
 import { agents, terminals, spaces, panes, machines, theme, shared, setShared, props, run, exec, hc, home, readTextFile, closeOverlay, openOverlay } from "herdr";
 import { base, ago, worktree, label, place, missing, resume, bring, facts, script } from "./sessions.js";
@@ -250,6 +251,11 @@ export default class Sessions extends View {
           list: rank(pick(open.filter((s) => !parked.has(s.space) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status))),
           loading: false,
         }));
+    const listed = new Set([...(shared("commands.running") ?? []), ...(shared("commands.done") ?? [])].map((c) => c.pane));
+    const spaceOf = new Map(sp.flatMap((w) => w.tabs.map((tab) => [tab.id, w])));
+    const idle = ps
+      .filter((p) => p.terminal && !p.status && !p.program?.agent && !listed.has(p.pane) && spaceOf.has(p.tab))
+      .map((p) => ({ id: p.pane, pane: p.pane, title: p.name ?? p.title ?? p.program?.name ?? "Terminal", where: spaceOf.get(p.tab).name, cwd: p.cwd ?? "", machine: machineOf(p.terminal), program: p.program, at: 0 }));
     const finished = { name: "Finished commands", kind: "command", list: rank(pick(commands("commands.done"), false)), loading: false };
     const busy = { name: "Running commands", kind: "running", list: rank(pick(commands("commands.running"), false)), loading: false };
     if (this.open === undefined) opened.splice(1, 0, finished, busy);
@@ -259,6 +265,7 @@ export default class Sessions extends View {
     }
     return [
       ...opened,
+      { name: "Idle terminals", kind: "terminal", list: rank(pick(idle, false)), loading: false },
       { name: "Spaces", kind: "space", list: rank(pick(all.filter((w) => !parked.has(w.id)), false)), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.scanning > 0 },
@@ -271,7 +278,7 @@ export default class Sessions extends View {
 
   go(it, cx, here = false, bringIt = false) {
     if (!it) return;
-    if (it.kind === "open" || it.kind === "space" || it.kind === "command" || it.kind === "running") {
+    if (["open", "space", "command", "running", "terminal"].includes(it.kind)) {
       this.hide();
       return it.kind === "space" ? run("space.select", { id: it.s.id }) : run("pane.focus", { pane: it.s.pane });
     }
@@ -308,6 +315,8 @@ export default class Sessions extends View {
           ? div().size(7).rounded(4).bg(t[s.status] ?? t.idle)
           : kind === "command"
             ? h_flex().size(14).rounded(4).bg(tone + "2e").items_center().justify_center().child(svg(ICON("terminal")).size(8).text_color(tone))
+          : kind === "terminal"
+            ? s.program?.icon ? (s.program.tint ? svg(s.program.icon).size(12).text_color(t.muted) : image(s.program.icon).size(12)) : svg(ICON("terminal")).size(12).text_color(t.dim)
           : kind === "running"
             ? h_flex().relative().size(14).items_center().justify_center().child(svg(ICON("terminal")).size(8).text_color(t.ansi6))
                 .child(div().absolute().top(0).left(0).size(14).child(svg(ICON("spinner")).size(14).text_color(t.ansi6).spin(900)))
@@ -330,10 +339,10 @@ export default class Sessions extends View {
         .child(h_flex().flex_1().min_w(0).gap(6).items_center()
           .child(div().min_w(0).truncate().text_color(t.foreground).child(s.title))
           .when(kind === "open" && Boolean(s.desc && s.own && s.own !== s.desc), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.own)))
-          .when((kind === "command" || kind === "running") && Boolean(s.where), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.where)))
+          .when(["command", "running", "terminal"].includes(kind) && Boolean(s.where), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.where)))
           .when(Boolean(s.hit), (el) => el.child(h_flex().flex_1().min_w(0).gap(4).items_center().text_size(11.5).text_color(t.dim).child(svg(s.hit?.icon ?? "").flex_none().size(11).text_color(t.dim)).child(div().min_w(0).truncate().child(s.hit?.text ?? "")))))
         .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.goneOf(s) && kind !== "open" ? " · gone" : ""}`))
-        .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : kind === "command" && s.exit ? `exit ${s.exit}` : ago(s.at)));
+        .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : kind === "terminal" ? s.program?.name ?? "" : kind === "command" && s.exit ? `exit ${s.exit}` : ago(s.at)));
     };
     const children = [];
     this.childOf = [];
@@ -350,7 +359,7 @@ export default class Sessions extends View {
     const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
     const past = selected?.s;
     const resuming = past && [this.goneOf(past) ? this.goneHint(past, "↵", "⇧↵") : `↵ resume${past.machine ? ` on ${past.machine}` : ""}`, past.machine && "⌘↵ bring here"].filter(Boolean).join(" · ");
-    const hint = this.busy ? "resuming…" : [{ open: "↵ go to", space: "↵ go to", command: "↵ go to", running: "↵ go to", history: resuming }[selected?.kind], (selected?.kind === "open" || selected?.kind === "history") && "⌃space preview"].filter(Boolean).join(" · ");
+    const hint = this.busy ? "resuming…" : [{ open: "↵ go to", space: "↵ go to", command: "↵ go to", running: "↵ go to", terminal: "↵ go to", history: resuming }[selected?.kind], (selected?.kind === "open" || selected?.kind === "history") && "⌃space preview"].filter(Boolean).join(" · ");
     return v_flex()
       .id("sessions")
       .track_focus(this.handle)
