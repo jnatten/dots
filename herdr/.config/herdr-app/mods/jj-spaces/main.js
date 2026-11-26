@@ -1476,7 +1476,7 @@ export default class Spaces extends View {
       .on_click(() => run("space.select", { id: w.id }))
       .child(div().text_color(w.active ? t.foreground : t.muted).child(String(n)))
       .child(agent ? div().absolute().right(5).text_color(tone(t, w.status)).child(glyph(w.status))
-        : div().absolute().right(3).child(commandMark(`cmd-${w.id}`, cmd, t, 10))));
+        : div().absolute().right(2).child(commandMark(`cmd-${w.id}`, cmd, t, 12))));
   }
 
   render() {

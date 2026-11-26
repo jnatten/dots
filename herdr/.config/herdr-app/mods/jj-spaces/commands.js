@@ -144,10 +144,15 @@ export function spaceCommand(view, space) {
   return (space.tabs ?? []).map((t) => view.cmdTabs[t.id]).filter(Boolean).reduce((a, b) => (a && a.rank >= b.rank ? a : b), null);
 }
 
-export const commandTone = (t, m) => ({ running: t.muted, ok: t.ansi2, failed: t.blocked, unknown: t.done })[m.state];
+export const commandTone = (t, m) => ({ running: t.ansi6, ok: t.ansi2, failed: t.blocked, unknown: t.done })[m.state];
 
-export function commandMark(id, m, t, size = 12) {
+// Running: the agents' ring spinner around the glyph, in a color of its own; finished: the glyph on a tinted tile.
+export function commandMark(id, m, t, size = 16) {
   const tip = m.at ? `${m.tip} ${duration(Date.now() - m.at)} ago` : `${m.tip} ${duration(Date.now() - m.since)}`;
-  return div().id(id).flex_none().flex().items_center().tooltip(tip)
-    .child(svg("mods/workspace-chrome/terminal.svg").size(size).text_color(commandTone(t, m)));
+  const color = commandTone(t, m);
+  const box = div().id(id).relative().size(size).flex_none().flex().items_center().justify_center().tooltip(tip)
+    .child(svg("mods/workspace-chrome/terminal.svg").size(Math.round(size * 0.55)).text_color(color));
+  return m.state === "running"
+    ? box.child(div().absolute().top(0).left(0).size(size).child(svg("mods/workspace-chrome/spinner.svg").size(size).text_color(color).spin(900)))
+    : box.rounded(4).bg(color + "2e");
 }

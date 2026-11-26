@@ -108,8 +108,9 @@ ask it through `shared("space-folders.ask")`. Folded folders are this Mac's
 (`jj-state.json`).
 
 A terminal glyph on a space row, the rail and a tab (jj-tabs, from `shared("commands.tabs")`)
-says a command runs there (muted, after 2 s) or finished while its tab wasn't shown in this
-window (green, red on a non-zero exit, blue when the code is unknown), until it is
+says a command runs there (inside a cyan ring spinning like the agents', after 2 s) or finished
+while its tab wasn't shown in this window (on a tile: green, red on a non-zero exit, blue when
+the code is unknown), until it is
 (`mods/jj-spaces/commands.js`). A command is a program in front of a shell (`panes()`' `program`)
 that isn't an agent and isn't skipped: the spacing dialog's Commands tab
 (`mods/jj-spacing/commands-tab.js`, `jj-commands` in `jj-settings.json`) skips editors, pagers,
