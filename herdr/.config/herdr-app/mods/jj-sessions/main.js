@@ -354,8 +354,10 @@ export default class Sessions extends View {
           this.peek(selected);
           return cx.stop_propagation();
         }
+        const page = ctrl && (e.key === "d" || e.key === "u") ? Math.max(1, Math.floor(height / 2 / 32)) * (e.key === "d" ? 1 : -1) : 0;
         if (down && count) this.at = (this.at + 1) % count;
         else if (up && count) this.at = (this.at + count - 1) % count;
+        else if (page && count) this.at = Math.max(0, Math.min(count - 1, this.at + page));
         else return;
         this.scroll.scroll_to_item(this.childOf[this.at] ?? 0);
         cx.stop_propagation();
