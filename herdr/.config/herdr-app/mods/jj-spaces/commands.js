@@ -1,13 +1,13 @@
 // Commands in front of a shell, for the marks on space rows, the rail and the tab bar
-// (jj-tabs, through shared("commands.tabs")): running, and finished while this window
-// wasn't showing their tab, until it does. A command is a program that's neither a shell nor
+// (jj-tabs, through shared("commands.tabs")): running, and finished while its pane wasn't
+// focused in this window (on screen), until it is. A command is a program that's neither a shell nor
 // an agent (agents report a status) nor on the skip list (the spacing dialog's Commands tab,
 // shared("jj-commands")); only one going back to its shell finishes, so an agent ending never
-// does. Each window keeps its own; the one that looks sets jj.seen on the terminal, so the
+// does. Each window keeps its own; the one that focuses it sets jj.seen on the terminal, so the
 // others let go too. fish's postexec puts the exit code there as jj.exit=<code>:<epoch s>.
 
 import { div, svg } from "gpui-kit";
-import { terminals, window, hc, shared, setShared } from "herdr";
+import { terminals, window, focused, hc, shared, setShared } from "herdr";
 import { duration } from "./agent-parts.js";
 
 // jj-spacing/commands-tab.js's SKIP.
@@ -33,10 +33,10 @@ function front(p, skip) {
   return skip.has(p.program.key.toLowerCase()) || skip.has(p.program.name.toLowerCase()) ? "skip" : "command";
 }
 
-// The tabs this window shows now: none while it's off screen.
-function looking(sp) {
-  if (!window()?.visible) return new Set();
-  return new Set((sp.find((s) => s.active)?.tabs ?? []).filter((t) => t.active).map((t) => t.id));
+// Whether this window has the pane focused, on screen. A focused layout terminal block has no pane.
+function focus() {
+  const f = window()?.visible ? focused() : null;
+  return (pane, terminal) => Boolean(f) && (f.pane ? f.pane === pane : f.terminal === terminal);
 }
 
 const seen = (terminal) => hc(["label", terminal, `jj.seen=${Date.now()}`]).catch(() => null);
@@ -49,9 +49,9 @@ export function commandsInit(view) {
   setShared("commands.tabs", {});
 }
 
-export function commandsDue(view, now, sp, ps, cx) {
+export function commandsDue(view, now, ps, cx) {
   const skip = skipped();
-  const shown = looking(sp);
+  const looks = focus();
   const tabOf = {};
   let changed = false;
   for (const p of ps) {
@@ -80,7 +80,7 @@ export function commandsDue(view, now, sp, ps, cx) {
     delete view.cmdRunning[p.pane];
     changed ||= run.shown;
     if (kind !== "shell" || run.shellAt - run.since < LONG) continue;
-    if (shown.has(p.tab)) seen(p.terminal);
+    if (looks(p.pane, p.terminal)) seen(p.terminal);
     else {
       view.cmdDone[p.pane] = { since: run.since, at: run.shellAt, tab: p.tab, terminal: p.terminal, title: run.title, name: run.name, exit: null };
       changed = true;
@@ -101,7 +101,7 @@ export function commandsDue(view, now, sp, ps, cx) {
       continue;
     }
     d.tab = tabOf[pane];
-    if (shown.has(d.tab)) {
+    if (looks(pane, d.terminal)) {
       delete view.cmdDone[pane];
       seen(d.terminal);
       changed = true;

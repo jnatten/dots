@@ -169,7 +169,7 @@ export default class Tabs extends View {
       if (active >= 0) this.scroll.scroll_to_item(active);
     }
     const stop = (_e, cx) => cx.stop_propagation();
-    // A command running in the tab, or finished while it wasn't shown: drawn as jj-spaces' commands.js does.
+    // A command running in the tab, or finished while its pane wasn't focused: drawn as jj-spaces' commands.js does.
     const commands = shared("commands.tabs") ?? {};
     const commandMark = (id, m, size = 14) => {
       const color = { running: t.ansi6, ok: t.ansi2, failed: t.blocked, unknown: t.done }[m.state];

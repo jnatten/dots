@@ -258,7 +258,7 @@ export default class Spaces extends View {
     this.foldersDue(now, cx);
     this.boardDue(now, cx);
     this.treeDue();
-    commandsDue(this, now, sp, ps, cx);
+    commandsDue(this, now, ps, cx);
   }
 
   // The agents list's block hidden while the tree shows its agents, and back on the rail.
