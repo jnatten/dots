@@ -1,5 +1,5 @@
 // Spacing dialog: the gap between panes (and around them), the panes' corner radius, the
-// terminals' padding and the panes' title bars, written into the shown layout with layout.set as they change.
+// terminals' padding and the panes' title bars, written into the shown layout's file as they change.
 // ↑/↓ pick a row, ←/→ or the buttons change it. Its Hints tab picks what hint
 // mode (ctrl-a f, jj-copy/patterns.json) highlights, kept as shared("jj-copy.hints").
 // Its Links tab picks what the sidebar's GitHub badges bring along (a PR's issues,
@@ -19,7 +19,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { layout, run, theme, props, closeOverlay, appHome, readTextFile, shared, setShared } from "herdr";
+import { layout, theme, props, closeOverlay, appHome, readTextFile, writeTextFile, shared, setShared } from "herdr";
 import { boardTab, boardTabInit, boardKey } from "./board-tab.js";
 import { commandsTab, commandsTabInit, commandsKey } from "./commands-tab.js";
 
@@ -108,17 +108,25 @@ function find(node, test) {
 const frameOf = (root) => find(root, (n) => n.content?.pane)?.content.pane ?? null;
 const areaOf = (root) => find(root, (n) => (n.children ?? []).some((c) => c.content?.pane));
 
-function current() {
-  const root = layout();
+function current(root = layout()) {
   const [padX, padY] = root?.terminal_padding ?? [DEFAULT.padX, DEFAULT.padY];
   const header = frameOf(root)?.header;
   return { gap: frameOf(root)?.gap ?? DEFAULT.gap, radius: frameOf(root)?.radius ?? DEFAULT.radius, padX, padY, bars: !header ? "none" : header.reveal === "hover" ? "hover" : "always" };
 }
 
+// Into the layout's own file, which Herdr picks up while keeping its clicks (sizes, hidden blocks,
+// a stack's tab: layouts/.state), so they stay out of dots. layout.set would drop every click, and
+// a tree read from layout() would carry them into the file. One edit at a time, each on the last.
+let edits = Promise.resolve();
 function edit(change) {
-  const root = JSON.parse(JSON.stringify(layout()));
-  change(root);
-  run("layout.set", { layout: root });
+  edits = edits.then(async () => {
+    const path = `${appHome()}/layouts/${shared("layout") ?? "jj"}.json`;
+    const text = await readTextFile(path);
+    const root = JSON.parse(text);
+    change(root);
+    const next = JSON.stringify(root, null, 2) + "\n";
+    if (JSON.stringify(root) !== JSON.stringify(JSON.parse(text))) await writeTextFile(path, next, text);
+  }).catch(() => null);
 }
 
 function spacing(root, values) {
@@ -198,14 +206,17 @@ export default class Spacing extends View {
 
   change(key, delta) {
     const row = ROWS.find((r) => r.key === key);
-    const values = current();
-    const next = Math.max(0, Math.min(row.max, values[key] + delta));
-    if (next !== values[key]) edit((root) => spacing(root, { ...values, [key]: next }));
+    edit((root) => {
+      const values = current(root);
+      spacing(root, { ...values, [key]: Math.max(0, Math.min(row.max, values[key] + delta)) });
+    });
   }
 
   cycle(delta) {
-    const i = BARS.findIndex(([mode]) => mode === current().bars);
-    edit((root) => bars(root, BARS[(i + delta + BARS.length) % BARS.length][0]));
+    edit((root) => {
+      const i = BARS.findIndex(([mode]) => mode === current(root).bars);
+      bars(root, BARS[(i + delta + BARS.length) % BARS.length][0]);
+    });
   }
 
   show(tab) {

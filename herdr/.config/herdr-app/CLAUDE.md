@@ -133,7 +133,10 @@ one at its prompt.
 - **Reloading:** Herdr doesn't always notice edits made through a symlink.
   - After editing a mod or `keys.json` in dots, run `touch -h` on its link in
     `~/.config/herdr-app` to reload it.
-  - Change the layout with `herdr-app do layout.set`, which writes through the link.
+  - Change the layout by editing `layouts/jj.json` in dots: Herdr picks the edit up. Resizes,
+    hidden blocks and a stack's tab are clicks Herdr keeps in `layouts/.state/` (not in dots),
+    so the file only changes when something means to change it. `layout.set` drops every click,
+    and a tree read from `layout()` has them in it, so the spacing dialog edits the file too.
 - **Tab, shift-tab and Escape:** the app takes them before a mod's `on_key_down` (Tab moves
   the keyboard to the next tab stop, which can be an input behind a dialog; Escape closes the
   top dialog). A mod that uses them binds its own with `cx.bind_keys` in a `key_context` of its
