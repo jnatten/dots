@@ -1,6 +1,7 @@
 // Commands in front of a shell, for the marks on space rows, the rail and the tab bar
-// (jj-tabs, through shared("commands.tabs")) and the session search's Finished commands
-// (jj-sessions, through shared("commands.done")): running, and finished while its pane wasn't
+// (jj-tabs, through shared("commands.tabs")) and the session search's Running and Finished
+// commands (jj-sessions, through shared("commands.running") and shared("commands.done")):
+// running, and finished while its pane wasn't
 // focused in this window (on screen), until it is. A command is a program that's neither a shell nor
 // an agent (agents report a status) nor on the skip list (the spacing dialog's Commands tab,
 // shared("jj-commands")); only one going back to its shell finishes, so an agent ending never
@@ -42,6 +43,9 @@ function focus() {
   return (pane, terminal) => Boolean(f) && (f.pane ? f.pane === pane : f.terminal === terminal);
 }
 
+// fish's title while a command runs: the command, then the folder.
+const bare = (title) => title.replace(/\s+[~/]\S*$/, "");
+
 // What ran, from the titles its terminal had: fish's title is the command and the folder, and
 // turns back into the folder alone (`prompt`) a moment before the shell is seen in front again.
 function titleOf(run, prompt) {
@@ -58,6 +62,7 @@ export function commandsInit(view) {
   view.cmdPrograms = shared("commands.seen") ?? [];
   setShared("commands.tabs", {});
   setShared("commands.done", []);
+  setShared("commands.running", []);
 }
 
 export function commandsDue(view, now, ps, cx) {
@@ -79,6 +84,7 @@ export function commandsDue(view, now, ps, cx) {
       if (p.title && p.title !== run.title) {
         run.title = p.title;
         run.titles = [...run.titles, p.title].slice(-5);
+        changed ||= run.shown;
       }
       if (!run.shown && now - run.since >= SHOW) {
         run.shown = true;
@@ -154,6 +160,8 @@ function publish(view, cx) {
   if (JSON.stringify(tabs) !== JSON.stringify(shared("commands.tabs") ?? {})) setShared("commands.tabs", tabs);
   const done = Object.entries(view.cmdDone).map(([pane, d]) => ({ pane, terminal: d.terminal, tab: d.tab, title: d.title || d.name, exit: d.exit, at: d.at }));
   if (JSON.stringify(done) !== JSON.stringify(shared("commands.done") ?? [])) setShared("commands.done", done);
+  const running = Object.entries(view.cmdRunning).filter(([, r]) => r.shown).map(([pane, r]) => ({ pane, terminal: r.terminal, tab: r.tab, title: bare(r.title ?? "") || r.name, since: r.since }));
+  if (JSON.stringify(running) !== JSON.stringify(shared("commands.running") ?? [])) setShared("commands.running", running);
   cx.notify();
 }
 
@@ -198,7 +206,7 @@ export function terminalList(view, w, ps) {
 export function terminalRows(list, t, now) {
   const shown = focused()?.pane;
   return list.map(({ p, m }, i) => {
-    const name = m?.state === "running" ? p.title.replace(/\s+[~/]\S*$/, "") || m.title : m ? m.title : p.name ?? p.title ?? p.program?.name ?? "";
+    const name = m?.state === "running" ? bare(p.title) || m.title : m ? m.title : p.name ?? p.title ?? p.program?.name ?? "";
     const when = m ? duration(now - (m.at ?? m.since)) : null;
     const pic = agentPref("icon") === "hidden" ? null : icon(p.program, 14, t.foreground);
     return h_flex()

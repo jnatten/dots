@@ -118,8 +118,8 @@ TUIs and ssh by default. Each window tracks on its own in memory; the one that f
 `jj.seen=<ms>` on the terminal so the others let go. The exit code and command line come from
 fish (`fish/.config/fish/config.fish`, commands over 2 s) as `jj.exit=<code>:<epoch s>` and
 `jj.cmd`; without them the command is what the terminal's title said while it ran. The session
-search (cmd-k) lists the unseen finished ones after Done (`shared("commands.done")`), and ↵
-focuses the pane. The Sidebar tab's Terminals option (`jj-spaces`' `terminals`: off, commands,
+search (cmd-k) lists the running ones after Working (`shared("commands.running")`) and the unseen
+finished ones after Done (`shared("commands.done")`), and ↵ focuses the pane. The Sidebar tab's Terminals option (`jj-spaces`' `terminals`: off, commands,
 all) lists a space's terminals under it after its agents, drawn like the tree's agent rows
 (`terminalRows` in commands.js): what runs or ran, how long ago and its mark, or the folder of
 one at its prompt.

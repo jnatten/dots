@@ -6,8 +6,9 @@
 // another machine ({ move: terminalAddress }, move.js), and starting a review in a space of its
 // own ({ review: true, folder, machine }, review.js). The search also finds a session by its
 // branches, PRs and issues (scan.mjs', and its links in shared("tasks.sessions")), and ⌃space
-// previews one ({ peek }, peek.js). Commands that finished in a pane you haven't focused since
-// (jj-spaces' shared("commands.done")) have a section after Done; ↵ focuses the pane.
+// previews one ({ peek }, peek.js). Commands running in a terminal (jj-spaces'
+// shared("commands.running")) have a section after Working, and those that finished in a pane
+// you haven't focused since (shared("commands.done")) one after Done; ↵ focuses the pane.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, ScrollHandle } from "gpui-base";
@@ -231,17 +232,17 @@ export default class Sessions extends View {
       return look(w, false) || mine.length ? [{ ...w, kind: "space" }, ...mine] : [];
     });
     const sp = spaces();
-    const commands = (shared("commands.done") ?? []).map((c) => ({
+    const commands = (key) => (shared(key) ?? []).map((c) => ({
       id: c.pane,
       pane: c.pane,
       title: c.title,
       where: sp.find((w) => w.tabs.some((tab) => tab.id === c.tab))?.name ?? "",
       cwd: ps.find((p) => p.pane === c.pane)?.cwd ?? "",
       machine: machineOf(c.terminal),
-      exit: c.exit,
-      at: Math.floor(c.at / 1000),
+      exit: c.exit ?? null,
+      at: Math.floor((c.at ?? c.since) / 1000),
     }));
-    const running = this.open === undefined
+    const opened = this.open === undefined
       ? [{ name: "Open", kind: "open", list: [], loading: true }]
       : URGENCY.map(([status, name]) => ({
           name,
@@ -249,9 +250,15 @@ export default class Sessions extends View {
           list: rank(pick(open.filter((s) => !parked.has(s.space) && (URGENCY.some(([u]) => u === s.status) ? s.status : "idle") === status))),
           loading: false,
         }));
-    running.splice(this.open === undefined ? 1 : 2, 0, { name: "Finished commands", kind: "command", list: rank(pick(commands, false)), loading: false });
+    const finished = { name: "Finished commands", kind: "command", list: rank(pick(commands("commands.done"), false)), loading: false };
+    const busy = { name: "Running commands", kind: "running", list: rank(pick(commands("commands.running"), false)), loading: false };
+    if (this.open === undefined) opened.splice(1, 0, finished, busy);
+    else {
+      opened.splice(2, 0, finished);
+      opened.splice(4, 0, busy);
+    }
     return [
-      ...running,
+      ...opened,
       { name: "Spaces", kind: "space", list: rank(pick(all.filter((w) => !parked.has(w.id)), false)), loading: false },
       { name: "Waiting", kind: "waiting", list: waiting, loading: false },
       { name: "History", kind: "history", list: past.slice(0, 100), total: past.length, loading: this.scanning > 0 },
@@ -264,7 +271,7 @@ export default class Sessions extends View {
 
   go(it, cx, here = false, bringIt = false) {
     if (!it) return;
-    if (it.kind === "open" || it.kind === "space" || it.kind === "command") {
+    if (it.kind === "open" || it.kind === "space" || it.kind === "command" || it.kind === "running") {
       this.hide();
       return it.kind === "space" ? run("space.select", { id: it.s.id }) : run("pane.focus", { pane: it.s.pane });
     }
@@ -301,6 +308,9 @@ export default class Sessions extends View {
           ? div().size(7).rounded(4).bg(t[s.status] ?? t.idle)
           : kind === "command"
             ? h_flex().size(14).rounded(4).bg(tone + "2e").items_center().justify_center().child(svg(ICON("terminal")).size(8).text_color(tone))
+          : kind === "running"
+            ? h_flex().relative().size(14).items_center().justify_center().child(svg(ICON("terminal")).size(8).text_color(t.ansi6))
+                .child(div().absolute().top(0).left(0).size(14).child(svg(ICON("spinner")).size(14).text_color(t.ansi6).spin(900)))
           : kind === "space"
             ? h_flex().size(14).rounded(4).bg(s.color.startsWith("#") ? s.color : (MARK[s.color] ?? t[s.color])).items_center().justify_center().text_size(8.5).font_bold().text_color("#ffffff").child([...s.title][0]?.toUpperCase() ?? "?")
             : svg(ICON("clock")).size(13).text_color(t.dim);
@@ -320,7 +330,7 @@ export default class Sessions extends View {
         .child(h_flex().flex_1().min_w(0).gap(6).items_center()
           .child(div().min_w(0).truncate().text_color(t.foreground).child(s.title))
           .when(kind === "open" && Boolean(s.desc && s.own && s.own !== s.desc), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.own)))
-          .when(kind === "command" && Boolean(s.where), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.where)))
+          .when((kind === "command" || kind === "running") && Boolean(s.where), (el) => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(s.where)))
           .when(Boolean(s.hit), (el) => el.child(h_flex().flex_1().min_w(0).gap(4).items_center().text_size(11.5).text_color(t.dim).child(svg(s.hit?.icon ?? "").flex_none().size(11).text_color(t.dim)).child(div().min_w(0).truncate().child(s.hit?.text ?? "")))))
         .child(div().flex_none().max_w(220).truncate().text_size(11.5).text_color(t.dim).child(this.busy === s.id ? "resuming…" : `${s.machine ? `${s.machine} · ` : ""}${label(s.cwd)}${this.goneOf(s) && kind !== "open" ? " · gone" : ""}`))
         .child(h_flex().flex_none().w(52).justify_end().text_size(11).text_color(t.dim).child(kind === "open" ? s.status : kind === "space" ? s.meta : kind === "command" && s.exit ? `exit ${s.exit}` : ago(s.at)));
@@ -340,7 +350,7 @@ export default class Sessions extends View {
     const height = Math.min(LIST, empty ? 40 : sections.filter((s) => s.list.length || s.loading).length * 26 + items.length * 32);
     const past = selected?.s;
     const resuming = past && [this.goneOf(past) ? this.goneHint(past, "↵", "⇧↵") : `↵ resume${past.machine ? ` on ${past.machine}` : ""}`, past.machine && "⌘↵ bring here"].filter(Boolean).join(" · ");
-    const hint = this.busy ? "resuming…" : [{ open: "↵ go to", space: "↵ go to", command: "↵ go to", history: resuming }[selected?.kind], (selected?.kind === "open" || selected?.kind === "history") && "⌃space preview"].filter(Boolean).join(" · ");
+    const hint = this.busy ? "resuming…" : [{ open: "↵ go to", space: "↵ go to", command: "↵ go to", running: "↵ go to", history: resuming }[selected?.kind], (selected?.kind === "open" || selected?.kind === "history") && "⌃space preview"].filter(Boolean).join(" · ");
     return v_flex()
       .id("sessions")
       .track_focus(this.handle)
