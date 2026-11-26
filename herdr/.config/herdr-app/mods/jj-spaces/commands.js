@@ -1,10 +1,12 @@
 // Commands in front of a shell, for the marks on space rows, the rail and the tab bar
-// (jj-tabs, through shared("commands.tabs")): running, and finished while its pane wasn't
+// (jj-tabs, through shared("commands.tabs")) and the session search's Finished commands
+// (jj-sessions, through shared("commands.done")): running, and finished while its pane wasn't
 // focused in this window (on screen), until it is. A command is a program that's neither a shell nor
 // an agent (agents report a status) nor on the skip list (the spacing dialog's Commands tab,
 // shared("jj-commands")); only one going back to its shell finishes, so an agent ending never
 // does. Each window keeps its own; the one that focuses it sets jj.seen on the terminal, so the
-// others let go too. fish's postexec puts the exit code there as jj.exit=<code>:<epoch s>.
+// others let go too. fish's postexec puts the exit code there as jj.exit=<code>:<epoch s>, and
+// the command line as jj.cmd.
 
 import { div, svg } from "gpui-kit";
 import { terminals, window, focused, hc, shared, setShared } from "herdr";
@@ -39,14 +41,22 @@ function focus() {
   return (pane, terminal) => Boolean(f) && (f.pane ? f.pane === pane : f.terminal === terminal);
 }
 
+// What ran, from the titles its terminal had: fish's title is the command and the folder, and
+// turns back into the folder alone (`prompt`) a moment before the shell is seen in front again.
+function titleOf(run, prompt) {
+  const title = [...run.titles].reverse().find((t) => t && t !== prompt) ?? run.name;
+  return prompt && title.endsWith(` ${prompt}`) ? title.slice(0, -prompt.length).trim() : title;
+}
+
 const seen = (terminal) => hc(["label", terminal, `jj.seen=${Date.now()}`]).catch(() => null);
 
 export function commandsInit(view) {
-  view.cmdRunning = {}; // pane -> { since, tab, terminal, title, name, shown, shellAt }
+  view.cmdRunning = {}; // pane -> { since, tab, terminal, title, titles, name, shown, shellAt }
   view.cmdDone = {}; // pane -> { since, at, tab, terminal, title, name, exit }
   view.cmdTabs = {}; // tab -> its most urgent mark
   view.cmdPrograms = shared("commands.seen") ?? [];
   setShared("commands.tabs", {});
+  setShared("commands.done", []);
 }
 
 export function commandsDue(view, now, ps, cx) {
@@ -61,10 +71,14 @@ export function commandsDue(view, now, ps, cx) {
     const run = view.cmdRunning[p.pane];
     if (kind === "command") {
       if (!run) {
-        view.cmdRunning[p.pane] = { since: now, tab: p.tab, terminal: p.terminal, title: p.title, name: p.program.name, shown: false, shellAt: null };
+        view.cmdRunning[p.pane] = { since: now, tab: p.tab, terminal: p.terminal, title: p.title, titles: [p.title], name: p.program.name, shown: false, shellAt: null };
         continue;
       }
-      Object.assign(run, { tab: p.tab, title: p.title || run.title, shellAt: null });
+      Object.assign(run, { tab: p.tab, shellAt: null });
+      if (p.title && p.title !== run.title) {
+        run.title = p.title;
+        run.titles = [...run.titles, p.title].slice(-5);
+      }
       if (!run.shown && now - run.since >= SHOW) {
         run.shown = true;
         changed = true;
@@ -82,7 +96,7 @@ export function commandsDue(view, now, ps, cx) {
     if (kind !== "shell" || run.shellAt - run.since < LONG) continue;
     if (looks(p.pane, p.terminal)) seen(p.terminal);
     else {
-      view.cmdDone[p.pane] = { since: run.since, at: run.shellAt, tab: p.tab, terminal: p.terminal, title: run.title, name: run.name, exit: null };
+      view.cmdDone[p.pane] = { since: run.since, at: run.shellAt, tab: p.tab, terminal: p.terminal, title: titleOf(run, p.title), name: run.name, exit: null };
       changed = true;
     }
   }
@@ -110,6 +124,7 @@ export function commandsDue(view, now, ps, cx) {
     const m = /^(\d+):(\d+)$/.exec(l["jj.exit"] ?? "");
     if (d.exit === null && m && m[2] * 1000 >= d.since - 1000 && m[2] * 1000 <= d.at + 5000) {
       d.exit = Number(m[1]);
+      d.title = l["jj.cmd"] || d.title;
       changed = true;
     }
   }
@@ -136,6 +151,8 @@ function publish(view, cx) {
   }
   view.cmdTabs = tabs;
   if (JSON.stringify(tabs) !== JSON.stringify(shared("commands.tabs") ?? {})) setShared("commands.tabs", tabs);
+  const done = Object.entries(view.cmdDone).map(([pane, d]) => ({ pane, terminal: d.terminal, tab: d.tab, title: d.title || d.name, exit: d.exit, at: d.at }));
+  if (JSON.stringify(done) !== JSON.stringify(shared("commands.done") ?? [])) setShared("commands.done", done);
   cx.notify();
 }
 

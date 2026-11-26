@@ -115,8 +115,11 @@ the code is unknown), until it is
 that isn't an agent and isn't skipped: the spacing dialog's Commands tab
 (`mods/jj-spacing/commands-tab.js`, `jj-commands` in `jj-settings.json`) skips editors, pagers,
 TUIs and ssh by default. Each window tracks on its own in memory; the one that focuses it sets
-`jj.seen=<ms>` on the terminal so the others let go. The exit code comes from fish
-(`fish/.config/fish/config.fish`, commands over 2 s) as `jj.exit=<code>:<epoch s>`.
+`jj.seen=<ms>` on the terminal so the others let go. The exit code and command line come from
+fish (`fish/.config/fish/config.fish`, commands over 2 s) as `jj.exit=<code>:<epoch s>` and
+`jj.cmd`; without them the command is what the terminal's title said while it ran. The session
+search (cmd-k) lists the unseen finished ones after Done (`shared("commands.done")`), and ↵
+focuses the pane.
 
 ## Working on mods
 
