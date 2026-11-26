@@ -20,7 +20,8 @@
 // ctrl-a t opens and closes the tasks list (jj-sessions' tasks.js) from here, and ctrl-a d
 // an agent's Description dialog (jj-agents').
 // Its Agents pref "tree" puts each space's agents under it (agent-tree.js) and hides the
-// agents list's block, except on the rail.
+// agents list's block, except on the rail. Its Terminals pref lists a space's terminals under
+// it too, after its agents: those running or that finished a command, or all (commands.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -36,7 +37,7 @@ import { previewInit, previewRender } from "./preview.js";
 import { discoverRepos } from "./board-data.js";
 import { agentRows, publishOrder, treeContext } from "./agent-tree.js";
 import { describeDialog } from "./agent-parts.js";
-import { commandMark, commandsDue, commandsInit, spaceCommand } from "./commands.js";
+import { commandMark, commandsDue, commandsInit, spaceCommand, terminalList, terminalRows } from "./commands.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -91,7 +92,7 @@ const BACKFILL = 15 * 60000;
 const BOARD_REPOS = 10 * 60000;
 const BOARD_LIST = 30 * 60000;
 // jj-spacing's Sidebar tab keeps what differs from these.
-const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list" };
+const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list", terminals: "off" };
 const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
@@ -1151,7 +1152,9 @@ export default class Spaces extends View {
   // the folder each filed space is in (shared("spaces.folder"), for jj-agents).
   grouped(t, collapsed) {
     const sp = spaces();
-    const filing = this.tree(sp, panes());
+    const ps = panes();
+    const now = Date.now();
+    const filing = this.tree(sp, ps);
     this.rowsById = new Map([...filing.inside.values(), filing.other, filing.waiting].flat().map((r) => [r.w.id, r]));
     for (const r of this.rowsById.values()) r.cmd = spaceCommand(this, r.w);
     this.filed = filing.list.length > 0;
@@ -1161,7 +1164,11 @@ export default class Spaces extends View {
     const listed = [];
     const hidden = new Set();
     const tree = !collapsed && pref("agents") === "tree" ? treeContext() : null;
-    const draw = (r) => (collapsed ? [this.compact(r, t)] : [this.row(r, t), ...(tree ? agentRows(this, r.w, t, tree) : [])]);
+    const draw = (r) => {
+      if (collapsed) return [this.compact(r, t)];
+      const terms = terminalList(this, r.w, ps);
+      return [this.row(r, t), ...(tree ? agentRows(this, r.w, t, tree, terms.length) : []), ...terminalRows(terms, t, now)];
+    };
     const rows = (members, shut) => {
       for (const r of members) {
         listed.push(r.w.id);

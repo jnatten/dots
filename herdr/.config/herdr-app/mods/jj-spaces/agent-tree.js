@@ -41,12 +41,13 @@ export function publishOrder(ctx) {
 }
 
 // A space's agents, each hanging off the space's avatar; a click on an agent's icon folds its sub-agents.
-export function agentRows(view, w, t, ctx) {
+// `after`: rows that follow them under the space (its terminals).
+export function agentRows(view, w, t, ctx, after = 0) {
   const members = ctx.by.get(w.id) ?? [];
   const pl = 16;
   return members.flatMap((a, i) => {
     ctx.order.push(a.address);
-    const last = i === members.length - 1;
+    const last = i === members.length - 1 && !after;
     const subs = subTree(ctx.all, a.address).map((s) => ({ ...s, lines: [last ? "" : "│", ...s.lines] }));
     const row = agentRow(view, a, last ? "└" : "├", subs, t, ctx, pl);
     if (view.agentFolded.has(a.address)) return [row];

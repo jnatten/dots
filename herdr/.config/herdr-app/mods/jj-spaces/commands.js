@@ -9,8 +9,9 @@
 // the command line as jj.cmd.
 
 import { div, svg } from "gpui-kit";
-import { terminals, window, focused, hc, shared, setShared } from "herdr";
-import { duration } from "./agent-parts.js";
+import { h_flex } from "gpui-base";
+import { terminals, window, focused, hc, run, shared, setShared } from "herdr";
+import { duration, icon, machineIcon, pref as agentPref, treeLines } from "./agent-parts.js";
 
 // jj-spacing/commands-tab.js's SKIP.
 export const SKIP = ["nvim", "vim", "vi", "hx", "emacs", "nano", "less", "man", "lazygit", "jjui", "tig", "gitui", "htop", "btop", "top", "k9s", "yazi", "ranger", "lf", "ssh", "mosh", "tmux", "zellij"];
@@ -138,9 +139,9 @@ function noteProgram(view, program) {
 }
 
 const markOf = (c) => {
-  if (!c.at) return { state: "running", rank: RANK.running, tip: `${c.title || c.name} · running`, since: c.since };
+  if (!c.at) return { state: "running", rank: RANK.running, tip: `${c.title || c.name} · running`, title: c.title || c.name, since: c.since };
   const state = c.exit === null ? "unknown" : c.exit === 0 ? "ok" : "failed";
-  return { state, rank: RANK[state], tip: `${c.title || c.name} · ${state === "failed" ? `failed (exit ${c.exit})` : "finished"}`, at: c.at };
+  return { state, rank: RANK[state], tip: `${c.title || c.name} · ${state === "failed" ? `failed (exit ${c.exit})` : "finished"}`, title: c.title || c.name, at: c.at };
 };
 
 function publish(view, cx) {
@@ -172,4 +173,53 @@ export function commandMark(id, m, t, size = 16) {
   return m.state === "running"
     ? box.child(div().absolute().top(0).left(0).size(size).child(svg("mods/workspace-chrome/spinner.svg").size(size).text_color(color).spin(900)))
     : box.rounded(4).bg(color + "2e");
+}
+
+// A pane's command mark: finished unseen, else running (after SHOW), else null.
+function paneMark(view, pane) {
+  const c = view.cmdDone[pane] ?? (view.cmdRunning[pane]?.shown ? view.cmdRunning[pane] : null);
+  return c ? markOf(c) : null;
+}
+
+// A space's terminals for the tree (its Terminals pref, from the spacing dialog's Sidebar tab):
+// none, those with a mark, or all; agents aren't terminals here.
+export function terminalList(view, w, ps) {
+  const mode = shared("jj-spaces")?.terminals ?? "off";
+  if (mode === "off") return [];
+  const tabs = new Set((w.tabs ?? []).map((tab) => tab.id));
+  return ps
+    .filter((p) => p.terminal && tabs.has(p.tab) && !p.status && !p.program?.agent)
+    .map((p) => ({ p, m: paneMark(view, p.pane) }))
+    .filter(({ m }) => mode === "all" || m);
+}
+
+// Drawn as the tree's agent rows: its program's icon, what runs or ran (fish's title without its
+// folder), how long ago and the mark; a terminal at its prompt shows its title, muted.
+export function terminalRows(list, t, now) {
+  const shown = focused()?.pane;
+  return list.map(({ p, m }, i) => {
+    const name = m?.state === "running" ? p.title.replace(/\s+[~/]\S*$/, "") || m.title : m ? m.title : p.name ?? p.title ?? p.program?.name ?? "";
+    const when = m ? duration(now - (m.at ?? m.since)) : null;
+    const pic = agentPref("icon") === "hidden" ? null : icon(p.program, 14, t.foreground);
+    return h_flex()
+      .id(`tree-term-${p.pane}`)
+      .pl(16)
+      .pr(8)
+      .h(26)
+      .flex_none()
+      .items_center()
+      .rounded(8)
+      .text_size(12.5)
+      .cursor_pointer()
+      .when(shown === p.pane, (el) => el.bg(t.raised))
+      .hover((s) => s.bg(t.hover))
+      .on_click(() => run("pane.focus", { pane: p.pane }))
+      .children(treeLines(t, [i === list.length - 1 ? "└" : "├"]))
+      .when(Boolean(pic), (el) => el.child(h_flex().flex_none().h(20).mr(8).items_center().child(pic)))
+      .when(agentPref("machine") === "icon", (el) => el.child(machineIcon(t, p.terminal).mr(8)))
+      .child(h_flex().flex_1().min_w(0).h(20).gap(6).items_center()
+        .child(div().flex_1().min_w(0).truncate().text_color(m ? t.foreground : t.muted).child(name))
+        .when(Boolean(when), (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(when)))
+        .when(Boolean(m), (el) => el.child(commandMark(`tree-cmd-${p.pane}`, m, t, 14))));
+  });
 }
