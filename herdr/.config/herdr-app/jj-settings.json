@@ -10,17 +10,17 @@
     "content": {
       "mod": "pane"
     },
-    "reveal": "hover",
+    "reveal": "always",
     "height": 26,
     "position": "top"
   },
   "jj-agents": {
-    "icon": "hidden",
     "machine": "icon"
   },
   "jj-spaces": {
+    "icon": "hidden",
     "agents": "tree",
-    "icon": "hidden"
+    "terminals": "commands"
   },
   "jj-board": {
     "repos": [

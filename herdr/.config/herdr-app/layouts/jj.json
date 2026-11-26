@@ -91,7 +91,7 @@
                     "width": 1,
                     "color": "accent"
                   },
-                  "radius": 18,
+                  "radius": 4,
                   "gap": 0,
                   "lone": true
                 }
@@ -140,7 +140,7 @@
   ],
   "background": "canvas",
   "terminal_padding": [
-    0,
+    4,
     0
   ],
   "divider": {
