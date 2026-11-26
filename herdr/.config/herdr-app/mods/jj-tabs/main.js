@@ -169,6 +169,9 @@ export default class Tabs extends View {
       if (active >= 0) this.scroll.scroll_to_item(active);
     }
     const stop = (_e, cx) => cx.stop_propagation();
+    // A command running in the tab, or finished while it wasn't shown (jj-spaces' commands.js).
+    const commands = shared("commands.tabs") ?? {};
+    const commandTone = { running: t.muted, ok: t.ansi2, failed: t.blocked, unknown: t.done };
     const button = (id, label, action) => div().id(id).size(22).flex_none().flex().items_center().justify_center().rounded(5).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
     const item = (c, i) => {
@@ -191,6 +194,8 @@ export default class Tabs extends View {
         .child(div().max_w(170).truncate().child(c.zoomed ? `${name} Z` : name))
         .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(11).flex_none().text_color(t.working).spin(900)))
         .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
+        .when(Boolean(commands[c.id]), el => el.child(div().id(`cmd-${c.id}`).flex_none().flex().items_center().tooltip(commands[c.id].tip)
+          .child(svg("mods/workspace-chrome/terminal.svg").size(11).text_color(commandTone[commands[c.id].state]))))
         .when(this.hovered === c.id, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); }).child(svg("mods/pane/close.svg").size(10))));
     };
     const root = layout(), sidebar = find(root, "sidebar"), w = window();

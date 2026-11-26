@@ -51,6 +51,13 @@ if set -q HC_TERMINAL_ID
     function __herdr_focus_off --on-event fish_preexec
         printf '\e[?1004l'
     end
+    # The exit code of a command over 2 s, for the Herdr sidebar's finished-command mark.
+    function __herdr_exit --on-event fish_postexec
+        set -l code $status
+        test "$CMD_DURATION" -ge 2000; and command -q hc; or return
+        sh -c 'hc label "$1" "jj.exit=$2:$(date +%s)" >/dev/null 2>&1' sh $HC_TERMINAL_ID $code &
+        disown
+    end
 end
 
 starship init fish | source

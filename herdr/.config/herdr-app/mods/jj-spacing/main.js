@@ -12,12 +12,15 @@
 // its machine (by name, by an icon before it, or not at all) and what it says of it: its own
 // title or nothing, and under it its space and tab, its latest update or nothing, kept as
 // shared("jj-agents").
+// Its Commands tab picks which programs don't count as a running command for the space and
+// tab marks (jj-spaces/commands.js), kept as shared("jj-commands") (commands-tab.js).
 // What isn't in the layout is saved in jj-settings.json by jj-limits.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { layout, run, theme, props, closeOverlay, appHome, readTextFile, shared, setShared } from "herdr";
 import { boardTab, boardTabInit, boardKey } from "./board-tab.js";
+import { commandsTab, commandsTabInit, commandsKey } from "./commands-tab.js";
 
 const DEFAULT = { gap: 6, radius: 8, padX: 14, padY: 12 };
 const ROWS = [
@@ -30,7 +33,7 @@ const STEP = 2;
 const BARS = [["always", "Shown"], ["hover", "On hover"], ["none", "Hidden"]];
 const HEADER = { content: { mod: "pane" }, height: 26, position: "top" };
 const HINTS = "jj-copy.hints";
-const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"], ["board", "Board"], ["sidebar", "Sidebar"]];
+const TABS = [["spacing", "Spacing"], ["hints", "Hints"], ["links", "Links"], ["board", "Board"], ["sidebar", "Sidebar"], ["commands", "Commands"]];
 
 // jj-spaces/trello.js's DEFAULTS.
 const LINKS = "jj-links";
@@ -180,6 +183,7 @@ export default class Spacing extends View {
       this.fields[f.key] = input;
     }
     boardTabInit(this);
+    commandsTabInit(this);
     cx.spawn(async (cx) => {
       try {
         this.patterns = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
@@ -207,7 +211,7 @@ export default class Spacing extends View {
     localStorage.setItem("tab", tab);
   }
 
-  // In a Links field, to the next or previous one, past the ends (or out of the Board tab's)
+  // In a Links field, to the next or previous one, past the ends (or out of the Board or Commands tab's)
   // back to the dialog; otherwise to the next or previous tab.
   tabKey(by) {
     if (!this.editing) return this.show(TABS[(TABS.findIndex(([id]) => id === this.tab) + by + TABS.length) % TABS.length][0]);
@@ -230,6 +234,7 @@ export default class Spacing extends View {
       return true;
     }
     if (this.tab === "board") return boardKey(this, e);
+    if (this.tab === "commands") return commandsKey(this, e);
     if (this.tab === "links") {
       const n = SWITCHES.length;
       if (up) this.link = (this.link + n - 1) % n;
@@ -406,13 +411,13 @@ export default class Spacing extends View {
           .child("The agent's title is Claude's /rename or AI title, or the title another agent sets. The latest update is Claude's summary of its last turn. Right-click an agent to give it a description of its own or hide its description. Under their space, the agents list shows only on the narrow rail.")),
       reset: Object.keys(PREFS).some((store) => Object.keys(shared(store) ?? {}).length) ? () => { for (const store of Object.keys(PREFS)) setShared(store, {}); } : null,
       resetLabel: "Reset to defaults",
-      hint: "↑↓ choose · ←→ change · tab spacing · esc close",
+      hint: "↑↓ choose · ←→ change · tab commands · esc close",
     };
   }
 
   render() {
     const t = theme();
-    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.tab === "board" ? boardTab(this, t) : this.tab === "sidebar" ? this.sidebar(t) : this.spacing(t);
+    const view = this.tab === "hints" ? this.hints(t) : this.tab === "links" ? this.links(t) : this.tab === "board" ? boardTab(this, t) : this.tab === "sidebar" ? this.sidebar(t) : this.tab === "commands" ? commandsTab(this, t) : this.spacing(t);
     const tab = ([id, label]) => div().id(`tab-${id}`).px(10).py(4).rounded(6).cursor_pointer()
       .text_color(this.tab === id ? t.foreground : t.muted)
       .when(this.tab === id, (el) => el.bg(t.selected))

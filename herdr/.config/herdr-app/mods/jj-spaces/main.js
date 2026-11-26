@@ -2,7 +2,8 @@
 // folders you make (folders.js: by path, or dragged there; the rest in Other), a
 // server icon on another machine's. Machines show only while they need you (asleep, a
 // login, rebuilt, loading). After a space's name, where its first terminal is now,
-// only where unusual: branch, ahead/behind (its folder says the repo). Agent state lives in the agents list, not here. Click to
+// only where unusual: branch, ahead/behind (its folder says the repo). Agent state lives in the agents list, not here;
+// a terminal glyph at the end says a command runs in it, or finished unseen (commands.js). Click to
 // switch, right-click for its menu, drag to reorder or onto a folder. Spaces put in Waiting (kept on
 // their machine, docs.js) go to a section of their own at the bottom, folded at first.
 // Then its GitHub PRs and issues: linked from its menu, its branch's PR, and
@@ -35,6 +36,7 @@ import { previewInit, previewRender } from "./preview.js";
 import { discoverRepos } from "./board-data.js";
 import { agentRows, publishOrder, treeContext } from "./agent-tree.js";
 import { describeDialog } from "./agent-parts.js";
+import { commandMark, commandsDue, commandsInit, spaceCommand } from "./commands.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -110,7 +112,8 @@ const rootOf = (g) => {
 };
 
 const URGENT = { blocked: 3, done: 2, working: 1 };
-const urgent = (rows) => rows.map((r) => r.w.status).reduce((m, st) => ((URGENT[st] ?? 0) > (URGENT[m] ?? 0) ? st : m), null);
+const statusOf = (r) => (r.cmd?.at && (URGENT[r.w.status] ?? 0) < URGENT.done ? "done" : r.w.status);
+const urgent = (rows) => rows.map(statusOf).reduce((m, st) => ((URGENT[st] ?? 0) > (URGENT[m] ?? 0) ? st : m), null);
 
 function loadState() {
   try {
@@ -191,6 +194,7 @@ export default class Spaces extends View {
     this.boardsAt = 0;
     this.boardsAsked = this.connected;
     this.agentFolded = new Set(); // agents whose sub-agents the tree folds
+    commandsInit(this);
     // The open board (shared("board.open"), which ctrl-a T closes) from a previous run is gone;
     // one still open through a reload says so again (board.js).
     setShared("board.open", null);
@@ -254,6 +258,7 @@ export default class Spaces extends View {
     this.foldersDue(now, cx);
     this.boardDue(now, cx);
     this.treeDue();
+    commandsDue(this, now, sp, ps, cx);
   }
 
   // The agents list's block hidden while the tree shows its agents, and back on the rail.
@@ -1148,6 +1153,7 @@ export default class Spaces extends View {
     const sp = spaces();
     const filing = this.tree(sp, panes());
     this.rowsById = new Map([...filing.inside.values(), filing.other, filing.waiting].flat().map((r) => [r.w.id, r]));
+    for (const r of this.rowsById.values()) r.cmd = spaceCommand(this, r.w);
     this.filed = filing.list.length > 0;
     const folded = new Set(shared("space-folders.folded") ?? []);
     const out = [];
@@ -1449,11 +1455,13 @@ export default class Spaces extends View {
             .child(svg(`mods/workspace-chrome/${w.machine ? "server" : "monitor"}.svg`).size(12)))
           .child(div().flex_shrink(1).min_w(48).when(pref("branch") !== "hidden", (el) => el.max_w(150)).truncate().text_color(t.foreground).child(w.name))
           .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
-          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id)))),
+          .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id))))
+          .when(Boolean(r.cmd), (el) => el.child(commandMark(`cmd-${w.id}`, r.cmd, t))),
       );
   }
 
-  compact({ w, n }, t) {
+  compact({ w, n, cmd }, t) {
+    const agent = (URGENT[w.status] ?? 0) >= (cmd?.at ? URGENT.done : URGENT.working) || !cmd;
     return railCell(h_flex()
       .id(`space-${w.id}`)
       .tooltip(w.machine ? `${w.name} · ${w.machine}` : w.name)
@@ -1467,7 +1475,8 @@ export default class Spaces extends View {
       .when(!w.active, (el) => el.hover((s) => s.bg(t.hover)))
       .on_click(() => run("space.select", { id: w.id }))
       .child(div().text_color(w.active ? t.foreground : t.muted).child(String(n)))
-      .child(div().absolute().right(5).text_color(tone(t, w.status)).child(glyph(w.status))));
+      .child(agent ? div().absolute().right(5).text_color(tone(t, w.status)).child(glyph(w.status))
+        : div().absolute().right(3).child(commandMark(`cmd-${w.id}`, cmd, t, 10))));
   }
 
   render() {
