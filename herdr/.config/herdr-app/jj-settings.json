@@ -20,7 +20,7 @@
   "jj-spaces": {
     "icon": "hidden",
     "agents": "tree",
-    "terminals": "commands"
+    "terminals": "all"
   },
   "jj-board": {
     "repos": [
@@ -30,5 +30,10 @@
       "6334241fc4c7a001b1527af7"
     ],
     "hideEmpty": true
+  },
+  "jj-commands": {
+    "skip": [
+      "sofka"
+    ]
   }
 }
