@@ -14,6 +14,9 @@ const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b
 // color name ("ansi6") or a picked #rrggbb. A space seen without one gets
 // the theme color fewest spaces use, once; every mod does the same in the
 // same order, so they agree, and adding or renaming spaces moves nothing.
+// A space by its name, else the sidebar's automatic one (jj-spaces' names.js), else Herdr's.
+const spaceName = (w) => shared("names")?.spaces?.[w.id] ?? w.name;
+const tabName = (c) => (!c.named && shared("names")?.tabs?.[c.id]) || c.name;
 const PROJECT_COLORS = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
 function spaceColors() {
   const ids = new Set(spaces().map((p) => p.id));
@@ -80,7 +83,7 @@ export default class Picker extends View {
           const mine = all.filter((a) => a.tab === ctx.id);
           return { w, ctx, mine, team: teamOf(mine.map((a) => a.address)) };
         })
-        .filter((c) => !f || [w.name, c.ctx.name, ...c.mine.map((a) => a.program?.name ?? "")].join(" ").toLowerCase().includes(f));
+        .filter((c) => !f || [spaceName(w), tabName(c.ctx), ...c.mine.map((a) => a.program?.name ?? "")].join(" ").toLowerCase().includes(f));
       return { w, ctxs };
     });
     const busy = groups.filter((p) => p.w.status && p.ctxs.length);
@@ -167,8 +170,8 @@ export default class Picker extends View {
           .text_size(11)
           .font_semibold()
           .text_color(t.dim)
-          .child(h_flex().size(18).rounded(5).bg(spaceColor(t, r.w)).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...r.w.name][0]?.toUpperCase() ?? "?"))
-          .child(r.w.name);
+          .child(h_flex().size(18).rounded(5).bg(spaceColor(t, r.w)).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...spaceName(r.w)][0]?.toUpperCase() ?? "?"))
+          .child(spaceName(r.w));
       }
       if (r.kind === "earlier") {
         return h_flex()
@@ -221,7 +224,7 @@ export default class Picker extends View {
         .hover((s) => s.bg(t.hover))
         .on_click(() => this.go(r))
         .child(this.glyph(t, r.ctx.status))
-        .child(div().flex_1().truncate().text_color(t.foreground).when(here, (d) => d.font_semibold()).child(r.ctx.name))
+        .child(div().flex_1().truncate().text_color(t.foreground).when(here, (d) => d.font_semibold()).child(tabName(r.ctx)))
         .when(r.ctx.status === "blocked", (el) => el.child(div().text_size(11).text_color(t.blocked).child("needs you")))
         .when(r.ctx.status === "done", (el) => el.child(div().text_size(11).text_color(t.done).child("finished")))
         .child(div().text_size(11).text_color(t.dim).child(who + (r.team ? `  +${r.team}` : "")));

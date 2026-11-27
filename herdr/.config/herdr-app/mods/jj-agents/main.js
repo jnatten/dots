@@ -26,6 +26,8 @@ function find(node, id) {
 
 // The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
+// An agent's space by its name, else the sidebar's automatic one (jj-spaces' names.js), else Herdr's.
+const spaceOf = (a) => shared("names")?.spaces?.[a.space] ?? a.space_name;
 
 // To the rail (on macOS wide enough for the traffic lights), or back to the width it had.
 function toggleSidebar() {
@@ -299,7 +301,7 @@ export default class Agents extends View {
   describeView(t) {
     const a = agents().find((x) => x.address === props().describe);
     const tab = a && spaces().flatMap((s) => s.tabs).find((x) => x.id === a.tab);
-    const where = a ? [a.space_name, tab?.named ? tab.name : null].filter(Boolean).join(" · ") : "This agent is gone";
+    const where = a ? [spaceOf(a), tab?.named ? tab.name : null].filter(Boolean).join(" · ") : "This agent is gone";
     const pick = (mode) => {
       this.mode = mode;
       this.input.focus();
@@ -443,9 +445,9 @@ export default class Agents extends View {
     const label = (a) => labels.get(a.address);
     const detail = new Map(list.map(a => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
     const seen = {};
-    for (const a of list) { const k = `${a.space_name}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
+    for (const a of list) { const k = `${spaceOf(a)}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
     for (const a of list) {
-      if (detail.get(a.address) == null && seen[`${a.space_name}\u0000`] > 1) detail.set(a.address, label(a));
+      if (detail.get(a.address) == null && seen[`${spaceOf(a)}\u0000`] > 1) detail.set(a.address, label(a));
     }
 
     const row = (a, i, subs = []) => {
@@ -480,10 +482,10 @@ export default class Agents extends View {
       // Without a space header above (priority, folders, pinned, needs you) the row names its space.
       const full = byPriority || byFolder || isPinned || urgent.has(a.address);
       const compact = (byPriority && !isPinned) || urgent.has(a.address);
-      const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
+      const name = full ? spaceOf(a) || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
       // Under a description: its space and named tab, or the agent's latest update. What isn't shown goes in the tooltip.
       const tab = tabs.get(a.tab);
-      const where = [full ? a.space_name : null, tab?.named && tab.name !== desc ? tab.name : null].filter(Boolean).join(" · ");
+      const where = [full ? spaceOf(a) : null, tab?.named && tab.name !== desc ? tab.name : null].filter(Boolean).join(" · ");
       const update = clean(term?.report?.msg) || null;
       const under = line2 === "space" ? (desc ? where : null) : line2 === "update" ? update : null;
       const tip = [desc, desc && under !== where ? where : null, under !== update ? update : null].filter(Boolean);
@@ -550,7 +552,7 @@ export default class Agents extends View {
       const f = byFolder ? (folders.get(filed[a.space]) ?? null) : null;
       const id = byPriority ? `sec-${r}` : byFolder ? `fd-${f?.id ?? "other"}` : `sp-${a.space}`;
       if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
-      else groups.push({ id, label: byPriority ? SECTION[r] : byFolder ? (f?.name ?? "Other") : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a], folder: byFolder ? (f ?? {}) : null });
+      else groups.push({ id, label: byPriority ? SECTION[r] : byFolder ? (f?.name ?? "Other") : spaceOf(a) || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a], folder: byFolder ? (f ?? {}) : null });
     }
     if (waiting.length) groups.push({ id: "waiting", label: "Waiting", status: null, members: waiting, waiting: true });
     const isFolded = (g) => (g.waiting ? !waitingOpen : this.folded.has(g.id));

@@ -210,7 +210,7 @@ export default class Sessions extends View {
     const colors = shared("space.colors") ?? {};
     const all = spaces().map((w) => ({
       id: w.id,
-      title: w.name,
+      title: shared("names")?.spaces?.[w.id] ?? w.name,
       cwd: place(w, ps) ?? "",
       machine: w.machine,
       color: colors[w.id] ?? "ansi6",

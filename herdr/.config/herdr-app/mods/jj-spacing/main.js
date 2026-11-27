@@ -8,7 +8,8 @@
 // Its Board tab picks the board's (ctrl-a T) repos and Trello boards (board-tab.js).
 // Its Sidebar tab picks whether space rows (jj-spaces) show their icon and branch, whether
 // their agents go under them as a tree instead of in a list of their own, which of their
-// terminals go under them too and whether those go under a header per tab, kept as
+// terminals go under them too, whether those go under a header per tab and what the spaces and
+// tabs nobody named are called, kept as
 // shared("jj-spaces"), and whether the agents list (jj-agents) shows each agent's icon,
 // its machine (by name, by an icon before it, or not at all) and what it says of it: its own
 // title or nothing, and under it its space and tab, its latest update or nothing, kept as
@@ -54,7 +55,7 @@ const linkValue = (key) => shared(LINKS)?.[key] ?? LINK_DEFAULTS[key];
 let bound = false;
 
 // jj-spaces' and jj-agents' PREF_DEFAULTS.
-const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden", agents: "list", terminals: "off", tabs: "off" }, "jj-agents": { icon: "shown", description: "title", line: "space", machine: "name" } };
+const PREFS = { "jj-spaces": { icon: "shown", branch: "hidden", agents: "list", terminals: "off", tabs: "off", names: "auto" }, "jj-agents": { icon: "shown", description: "title", line: "space", machine: "name" } };
 const SHOWN = [["shown", "Shown"], ["hidden", "Hidden"]];
 const SIDEBAR_ROWS = [
   { store: "jj-spaces", key: "icon", label: "Icon", options: SHOWN },
@@ -62,6 +63,7 @@ const SIDEBAR_ROWS = [
   { store: "jj-spaces", key: "agents", label: "Agents", options: [["list", "Own list"], ["tree", "Under their space"]] },
   { store: "jj-spaces", key: "terminals", label: "Terminals", options: [["off", "Off"], ["commands", "With a command"], ["all", "All"]] },
   { store: "jj-spaces", key: "tabs", label: "Tabs", options: [["off", "Off"], ["several", "When several"], ["always", "Always"]] },
+  { store: "jj-spaces", key: "names", label: "Names", options: [["herdr", "Herdr's"], ["auto", "Automatic"]] },
   { store: "jj-agents", key: "icon", label: "Icon", options: SHOWN },
   { store: "jj-agents", key: "machine", label: "Machine", options: [["name", "Name"], ["icon", "Icon"], ["off", "Off"]] },
   { store: "jj-agents", key: "description", label: "Description", options: [["title", "Agent's title"], ["off", "Off"]] },
@@ -422,7 +424,7 @@ export default class Spacing extends View {
       body: v_flex().flex_1().min_h(0).gap(4)
         .children(SIDEBAR_ROWS.flatMap((r, i) => [...(SIDEBAR_ROWS[i - 1]?.store !== r.store ? [section(r.store)] : []), row(r, i)]))
         .child(div().px(8).pt(10).text_size(11.5).text_color(t.dim)
-          .child("The agent's title is Claude's /rename or AI title, or the title another agent sets. The latest update is Claude's summary of its last turn. Right-click an agent to give it a description of its own or hide its description. Under their space, the agents list shows only on the narrow rail. Terminals go under their space after its agents: those running a command or that finished one you haven't focused since, or all of them. Tabs puts them under a header per tab, always or when they're in more than one; click a header to show that tab.")),
+          .child("The agent's title is Claude's /rename or AI title, or the title another agent sets. The latest update is Claude's summary of its last turn. Right-click an agent to give it a description of its own or hide its description. Under their space, the agents list shows only on the narrow rail. Terminals go under their space after its agents: those running a command or that finished one you haven't focused since, or all of them. Tabs puts them under a header per tab, always or when they're in more than one; click a header to show that tab. Automatic names call a space nobody named after its worktree or branch, and a tab after its panes' programs; a name you give wins.")),
       reset: Object.keys(PREFS).some((store) => Object.keys(shared(store) ?? {}).length) ? () => { for (const store of Object.keys(PREFS)) setShared(store, {}); } : null,
       resetLabel: "Reset to defaults",
       hint: "↑↓ choose · ←→ change · tab commands · esc close",

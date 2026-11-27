@@ -70,7 +70,7 @@ function sessionsNow() {
       cwd: t.labels["claude.cwd"] || was?.cwd || "",
       title: t.labels["jj.description"] || a?.title || was?.title || "Claude",
       space: a?.space ?? was?.space ?? null,
-      spaceName: a?.space_name ?? was?.spaceName ?? "",
+      spaceName: (a && shared("names")?.spaces?.[a.space]) || a?.space_name || was?.spaceName || "",
       links,
       at: now,
       running: { address: t.address, status: a?.status ?? "idle" },

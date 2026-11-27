@@ -124,7 +124,10 @@ all) lists a space's terminals under it after its agents, drawn like the tree's 
 (`terminalRows` in commands.js): what runs or ran, how long ago and its mark, or the folder of
 one at its prompt. Its Tabs option (`tabs`: off, several, always) puts a space's agents and
 terminals under a header per tab (`spaceRows` in agent-tree.js), when they're in more than one
-or always; a click on a header shows that tab.
+or always; a click on a header shows that tab. Its Names option (`names`: herdr, auto) calls
+the spaces and tabs nobody named after their worktree or branch and their panes' programs
+("Claude Code | fish"), display-only: `mods/jj-spaces/names.js` works them out and shares them as
+`shared("names")` for the tab bar, agents list, pickers and session search.
 
 ## Working on mods
 

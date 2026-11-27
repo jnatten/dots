@@ -19,6 +19,7 @@ import { editLinks, forgetHistory, linksOf, split } from "./docs.js";
 const spaceOf = () => spaces().find((s) => s.id === props()?.link);
 const agentOf = () => agents().find((a) => a.address === props()?.agent);
 const nameOf = (a) => a.tab_name || a.title || a.address;
+const spaceName = (s) => shared("names")?.spaces?.[s.id] ?? s.name;
 const targetOf = () => (props()?.agent ? { agent: props().agent } : { space: props()?.link });
 const open = (url, cx) => cx.spawn(async () => { await exec("open", [url]).catch(() => null); });
 
@@ -272,7 +273,7 @@ export function linkRender(view) {
     .bg(t.popover)
     .text_size(13)
     .child(div().flex_none().truncate().font_semibold().text_color(t.foreground)
-      .child(agent ? `Links of ${agent.pane ? nameOf(agent) : "the agent"}${s ? ` in ${s.name}` : ""}` : `Links${s ? ` of ${s.name}` : ""}`))
+      .child(agent ? `Links of ${agent.pane ? nameOf(agent) : "the agent"}${s ? ` in ${spaceName(s)}` : ""}` : `Links${s ? ` of ${spaceName(s)}` : ""}`))
     .child(Input.new(view.input).h(32).px(10).flex_none().items_center().rounded(6).border(1).border_color(t.accent).bg(t.background).text_color(t.foreground))
     .when(Boolean(view.error), (el) => el.child(div().flex_none().text_color(t.blocked).child(view.error)))
     .child(v_flex().id("link-list").flex_1().min_h(0).overflow_y_scrollbar().track_scroll(view.scroll)

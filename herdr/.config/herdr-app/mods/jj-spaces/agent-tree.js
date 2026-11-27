@@ -60,7 +60,8 @@ export function spaceRows(view, w, t, ctx, terms, now, tabs) {
   });
 }
 
-// A tab's header in the tree: its name (or "Tab 2"), brighter when it's the space's shown tab; a click shows it.
+// A tab's header in the tree: its name, else its automatic one (names.js), else "Tab 2"; brighter
+// when it's the space's shown tab; a click shows it.
 function tabRow(w, tab, last, t) {
   return h_flex()
     .id(`tree-tab-${tab.id}`)
@@ -79,7 +80,7 @@ function tabRow(w, tab, last, t) {
       run("tab.select", { id: tab.id });
     })
     .children(treeLines(t, [last ? "└" : "├"], 20))
-    .child(div().flex_1().min_w(0).truncate().child(tab.named ? tab.name : `Tab ${tab.index}`));
+    .child(div().flex_1().min_w(0).truncate().child(tab.named ? tab.name : (shared("names")?.tabs?.[tab.id] ?? `Tab ${tab.index}`)));
 }
 
 // Agents hanging off the space's avatar (or a tab's header, `lead` in); a click on an agent's icon

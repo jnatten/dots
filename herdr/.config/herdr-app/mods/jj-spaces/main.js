@@ -24,7 +24,8 @@
 // Its Agents pref "tree" puts each space's agents under it (agent-tree.js) and hides the
 // agents list's block, except on the rail. Its Terminals pref lists a space's terminals under
 // it too, after its agents: those running or that finished a command, or all (commands.js).
-// Its Tabs pref puts them under a header per tab (agent-tree.js).
+// Its Tabs pref puts them under a header per tab (agent-tree.js). Its Names pref calls the
+// spaces and tabs nobody named after their worktree or branch and their panes' programs (names.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -41,6 +42,7 @@ import { discoverRepos } from "./board-data.js";
 import { publishOrder, spaceRows, treeContext } from "./agent-tree.js";
 import { describeDialog } from "./agent-parts.js";
 import { commandMark, commandsDue, commandsInit, spaceCommand, terminalList } from "./commands.js";
+import { branchTitle, publishNames } from "./names.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -95,7 +97,7 @@ const BACKFILL = 15 * 60000;
 const BOARD_REPOS = 10 * 60000;
 const BOARD_LIST = 30 * 60000;
 // jj-spacing's Sidebar tab keeps what differs from these.
-const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list", terminals: "off", tabs: "off" };
+const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list", terminals: "off", tabs: "off", names: "auto" };
 const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
@@ -147,7 +149,7 @@ export default class Spaces extends View {
     if (props()?.folder) return folderInit(this, cx);
     if (props()?.board) return boardInit(this, cx);
     if (props()?.preview) return previewInit(this, cx);
-    this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked, gh: "owner/repo" }, null: not a repo
+    this.git = {}; // where() -> { name, branch, ahead, behind, repo, workspace (a jj one's folder), linked, gh: "owner/repo" }, null: not a repo
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
     this.pending = new Set(); // where()s to look at next
@@ -501,7 +503,7 @@ export default class Spaces extends View {
           cwd: t.labels["claude.cwd"] ?? "",
           title: t.labels["jj.description"] || a?.title || t.title || a?.tab_name || "",
           space: a ? split(a.space)[1] : "",
-          spaceName: a?.space_name ?? "",
+          spaceName: (a && this.names?.spaces[a.space]) || a?.space_name || "",
           terminal: split(t.address)[1],
         };
       });
@@ -1099,8 +1101,11 @@ export default class Spaces extends View {
       ]);
       const name = repo.endsWith("/.git") ? base(repo.slice(0, -5)) : base(repo).replace(/\.git$/, "");
       const [ahead, behind] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
-      const bookmark = branch.code === 0 ? null : await bookmarkOf(cwd, on);
-      const info = { name, top, branch: bookmark ?? (branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)"), ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git`, gh: origin.code === 0 ? githubRepo(origin.stdout) : null };
+      // In jj, a workspace of its own (claude --worktree's) is a folder inside the repo git doesn't see.
+      const [bookmark, ws] = branch.code === 0 ? [null, null]
+        : await Promise.all([bookmarkOf(cwd, on), exec("jj", ["--ignore-working-copy", "workspace", "root"], { cwd, on }).catch(() => null)]);
+      const root = ws?.code === 0 ? ws.stdout.replace(/\n$/, "") : null;
+      const info = { name, top, branch: bookmark ?? (branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)"), ahead, behind, repo: JSON.stringify([on, repo]), workspace: root && root !== top ? root : null, linked: repo !== `${top}/.git`, gh: origin.code === 0 ? githubRepo(origin.stdout) : null };
       this.git[key] = info;
       if (!on) this.watch(repo, cx);
     } catch {
@@ -1385,7 +1390,7 @@ export default class Spaces extends View {
   // nearly every space is on one.
   gitTail(g, name, t) {
     const raw = g.branch ?? "detached";
-    const where = pref("branch") === "hidden" || raw.toLowerCase() === name.toLowerCase() || raw === "master" || raw === "main" ? "" : raw;
+    const where = pref("branch") === "hidden" || raw.toLowerCase() === name.toLowerCase() || branchTitle(raw) === name || raw === "master" || raw === "main" ? "" : raw;
     return h_flex()
       .flex_1()
       .min_w(0)
@@ -1403,6 +1408,7 @@ export default class Spaces extends View {
   // machine, a space moves next to it (into its folder); on another machine's, into its folder.
   row(r, t) {
     const { w, i, g } = r;
+    const name = this.nameOf(w);
     const on = w.active;
     const fromIndex = this.pressed === null ? -1 : spaces().findIndex(s => s.id === this.pressed);
     const colors = shared("space.colors") ?? {};
@@ -1465,22 +1471,27 @@ export default class Spaces extends View {
         h_flex()
           .gap(9)
           .items_center()
-          .when(pref("icon") !== "hidden", (el) => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?")))
+          .when(pref("icon") !== "hidden", (el) => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...name][0]?.toUpperCase() ?? "?")))
           .child(div().id(`space-machine-${w.id}`).flex_none().flex().items_center().text_color(t.dim).tooltip(w.machine ?? "This machine")
             .when(pref("icon") === "hidden", (el) => el.pl(3).mr(-3))
             .child(svg(`mods/workspace-chrome/${w.machine ? "server" : "monitor"}.svg`).size(12)))
-          .child(div().flex_shrink(1).min_w(48).when(pref("branch") !== "hidden", (el) => el.max_w(150)).truncate().text_color(t.foreground).child(w.name))
-          .child(g ? this.gitTail(g, w.name, t) : div().flex_1())
+          .child(div().flex_shrink(1).min_w(48).when(pref("branch") !== "hidden", (el) => el.max_w(150)).truncate().text_color(t.foreground).child(name))
+          .child(g ? this.gitTail(g, name, t) : div().flex_1())
           .when(this.links?.get(w.id)?.length > 0, (el) => el.child(kinds(this.links.get(w.id), this.items, t, `gh-${w.id}`, () => openLinks(w.id))))
           .when(Boolean(r.cmd), (el) => el.child(commandMark(`cmd-${w.id}`, r.cmd, t))),
       );
+  }
+
+  // Its name: its own, else the automatic one (names.js), else Herdr's.
+  nameOf(w) {
+    return this.names?.spaces[w.id] ?? w.name;
   }
 
   compact({ w, n, cmd }, t) {
     const agent = (URGENT[w.status] ?? 0) >= (cmd?.at ? URGENT.done : URGENT.working) || !cmd;
     return railCell(h_flex()
       .id(`space-${w.id}`)
-      .tooltip(w.machine ? `${w.name} · ${w.machine}` : w.name)
+      .tooltip(w.machine ? `${this.nameOf(w)} · ${w.machine}` : this.nameOf(w))
       .relative()
       .w(RAIL_CELL)
       .h(26)
@@ -1527,8 +1538,10 @@ export default class Spaces extends View {
       changed = true;
     }
     if (changed) setShared("space.colors", kept);
-    this.publish(sp, panes());
+    const ps = panes();
+    this.publish(sp, ps);
     this.publishFolders();
+    this.names = publishNames(sp, ps, (w) => this.git[where(w, ps)] ?? null, pref("names") !== "herdr");
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
       .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())

@@ -16,6 +16,8 @@ const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b
 const hex = () => Array.from({ length: 32 }, () => ((Math.random() * 16) | 0).toString(16)).join("");
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 const local = (id) => id.split("/").pop();
+// A space by its name, else the sidebar's automatic one (jj-spaces' names.js), else Herdr's.
+const spaceName = (w) => shared("names")?.spaces?.[w.id] ?? w.name;
 const sleep = (cx, ms) => new Promise((resolve) => cx.timer.after(ms, () => resolve()));
 
 async function waitFor(cx, done, ms = 4000) {
@@ -155,9 +157,9 @@ export default class Panes extends View {
     const machine = machineOf(p.terminal);
     const f = this.text.trim();
     const list = spaces()
-      .filter((s) => s.id !== from?.id && (s.machine ?? null) === machine && (!f || s.name.toLowerCase().includes(f.toLowerCase())))
+      .filter((s) => s.id !== from?.id && (s.machine ?? null) === machine && (!f || spaceName(s).toLowerCase().includes(f.toLowerCase())))
       .map((s) => ({ space: s }));
-    const exact = list.some(({ space }) => space.name.toLowerCase() === f.toLowerCase());
+    const exact = list.some(({ space }) => spaceName(space).toLowerCase() === f.toLowerCase());
     return [...list, ...(exact ? [] : [{ name: f }])];
   }
 
@@ -183,7 +185,7 @@ export default class Panes extends View {
     const colors = shared("space.colors") ?? {};
     const avatar = (s) => {
       const c = colors[s.id] ?? "ansi6";
-      return h_flex().size(16).flex_none().rounded(4).bg(c.startsWith("#") ? c : (MARK[c] ?? t[c])).items_center().justify_center().text_size(9).font_bold().text_color("#ffffff").child([...s.name][0]?.toUpperCase() ?? "?");
+      return h_flex().size(16).flex_none().rounded(4).bg(c.startsWith("#") ? c : (MARK[c] ?? t[c])).items_center().justify_center().text_size(9).font_bold().text_color("#ffffff").child([...spaceName(s)][0]?.toUpperCase() ?? "?");
     };
     const row = (choice, i) =>
       h_flex()
@@ -199,7 +201,7 @@ export default class Panes extends View {
         .when(i !== this.at, (el) => el.hover((s) => s.bg(t.hover)))
         .on_click((_e, cx) => this.pick(choice, cx))
         .child(choice.space ? avatar(choice.space) : div().w(16).flex_none().text_color(t.dim).child("+"))
-        .child(div().flex_1().min_w(0).truncate().text_color(choice.space ? t.foreground : t.muted).child(choice.space ? choice.space.name : choice.name ? `New space “${choice.name}”` : "New space"));
+        .child(div().flex_1().min_w(0).truncate().text_color(choice.space ? t.foreground : t.muted).child(choice.space ? spaceName(choice.space) : choice.name ? `New space “${choice.name}”` : "New space"));
     return v_flex()
       .id("move-pane")
       .track_focus(this.handle)
