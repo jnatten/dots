@@ -20,7 +20,8 @@
   "jj-spaces": {
     "icon": "hidden",
     "agents": "tree",
-    "terminals": "all"
+    "terminals": "all",
+    "tabs": "several"
   },
   "jj-board": {
     "repos": [
