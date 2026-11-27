@@ -3,8 +3,9 @@
 // so it gets the keys it scrolls on through `hc keys`; its line keys are
 // shift+pageup/pagedown, which ~/.claude/keybindings.json binds to
 // scroll:lineUp/lineDown. Other terminals scroll Herdr's view of their history.
-// f starts hint mode (jj-copy's fingers) on what's shown, and leaves it there; so does
-// ctrl-a f, which closes this popup (shared("jj-scroll.keep"), set by jj-tabs).
+// f starts hint mode (jj-copy's fingers) on what's shown, and leaves it there; so do
+// ctrl-a f and ctrl-a v (copy mode), which close this popup (shared("jj-scroll.keep"), set
+// by jj-tabs).
 
 import { View, div } from "gpui-kit";
 import { h_flex } from "gpui-base";
