@@ -4,7 +4,8 @@
 //   descriptions, the board's repos and Trello boards, the programs that aren't commands). The file wins at start and whenever it changes on disk (a pull); changes
 //   made here are written back.
 // - jj-state.json (this Mac's, linked into each window's home by new-window.sh): what
-//   every window on this Mac shows alike (space colors, folded folders). A key it
+//   every window on this Mac shows alike (space colors, folded folders, other machines'
+//   spaces hidden). A key it
 //   doesn't have yet is taken from the window that looks first, and an emptied one is
 //   kept, so a window coming back can't bring old values with it.
 // Without a file (dots not stowed there yet, no second window yet) it isn't synced.
@@ -13,7 +14,7 @@ import { appHome, readTextFile, writeTextFile, shared, setShared } from "herdr";
 
 const FILES = [
   { name: "jj-settings.json", keys: ["jj-copy.hints", "jj-links", "jj-spacing.header", "jj-agents", "jj-spaces", "jj-board", "jj-commands"], fill: false, keepEmpty: false },
-  { name: "jj-state.json", keys: ["space.colors", "space-folders.folded"], fill: true, keepEmpty: true },
+  { name: "jj-state.json", keys: ["space.colors", "space-folders.folded", "spaces.hide-remote"], fill: true, keepEmpty: true },
 ];
 
 const empty = (v) => v == null || (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);

@@ -19,6 +19,8 @@
 // spacing dialog's Board tab; and links the sessions the board starts to their item.
 // ctrl-a t opens and closes the tasks list (jj-sessions' tasks.js) from here, and ctrl-a d
 // an agent's Description dialog (jj-agents').
+// The server button beside + hides other machines' spaces but the shown one, and their
+// machines, in every window on this Mac (shared("spaces.hide-remote"), in jj-state.json).
 // Its Agents pref "tree" puts each space's agents under it (agent-tree.js) and hides the
 // agents list's block, except on the rail. Its Terminals pref lists a space's terminals under
 // it too, after its agents: those running or that finished a command, or all (commands.js).
@@ -1156,6 +1158,8 @@ export default class Spaces extends View {
     const now = Date.now();
     const filing = this.tree(sp, ps);
     this.rowsById = new Map([...filing.inside.values(), filing.other, filing.waiting].flat().map((r) => [r.w.id, r]));
+    const local = Boolean(shared("spaces.hide-remote"));
+    const shown = (r) => !local || !r.w.machine || r.w.active;
     for (const r of this.rowsById.values()) r.cmd = spaceCommand(this, r.w);
     this.filed = filing.list.length > 0;
     const folded = new Set(shared("space-folders.folded") ?? []);
@@ -1181,24 +1185,28 @@ export default class Spaces extends View {
       }
     };
     for (const f of filing.list) {
-      const members = filing.inside.get(f.id);
+      const all = filing.inside.get(f.id);
+      const members = all.filter(shown);
+      if (all.length && !members.length) continue;
       const color = f.color ? (MARK[f.color] ?? t[f.color]) : t.dim;
       out.push(collapsed ? this.railHead(f.id, f.name, color, folded.has(f.id), members, t) : this.folderHead(f, color, members, folded.has(f.id), t, filing.list));
       rows(members, folded.has(f.id));
     }
     const dragging = this.pressed !== null && Boolean(this.rowsById.get(this.pressed)?.folder);
-    if (this.filed && (filing.other.length || dragging)) {
-      out.push(collapsed ? this.railHead("other", "Other", t.border, folded.has("other"), filing.other, t) : this.otherHead(filing.other, folded.has("other"), t));
-      rows(filing.other, folded.has("other"));
-    } else rows(filing.other, false);
+    const other = filing.other.filter(shown);
+    if (this.filed && (other.length || dragging)) {
+      out.push(collapsed ? this.railHead("other", "Other", t.border, folded.has("other"), other, t) : this.otherHead(other, folded.has("other"), t));
+      rows(other, folded.has("other"));
+    } else rows(other, false);
     if (!sp.length) out.push(machines().find((m) => m.name === null)?.layout === "loading" ? this.loadingRow(t, collapsed) : this.emptyRow(t, collapsed));
-    out.push(...this.machineRows(t, collapsed));
+    if (!local) out.push(...this.machineRows(t, collapsed));
     const open = Boolean(shared("waiting.open"));
-    for (const r of filing.waiting) {
+    const waiting = filing.waiting.filter(shown);
+    for (const r of waiting) {
       listed.push(r.w.id);
       if (open) r.n = order.push(r.w.id);
     }
-    out.push(...this.waitingSection(t, collapsed, filing.waiting, draw));
+    out.push(...this.waitingSection(t, collapsed, waiting, draw));
     this.hidden = hidden;
     if (tree) publishOrder(tree);
     const filed = Object.fromEntries(filing.list.flatMap((f) => filing.inside.get(f.id).map((r) => [r.w.id, f.id])));
@@ -1486,6 +1494,19 @@ export default class Spaces extends View {
         : div().absolute().right(2).child(commandMark(`cmd-${w.id}`, cmd, t, 12))));
   }
 
+  // Shows or hides other machines' spaces; crossed out while they're hidden.
+  remoteButton(t) {
+    const hidden = Boolean(shared("spaces.hide-remote"));
+    return div().id("space-remote").size(26).flex_none().flex().items_center().justify_center().relative().rounded(6)
+      .when(hidden, (el) => el.text_color(t.foreground))
+      .hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .tooltip(hidden ? "Show other machines' spaces" : "Hide other machines' spaces")
+      .on_click(() => setShared("spaces.hide-remote", !hidden))
+      .child(svg("mods/workspace-chrome/server.svg").size(14))
+      .when(hidden, (el) => el.child(div().absolute().right(2).bottom(2).size(11).flex().items_center().justify_center().rounded_full().bg(t.chrome).text_color(t.blocked)
+        .child(svg("mods/workspace-chrome/x.svg").size(9))));
+  }
+
   render() {
     if (props()?.link) return linkRender(this);
     if (props()?.folder) return folderRender(this);
@@ -1511,11 +1532,13 @@ export default class Spaces extends View {
       .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
         .when(collapsed, el => el.pl(0).pr(0).justify_center())
         .when(!collapsed, el => el.child("Spaces"))
-        .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
-          .tooltip("New space · right-click: on another machine, or a folder")
-          .on_click(() => run("space.new"))
-          .on_mouse_down("right", () => openOverlay({ mod: "jj-menu", kind: "popup", width: 240, height: 300, props: { tab: "new" } }))
-          .child(svg("mods/workspace-chrome/plus.svg").size(14))))
+        .child(h_flex().gap(2).items_center()
+          .when(!collapsed, el => el.child(this.remoteButton(t)))
+          .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
+            .tooltip("New space · right-click: on another machine, or a folder")
+            .on_click(() => run("space.new"))
+            .on_mouse_down("right", () => openOverlay({ mod: "jj-menu", kind: "popup", width: 240, height: 300, props: { tab: "new" } }))
+            .child(svg("mods/workspace-chrome/plus.svg").size(14)))))
       .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 8).pb(14).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.endDrag(); cx.notify(); })
         .children(this.grouped(t, collapsed)));
