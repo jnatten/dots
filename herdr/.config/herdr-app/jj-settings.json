@@ -15,13 +15,14 @@
     "position": "top"
   },
   "jj-agents": {
-    "machine": "icon"
+    "machine": "icon",
+    "line": "update"
   },
   "jj-spaces": {
     "icon": "hidden",
     "agents": "tree",
-    "terminals": "all",
-    "tabs": "several"
+    "tabs": "several",
+    "terminals": "commands"
   },
   "jj-board": {
     "repos": [
