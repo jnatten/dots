@@ -6,7 +6,7 @@
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { props, theme, settings, terminals, panes, run, exec, hc, appHome, home, notify, openOverlay, closeOverlay, shared, setShared, readTextFile } from "herdr";
+import { props, theme, settings, terminals, panes, run, exec, hc, appHome, home, notify, closeOverlay, shared, setShared, readTextFile } from "herdr";
 import * as vim from "./vim.js";
 
 const HISTORY = "100000";
@@ -82,11 +82,9 @@ async function openable({ text, kind }, cwd, on) {
 }
 
 // Hint mode on a pane: the helper reads what the pane shows and runs until a hint is
-// typed or Esc. A fullscreen program (Claude Code: it scrolls itself) has the helper
-// shown in its place, then gets its pane back as it was. A plain terminal has it over the
-// whole window instead (a dialog of its terminal, so every line fits): swapping its view out
-// would cost Herdr's view its history, and with that where it was scrolled to; scrolled up,
-// the hints go on the lines shown.
+// typed or Esc. The helper is shown in the pane's place, then the pane gets its own view
+// back as it was, history and scroll position included; scrolled up, the hints go on the
+// lines shown.
 // Pressed again while one runs, it ends that one.
 async function fingers(cx, { terminal, pane, cwd }) {
   const running = shared(RUNNING);
@@ -119,11 +117,10 @@ async function fingers(cx, { terminal, pane, cwd }) {
     setShared(RUNNING, address);
     const live = () => terminals().some((x) => x.address === address && x.state === "live");
     for (let waited = 0; waited < 3000 && !live(); waited += 25) await sleep(cx, 25);
-    if (live() && view) openOverlay({ kind: "dialog", frame: "none", width: 1, height: 1, layout: { type: "block", content: { terminal: address } } });
-    else if (live()) run("terminal.show", { terminal: address, pane });
+    if (live()) run("terminal.show", { terminal: address, pane });
     for (let waited = 0; waited < 600000 && live(); waited += 50) await sleep(cx, 50);
     if (live()) run("terminal.kill", { terminal: address });
-    if (!view) run("terminal.show", { pane });
+    run("terminal.show", { pane });
     if (shared(RUNNING) === address) setShared(RUNNING, null);
     const result = JSON.parse((await readTextFile(`${tmp}/result.json`).catch(() => null)) ?? "null");
     if (!result) return;
