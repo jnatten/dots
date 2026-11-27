@@ -2,11 +2,14 @@
 // tab): each space's agents under it, and their sub-agents under them. The agents list's
 // block (jj-agents) is hidden meanwhile, except on the rail, and the agent order next/prev
 // go by is this tree's. Drawn with jj-agents' own pieces (agent-parts.js, a copy of its parts.js).
+// Its Tabs pref puts a space's agents and terminals under a header per tab: always, or when
+// they're in more than one ("several").
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { agents, terminals, spaces, focused, run, setAgentOrder, shared, setShared } from "herdr";
 import { activity, clean, describe, duration, icon, machineIcon, menu, pref as agentPref, since, statusMark, subRow, subTree, telling, trackChanges, treeLines } from "./agent-parts.js";
+import { terminalRows } from "./commands.js";
 
 // What every space's agents are drawn from, read once per render.
 export function treeContext() {
@@ -40,22 +43,60 @@ export function publishOrder(ctx) {
   if (JSON.stringify(ctx.order) !== JSON.stringify(shared("agents.order") ?? [])) setShared("agents.order", ctx.order);
 }
 
-// A space's agents, each hanging off the space's avatar; a click on an agent's icon folds its sub-agents.
-// `after`: rows that follow them under the space (its terminals).
-export function agentRows(view, w, t, ctx, after = 0) {
-  const members = ctx.by.get(w.id) ?? [];
+// What goes under a space: its agents (in the tree, `ctx`), then its terminals (`terms`, from
+// terminalList), under a header per tab when `tabs` is "always", or "several" and they're in more than one.
+export function spaceRows(view, w, t, ctx, terms, now, tabs) {
+  const members = ctx?.by.get(w.id) ?? [];
+  const groups = (w.tabs ?? [])
+    .map((tab) => ({ tab, agents: members.filter((a) => a.tab === tab.id), terms: terms.filter((x) => x.p.tab === tab.id) }))
+    .filter((g) => g.agents.length || g.terms.length);
+  if (!(tabs === "always" ? groups.length : tabs === "several" && groups.length > 1)) {
+    return [...(ctx ? agentRows(view, members, t, ctx, terms.length) : []), ...terminalRows(terms, t, now)];
+  }
+  return groups.flatMap((g, i) => {
+    const last = i === groups.length - 1;
+    const lead = [last ? "" : "│"];
+    return [tabRow(w, g.tab, last, t), ...(ctx ? agentRows(view, g.agents, t, ctx, g.terms.length, lead) : []), ...terminalRows(g.terms, t, now, lead)];
+  });
+}
+
+// A tab's header in the tree: its name (or "Tab 2"), brighter when it's the space's shown tab; a click shows it.
+function tabRow(w, tab, last, t) {
+  return h_flex()
+    .id(`tree-tab-${tab.id}`)
+    .pl(16)
+    .pr(8)
+    .h(20)
+    .flex_none()
+    .items_center()
+    .rounded(6)
+    .text_size(11)
+    .text_color(tab.active ? t.muted : t.dim)
+    .cursor_pointer()
+    .hover((s) => s.bg(t.hover))
+    .on_click(() => {
+      run("space.select", { id: w.id });
+      run("tab.select", { id: tab.id });
+    })
+    .children(treeLines(t, [last ? "└" : "├"], 20))
+    .child(div().flex_1().min_w(0).truncate().child(tab.named ? tab.name : `Tab ${tab.index}`));
+}
+
+// Agents hanging off the space's avatar (or a tab's header, `lead` in); a click on an agent's icon
+// folds its sub-agents. `after`: rows that follow them there (terminals).
+function agentRows(view, members, t, ctx, after = 0, lead = []) {
   const pl = 16;
   return members.flatMap((a, i) => {
     ctx.order.push(a.address);
     const last = i === members.length - 1 && !after;
-    const subs = subTree(ctx.all, a.address).map((s) => ({ ...s, lines: [last ? "" : "│", ...s.lines] }));
-    const row = agentRow(view, a, last ? "└" : "├", subs, t, ctx, pl);
+    const subs = subTree(ctx.all, a.address).map((s) => ({ ...s, lines: [...lead, last ? "" : "│", ...s.lines] }));
+    const row = agentRow(view, a, [...lead, last ? "└" : "├"], subs, t, ctx, pl);
     if (view.agentFolded.has(a.address)) return [row];
     return [row, ...subs.map((s) => subRow(t, s, { shown: ctx.shown, compact: true, listed: ctx.listed, pl }))];
   });
 }
 
-function agentRow(view, a, line, subs, t, ctx, pl) {
+function agentRow(view, a, lines, subs, t, ctx, pl) {
   const term = ctx.terms.get(a.address);
   const tab = ctx.tabs.get(a.tab);
   const desc = describe(a, term?.labels);
@@ -98,7 +139,7 @@ function agentRow(view, a, line, subs, t, ctx, pl) {
     .hover((s) => s.bg(t.hover))
     .on_click(() => run("pane.focus", { pane: a.pane }))
     .on_mouse_down("right", () => menu(a))
-    .children(treeLines(t, [line]))
+    .children(treeLines(t, lines))
     .when(Boolean(pic), (el) => el.child(h_flex().id(`tree-icon-${a.address}`).flex_none().h(20).mr(8).items_center().when(Boolean(under), (el) => el.self_start())
       .when(subs.length > 0, (el) => el.on_click(toggle))
       .child(pic)))

@@ -24,6 +24,7 @@
 // Its Agents pref "tree" puts each space's agents under it (agent-tree.js) and hides the
 // agents list's block, except on the rail. Its Terminals pref lists a space's terminals under
 // it too, after its agents: those running or that finished a command, or all (commands.js).
+// Its Tabs pref puts them under a header per tab (agent-tree.js).
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -37,9 +38,9 @@ import { folderInit, folderRender } from "./folder-dialog.js";
 import { boardInit, boardRender } from "./board.js";
 import { previewInit, previewRender } from "./preview.js";
 import { discoverRepos } from "./board-data.js";
-import { agentRows, publishOrder, treeContext } from "./agent-tree.js";
+import { publishOrder, spaceRows, treeContext } from "./agent-tree.js";
 import { describeDialog } from "./agent-parts.js";
-import { commandMark, commandsDue, commandsInit, spaceCommand, terminalList, terminalRows } from "./commands.js";
+import { commandMark, commandsDue, commandsInit, spaceCommand, terminalList } from "./commands.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -94,7 +95,7 @@ const BACKFILL = 15 * 60000;
 const BOARD_REPOS = 10 * 60000;
 const BOARD_LIST = 30 * 60000;
 // jj-spacing's Sidebar tab keeps what differs from these.
-const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list", terminals: "off" };
+const PREF_DEFAULTS = { icon: "shown", branch: "hidden", agents: "list", terminals: "off", tabs: "off" };
 const pref = (key) => shared("jj-spaces")?.[key] ?? PREF_DEFAULTS[key];
 const machineOf = (id) => (id.includes("/") ? id.split("/")[0] : null);
 
@@ -1171,7 +1172,7 @@ export default class Spaces extends View {
     const draw = (r) => {
       if (collapsed) return [this.compact(r, t)];
       const terms = terminalList(this, r.w, ps);
-      return [this.row(r, t), ...(tree ? agentRows(this, r.w, t, tree, terms.length) : []), ...terminalRows(terms, t, now)];
+      return [this.row(r, t), ...spaceRows(this, r.w, t, tree, terms, now, pref("tabs"))];
     };
     const rows = (members, shut) => {
       for (const r of members) {

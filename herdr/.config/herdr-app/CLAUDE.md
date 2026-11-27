@@ -122,7 +122,9 @@ search (cmd-k) lists the running ones after Working (`shared("commands.running")
 finished ones after Done (`shared("commands.done")`), and ↵ focuses the pane. The Sidebar tab's Terminals option (`jj-spaces`' `terminals`: off, commands,
 all) lists a space's terminals under it after its agents, drawn like the tree's agent rows
 (`terminalRows` in commands.js): what runs or ran, how long ago and its mark, or the folder of
-one at its prompt.
+one at its prompt. Its Tabs option (`tabs`: off, several, always) puts a space's agents and
+terminals under a header per tab (`spaceRows` in agent-tree.js), when they're in more than one
+or always; a click on a header shows that tab.
 
 ## Working on mods
 

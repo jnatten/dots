@@ -203,7 +203,7 @@ export function terminalList(view, w, ps) {
 
 // Drawn as the tree's agent rows: its program's icon, what runs or ran (fish's title without its
 // folder), how long ago and the mark; a terminal at its prompt shows its title, muted.
-export function terminalRows(list, t, now) {
+export function terminalRows(list, t, now, lead = []) {
   const shown = focused()?.pane;
   return list.map(({ p, m }, i) => {
     const name = m?.state === "running" ? bare(p.title) || m.title : m ? m.title : p.name ?? p.title ?? p.program?.name ?? "";
@@ -222,7 +222,7 @@ export function terminalRows(list, t, now) {
       .when(shown === p.pane, (el) => el.bg(t.raised))
       .hover((s) => s.bg(t.hover))
       .on_click(() => run("pane.focus", { pane: p.pane }))
-      .children(treeLines(t, [i === list.length - 1 ? "└" : "├"]))
+      .children(treeLines(t, [...lead, i === list.length - 1 ? "└" : "├"]))
       .when(Boolean(pic), (el) => el.child(h_flex().flex_none().h(20).mr(8).items_center().child(pic)))
       .when(agentPref("machine") === "icon", (el) => el.child(machineIcon(t, p.terminal).mr(8)))
       .child(h_flex().flex_1().min_w(0).h(20).gap(6).items_center()
