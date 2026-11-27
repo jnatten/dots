@@ -79,12 +79,12 @@ async function openable({ text, kind }, cwd, on) {
   return { target: path };
 }
 
-// Runs one of this mod's helpers in the pane's place on what the pane shows (`history`
-// lines above the screen, from what the view shows, in screen.json), with `args` after
-// screen.json and result.json, until it ends; then the pane gets its own view back as it
-// was, history and scroll position included. The helper's result, or null.
+// Runs one of this mod's helpers in the pane's place with the arguments `args(tmp, size,
+// view)` gives once it has put what the pane shows in the temp folder `tmp`, until it ends;
+// then the pane gets its own view back as it was, history and scroll position included.
+// The helper's result (tmp/result.json), or null.
 // Pressed again while one runs, it ends that one.
-async function inPane(cx, { terminal, pane }, helper, history, args) {
+async function inPane(cx, { terminal, pane }, helper, args) {
   if (!terminal || !pane) return null;
   const running = shared(RUNNING);
   if (running && terminals().some((x) => x.address === running && x.state === "live")) {
@@ -93,12 +93,12 @@ async function inPane(cx, { terminal, pane }, helper, history, args) {
   }
   const scroll = panes().find((p) => p.pane === pane)?.scroll;
   const view = scroll && { ...scroll };
-  const dir = await exec("sh", ["-c", 'd=$(mktemp -d "${TMPDIR:-/tmp}/herdr-jj-copy.XXXXXX") && hc read "$1" --lines "$2" --json >"$d/screen.json" && printf %s "$d"', "sh", terminal, String(history(view))]);
+  const dir = await exec("sh", ["-c", 'mktemp -d "${TMPDIR:-/tmp}/herdr-jj-copy.XXXXXX"']);
   const tmp = (dir.stdout ?? "").trim();
-  if (dir.code !== 0 || !tmp) throw new Error((dir.stderr || "couldn't read the pane").trim());
+  if (dir.code !== 0 || !tmp) throw new Error((dir.stderr || "couldn't make a temp folder").trim());
   try {
     const size = JSON.parse((await hc(["get", terminal, "--json"])).stdout);
-    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await nodejs(), `${appHome()}/mods/jj-copy/${helper}`, `${tmp}/screen.json`, `${tmp}/result.json`, ...(await args(tmp, size, view))]);
+    const r = await hc(["run", "--json", "--bg", "--rm", "--no-parent", "--", await nodejs(), `${appHome()}/mods/jj-copy/${helper}`, ...(await args(tmp, size, view))]);
     let address = null;
     try {
       address = r.code === 0 ? JSON.parse(r.stdout).address : null;
@@ -125,7 +125,9 @@ async function inPane(cx, { terminal, pane }, helper, history, args) {
 
 // Hint mode on a pane, until a hint is typed or Esc; scrolled up, the hints go on the lines shown.
 async function fingers(cx, { terminal, pane, cwd }) {
-  const result = await inPane(cx, { terminal, pane }, "fingers.mjs", (view) => view?.from_bottom ?? 0, async (tmp, size, view) => {
+  const result = await inPane(cx, { terminal, pane }, "fingers.mjs", async (tmp, size, view) => {
+    const read = await exec("sh", ["-c", 'hc read "$1" --lines "$2" --json >"$3"', "sh", terminal, String(view?.from_bottom ?? 0), `${tmp}/screen.json`]);
+    if (read.code !== 0) throw new Error((read.stderr || "couldn't read the pane").trim());
     if (view?.from_bottom > 0) {
       // The lines the view shows: `up` lines of history above the screen, then the screen's top.
       const read = JSON.parse((await readTextFile(`${tmp}/screen.json`)) ?? "{}");
@@ -135,7 +137,7 @@ async function fingers(cx, { terminal, pane, cwd }) {
     const every = JSON.parse((await readTextFile(`${appHome()}/mods/jj-copy/patterns.json`)) ?? "[]");
     const chosen = shared("jj-copy.hints") ?? {};
     const ids = every.filter((p) => chosen[p.id] ?? p.on).map((p) => p.id);
-    return [JSON.stringify(ids), String(size.cols), String(view?.len ?? size.rows)];
+    return [`${tmp}/screen.json`, `${tmp}/result.json`, JSON.stringify(ids), String(size.cols), String(view?.len ?? size.rows)];
   });
   if (!result) return;
   if (result.none) return notify({ title: "Nothing to hint", body: "No hashes, paths or links on the screen." });
@@ -158,9 +160,14 @@ async function fingers(cx, { terminal, pane, cwd }) {
   notify({ title: "Copied", body: short(result.text) });
 }
 
-// Copy mode on a pane's screen and history, starting on what the view shows.
+// Copy mode on a pane's screen and history in their colours, starting on what the view
+// shows. A fullscreen program (no view) has its screen alone, as it has no history of its own.
 async function copy(cx, { terminal, pane }) {
-  const result = await inPane(cx, { terminal, pane }, "copy.mjs", () => HISTORY, async (_tmp, size, view) => [String(view?.from_bottom ?? 0), String(size.rows), String(size.cols), String(view?.len ?? size.rows)]);
+  const result = await inPane(cx, { terminal, pane }, "copy.mjs", async (tmp, size, view) => {
+    const read = await exec(await nodejs(), [`${appHome()}/mods/jj-copy/capture.mjs`, "--rows", terminal, `${tmp}/screen.json`, view ? HISTORY : "0"], { timeout: 60000 });
+    if (read.code !== 0) throw new Error((read.stderr || "couldn't read the pane").trim());
+    return [`${tmp}/screen.json`, `${tmp}/result.json`, String(view?.from_bottom ?? 0), String(size.rows), String(size.cols), String(view?.len ?? size.rows)];
+  });
   if (typeof result?.text !== "string") return;
   cx.write_to_clipboard(result.text);
   const n = result.text.split("\n").length;

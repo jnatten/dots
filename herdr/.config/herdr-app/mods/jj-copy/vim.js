@@ -62,11 +62,15 @@ const before = (a, b) => a.row < b.row || (a.row === b.row && a.col <= b.col);
 export const ordered = (a, b) => (before(a, b) ? [a, b] : [b, a]);
 
 // The text from a to b, both ends included; whole lines when `linewise`, without a final line break.
-export function selection(lines, a, b, linewise) {
+// A line that `wrapped(row)` goes on in the next one, without a line break between them.
+export function selection(lines, a, b, linewise, wrapped = () => false) {
   const [s, e] = ordered(a, b);
-  if (linewise) return lines.slice(s.row, e.row + 1).join("\n");
-  if (s.row === e.row) return lines[s.row].slice(s.col, e.col + 1);
-  return [lines[s.row].slice(s.col), ...lines.slice(s.row + 1, e.row), lines[e.row].slice(0, e.col + 1)].join("\n");
+  let text = "";
+  for (let r = s.row; r <= e.row; r++) {
+    text += lines[r].slice(linewise || r > s.row ? 0 : s.col, linewise || r < e.row ? undefined : e.col + 1);
+    if (r < e.row && !wrapped(r)) text += "\n";
+  }
+  return text;
 }
 
 // Smart case, as vim's ignorecase + smartcase: lowercase queries match any case.

@@ -1,8 +1,12 @@
 // Writes a herdr-core terminal's history and screen, colours kept, as lines of
 // text with SGR codes (what tmux's capture-pane -e gives): the first paint of a
 // watch-only `hc attach`, without its clears, tab stops and cursor moves.
+// With --rows, as JSON { history, alt, lines }: a line per row as the terminal has them
+// (a wrapped line is several, the screen's blank rows at the top kept, those at the
+// bottom left out), of which the first `history` are history; `alt` when the screen is
+// the alternate one.
 //
-// usage: node capture.mjs <terminal> <file> [history lines]
+// usage: node capture.mjs [--rows] <terminal> <file> [history lines]
 
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -69,14 +73,30 @@ function clean(part) {
 
 // The paint is: modes, a clear, the history as lines, newlines that push it into
 // scrollback, another clear, tab stops, then the screen as lines.
-function lines(paint) {
+function split(paint) {
   const first = paint.indexOf(CLEAR);
   const second = first !== -1 ? paint.indexOf(CLEAR, first + CLEAR.length) : -1;
   const history = second !== -1 ? paint.slice(first + CLEAR.length, second) : "";
   const screen = second !== -1 ? paint.slice(second + CLEAR.length) : first !== -1 ? paint.slice(first + CLEAR.length) : paint;
+  return { history, screen };
+}
+
+function lines(paint) {
+  const { history, screen } = split(paint);
   const parts = [clean(history).replace(/\n+$/, ""), clean(screen).replace(/^\n+|\n+$/g, "")].filter((p) => p.trim());
   return parts.join("\n").replace(/\n/g, "\r\n") + "\x1b[0m\r\n";
 }
 
-const [terminal, path, history = "100000"] = process.argv.slice(2);
-writeFileSync(path, Buffer.from(lines(await firstPaint(terminal, history)), "latin1"));
+// Each history line ends in CRLF, and the newlines that push them into scrollback are bare.
+// On the alternate screen, the main screen is painted first, then the alternate one.
+function rows(paint) {
+  const { history, screen } = split(Buffer.from(paint, "latin1").toString("utf8"));
+  const alt = screen.search(/\x1b\[\?(?:1049|1047|47)h/);
+  const past = history ? history.split("\r\n").slice(0, -1).map(clean) : [];
+  return { history: past.length, alt: alt !== -1, lines: [...past, ...clean(alt === -1 ? screen : screen.slice(alt)).split("\n")] };
+}
+
+const byRows = process.argv[2] === "--rows";
+const [terminal, path, history = "100000"] = process.argv.slice(byRows ? 3 : 2);
+const paint = await firstPaint(terminal, history);
+writeFileSync(path, byRows ? JSON.stringify(rows(paint)) : Buffer.from(lines(paint), "latin1"));

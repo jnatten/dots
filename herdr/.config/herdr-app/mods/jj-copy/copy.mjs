@@ -1,24 +1,46 @@
-// Copy mode, as tmux's: a pane's screen and history with a cursor that vim keys move,
-// v and V to select, / and ? to search, y or Enter to copy (the line when nothing is
-// selected), q or Esc to leave. Writes {text} to the result file when something is
-// copied. Run in a terminal shown in the pane, starting on the lines it showed.
+// Copy mode, as tmux's: a pane's screen and history in their colours, with a cursor that
+// vim keys move, v and V to select, / and ? to search, y or Enter to copy (the line when
+// nothing is selected), q or Esc to leave. Writes {text} to the result file when something
+// is copied. Run in a terminal shown in the pane, starting on the lines it showed.
+// A row as wide as the pane is taken to go on in the next one (a wrapped line), outside
+// the alternate screen, so copying joins them.
 //
-// usage: node copy.mjs <hc read --json file> <result file> <lines scrolled up> <screen rows> <cols> <rows>
+// usage: node copy.mjs <capture.mjs --rows file> <result file> <lines scrolled up> <screen rows> <cols> <rows>
 
 import { readFileSync, writeFileSync } from "node:fs";
 import * as vim from "./vim.js";
 
-const [MATCH, SEL, BAR, RESET] = ["\x1b[0;30;43m", "\x1b[0;7m", "\x1b[0;30;43m", "\x1b[0m"];
+const [MATCH, REVERSE, BAR, RESET] = ["\x1b[30;43m", "\x1b[7m", "\x1b[0;30;43m", "\x1b[0m"];
 const CSI = { A: "up", B: "down", C: "right", D: "left", H: "home", F: "end", "1~": "home", "7~": "home", "4~": "end", "8~": "end", "5~": "pageup", "6~": "pagedown" };
 
 const [screen, result, up, screenRows, cols0, rows0] = process.argv.slice(2);
-const lines = (JSON.parse(readFileSync(screen, "utf8")).text ?? "").split("\n").map((l) => l.replace(/\s+$/, ""));
+const capture = JSON.parse(readFileSync(screen, "utf8"));
+const plain = (sgr) => !sgr || /^\x1b\[0?m$/.test(sgr);
+
+// Each row's text, the SGR codes each of its characters is drawn with, and whether it wraps.
+const lines = [];
+const styles = [];
+const wrapped = [];
+let sgr = "";
+for (const row of [...capture.lines, ...Array(Math.max(0, capture.history + Number(screenRows) - capture.lines.length)).fill("")]) {
+  let text = "";
+  const style = [];
+  for (const part of row.split(/(\x1b\[[0-9;:]*m)/)) {
+    if (part.startsWith("\x1b[")) sgr = /^\x1b\[0?[;m]/.test(part) ? part : sgr + part;
+    else (text += part), style.push(...Array(part.length).fill(sgr));
+  }
+  const full = !capture.alt && text.length >= Number(cols0);
+  while (!full && text.endsWith(" ") && plain(style.at(-1))) (text = text.slice(0, -1)), style.pop();
+  lines.push(text);
+  styles.push(style);
+  wrapped.push(full);
+}
 let last = lines.length - 1;
 while (last > 0 && !lines[last]) last--;
 
 let rows = Number(rows0);
 let cols = Number(cols0);
-let top = Math.max(0, lines.length - Number(screenRows) - Number(up));
+let top = Math.max(0, capture.history - Number(up));
 let left = 0;
 let cur = { row: 0, col: 0 };
 let want = 0;
@@ -73,20 +95,21 @@ function selected(r) {
   return [r === s.row ? s.col : 0, r === e.row ? e.col : end];
 }
 
+// A row in its colours, search matches in yellow and the selection in reverse.
 function line(r) {
   if (r >= lines.length) return "";
   const text = lines[r];
   const shown = text.slice(left, left + cols);
   const sel = selected(r);
   const width = Math.min(cols, Math.max(shown.length, sel ? 1 : 0));
-  const paint = new Array(width).fill(null);
+  const paint = Array.from({ length: width }, (_, i) => styles[r][left + i] ?? "");
   for (const [s, e] of vim.matches(text, query)) for (let c = Math.max(s, left); c < Math.min(e, left + width); c++) paint[c - left] = MATCH;
-  if (sel) for (let c = Math.max(sel[0], left); c <= Math.min(sel[1], left + width - 1); c++) paint[c - left] = SEL;
+  if (sel) for (let c = Math.max(sel[0], left); c <= Math.min(sel[1], left + width - 1); c++) paint[c - left] = (styles[r][c] ?? "") + REVERSE;
   let out = "";
   for (let i = 0; i < width; ) {
     let j = i;
     while (j < width && paint[j] === paint[i]) j++;
-    out += (paint[i] ?? RESET) + shown.slice(i, j).padEnd(j - i, " ");
+    out += RESET + paint[i] + shown.slice(i, j).padEnd(j - i, " ");
     i = j;
   }
   return out;
@@ -191,7 +214,13 @@ function key(e) {
       anchor ??= { ...cur };
     }
   };
-  const yank = () => finish({ text: anchor ? vim.selection(lines, anchor, cur, mode === "line") : lines[cur.row] });
+  const yank = () => {
+    if (anchor) return finish({ text: vim.selection(lines, anchor, cur, mode === "line", (r) => wrapped[r]) });
+    let [s, e] = [cur.row, cur.row];
+    while (s > 0 && wrapped[s - 1]) s--;
+    while (e < last && wrapped[e]) e++;
+    return finish({ text: vim.selection(lines, { row: s, col: 0 }, { row: e, col: 0 }, true, (r) => wrapped[r]) });
+  };
   if (ctrl) {
     if (k === "d") (top += half), go(row + half, col, true);
     else if (k === "u") (top = Math.max(0, top - half)), go(row - half, col, true);
